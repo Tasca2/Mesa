@@ -1,0 +1,8 @@
+﻿node_modules/
+_rodadas/
+_snapshots/
+_dados/
+.env
+*.log
+*.mp4
+

@@ -1,0 +1,114 @@
+{
+  "manifest_version": "0.3",
+  "name": "mesa-do-assessor",
+  "display_name": "Mesa do Assessor",
+  "version": "1.0.0",
+  "description": "Painel que guia o assessor de investimentos pelas rotinas do dia, pelo mercado e pelos posts, com a base do segundo cérebro e a Análise de Ativo do CaptaMais.",
+  "author": {
+    "name": "Mesa do Assessor"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server.mjs"
+      ],
+      "env": {
+        "METODO_SKILLS": "${__dirname}/skills",
+        "ROTINAS_SKILLS": "${__dirname}/rotinas",
+        "MESA_BASE": "${__dirname}/base-assessor.md",
+        "CAPTAMAIS_URL": "${user_config.captamais_url}",
+        "MESA_COFRE": "${user_config.cofre_pasta}",
+        "CAPTAMAIS_MARKET_KEY": "${user_config.captamais_chave_mercado}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "abrir_painel",
+      "description": "Abre o painel da Mesa do Assessor"
+    },
+    {
+      "name": "carregar_metodo",
+      "description": "Devolve as instruções da skill ou rotina pedida pelo painel"
+    },
+    {
+      "name": "mesa_perfil",
+      "description": "Perfil do assessor e última tarefa"
+    },
+    {
+      "name": "consultar_cofre",
+      "description": "Busca no segundo cérebro do assessor"
+    },
+    {
+      "name": "analise_ativo",
+      "description": "Dados da Análise de Ativo do CaptaMais"
+    },
+    {
+      "name": "mesa_andamento",
+      "description": "Mostra no painel o que o assessor precisa responder no chat"
+    },
+    {
+      "name": "mesa_ler_andamento",
+      "description": "Lê o andamento (uso do painel)"
+    },
+    {
+      "name": "mesa_conectar",
+      "description": "Entrar no CaptaMais (uso do painel)"
+    },
+    {
+      "name": "mesa_registrar",
+      "description": "Registra o uso da Mesa (uso do painel)"
+    },
+    {
+      "name": "mesa_baixar",
+      "description": "Baixa a entrega pronta (uso do painel)"
+    },
+    {
+      "name": "mesa_carrossel",
+      "description": "Gera as imagens do carrossel ou da arte (PNG e PDF)"
+    },
+    {
+      "name": "mesa_documento",
+      "description": "Gera um documento em PDF"
+    },
+    {
+      "name": "mesa_apresentacao",
+      "description": "Gera uma apresentação em PDF com a marca do assessor"
+    }
+  ],
+  "tools_generated": false,
+  "compatibility": {
+    "platforms": [
+      "win32",
+      "darwin"
+    ],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  },
+  "user_config": {
+    "captamais_chave_mercado": {
+      "type": "string",
+      "title": "Chave do CaptaMais (opcional)",
+      "description": "Normalmente não precisa: use o botão Entrar no CaptaMais na Mesa.",
+      "sensitive": true,
+      "required": false
+    },
+    "captamais_url": {
+      "type": "string",
+      "title": "Endereço do CaptaMais",
+      "description": "Deixe como está (https://captamais.me). Só endereços https são aceitos.",
+      "required": false,
+      "default": "https://captamais.me"
+    },
+    "cofre_pasta": {
+      "type": "directory",
+      "title": "Pasta do segundo cérebro",
+      "description": "Pasta com as notas do cofre (ex.: AppCaptaMais\\knowledge).",
+      "required": false
+    }
+  }
+}
