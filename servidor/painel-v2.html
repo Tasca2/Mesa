@@ -141,6 +141,9 @@
   .md strong { color: var(--ink); } .md tr:nth-child(even) td { background: rgba(255,255,255,.03); }
   .md th { color: var(--gold2); font-size: .85em; letter-spacing: .06em; text-transform: uppercase; }
   .md a { color: var(--gold2); }
+  .md .tab { overflow-x: auto; margin: 0 0 12px; border: 1px solid var(--line2); border-radius: 10px; } .md .tab table { width: 100%; margin: 0; border-collapse: collapse; } .md .tab th, .md .tab td { border: 0; border-bottom: 1px solid var(--line2); } .md .tab tr:last-child td { border-bottom: 0; }
+  .md td.s-up { color: #8fd19e; } .md td.s-down { color: #f2958a; } .md td.s-mid { color: #e8c88e; } .md td.s-ok { color: #8fd19e; }
+  .md details.recolhida { margin: 0 0 9px; border: 1px solid var(--line2); border-radius: 10px; padding: 0 12px; } .md details.recolhida > summary { cursor: pointer; padding: 9px 0; font-weight: 700; color: var(--gold2); letter-spacing: .04em; } .md details.recolhida[open] > summary { border-bottom: 1px solid var(--line2); margin-bottom: 8px; }
   .texto-md { margin-top: 10px; max-height: 38vh; overflow-y: auto; padding: 12px 14px; background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; font-size: 14.5px; }
   .campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; margin: 14px 0 6px; }
   .campo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
@@ -684,21 +687,18 @@
     "acao": {
       "obj": "Ler uma empresa pelos meus critérios, mostrando evidências e lacunas.",
       "entrega": [
-        "Em uma frase: o que a empresa é, como está no último balanço e o ponto que mais pesa agora",
-        "Enquadramento do negócio em 3 linhas: o que vende, onde ganha dinheiro e o que mexe nos resultados dela",
-        "Histórico e rentabilidade comparados com o IBOV na mesma janela, com data-base (Análise de Ativo do CaptaMais)",
-        "Múltiplos e indicadores em tabela (P/L, P/VP, EV/EBITDA, dividend yield, ROE, margens e o que mais vier): valor, referência para comparar (histórico da própria empresa, setor ou índice, quando houver) e leitura de uma linha; sem chamar de barato ou caro; denominador negativo é não significativo",
-        "Último balanço e os 4 trimestres anteriores em tabela: receita, resultado operacional, lucro, margem, dívida líquida e caixa, com variação contra o trimestre anterior e contra o mesmo trimestre do ano passado, data e fonte",
-        "O que as casas de research dizem, em tabela: casa, data, recomendação, preço-alvo e a premissa principal; ajustes de alvo nos últimos 30 dias e a dispersão entre as casas. É opinião delas, cite a casa e a data",
-        "Pontos fortes (até 4) e pontos fracos (até 4), cada um com número, período e fonte",
-        "Onde desconfiar: sinais de alerta encontrados ou descartados (lucro sem caixa, item não recorrente, dívida de curto prazo ou em moeda estrangeira, queda de margem, receita concentrada, casas muito divergentes), cada um com o dado que o sustenta",
-        "Solidez financeira em 4 linhas: dívida líquida sobre resultado operacional, cobertura de juros, caixa e vencimentos, com o que sustenta e o que preocupa",
-        "O que monitorar daqui para frente: de 5 a 7 indicadores, cada um com o valor atual, o nível que mudaria a leitura e a data do próximo dado (resultado trimestral, fato relevante)",
-        "O que atende e o que não atende ao método (só se eu tiver informado indicadores e faixas)",
-        "Lacunas de informação",
-        "Leitura para o cliente em linguagem simples (3 a 5 frases, sem recomendação)",
-        "Perguntas que o cliente pode fazer, com resposta descritiva",
-        "Se eu pedir na conversa: uma mini-apresentação com a ferramenta mesa_apresentacao (5 a 7 slides: múltiplos, balanço, casas, pontos fortes e fracos, o que monitorar), sem refazer a pesquisa"
+        "Em uma frase (negrito): o que a empresa é, como está no último balanço e o ponto que mais pesa agora",
+        "O negócio, em 2 linhas: o que vende, onde ganha dinheiro e o que mexe nos resultados",
+        "Ficha em UMA tabela (Grupo | Indicador | Valor | Referência | Leitura): rentabilidade e volatilidade contra o IBOV, múltiplos (P/L, P/VP, EV/EBITDA, dividend yield, ROE), margens e solidez (dívida líquida sobre resultado operacional, cobertura de juros, liquidez), no máximo 10 linhas, com período e data-base no rodapé da tabela; sem chamar de barato ou caro",
+        "Último balanço em UMA tabela de 5 trimestres (Trimestre | Receita | Resultado operacional | Lucro | Dívida líquida | Caixa | Δ t/t | Δ a/a), com a fonte no rodapé",
+        "Casas de research em UMA tabela (Casa | Data | Recomendação | Alvo) e uma linha com mediana, dispersão e os ajustes dos últimos 30 dias; opinião delas, nunca minha",
+        "Fortes e fracos em UMA tabela de duas colunas, até 3 de cada, uma linha cada, com o número que sustenta",
+        "Atenção em UMA tabela (Sinal | Status | Dado): só o que foi encontrado ou ficou parcial (▼ encontrado, ● parcial, – sem dado); os descartados vão numa linha única abaixo. Lucro sem caixa, item não recorrente, dívida curta ou em moeda estrangeira, queda de margem, concentração e divergência entre fontes",
+        "Monitorar em UMA tabela de até 5 linhas (Indicador | Hoje | Muda a leitura se | Quando sai o dado)",
+        "Cliente: leitura em 3 a 5 frases, sem recomendação, e as 3 perguntas mais difíceis com a resposta em uma frase cada",
+        "O que atende ao método (só se eu informei indicadores e faixas); sem faixas, proponha de 3 a 5 critérios em uma linha",
+        "Se eu pedir na conversa: mini-apresentação com mesa_apresentacao (5 a 7 slides), sem refazer a pesquisa",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (dados que faltam, divergências entre fontes e o que abrir no RI ou na CVM), sem repetir o que já aparece acima"
       ],
       "insumos": [
         "Empresa (ticker)",
@@ -710,20 +710,15 @@
     "setor": {
       "obj": "Comparar empresas na mesma base, sem eleger vencedora.",
       "entrega": [
-        "Em uma frase: o que mais diferencia as empresas na pergunta que eu fiz",
-        "Escopo e o que torna as empresas comparáveis (janela, moeda, consolidação, definição)",
-        "Tabela lado a lado com indicadores adequados ao setor: indicador, definição, período e fonte para cada empresa (receita, crescimento, margens, geração de caixa, dívida, retorno sobre capital ou os próprios do setor)",
-        "Múltiplos lado a lado (P/L, P/VP, EV/EBITDA, dividend yield) com a data da cotação, sem chamar nenhuma de barata ou cara",
-        "Rentabilidade e volatilidade no mesmo período, contra o IBOV (Análise de Ativo do CaptaMais)",
-        "Último balanço de cada empresa: variação contra o trimestre anterior e contra o mesmo trimestre do ano passado",
-        "Preço-alvo e recomendação das casas de research para cada empresa, com casa e data (opinião delas)",
-        "Em cada empresa, 1 ponto forte e 1 ponto fraco, com número e fonte",
-        "Onde desconfiar em cada empresa: lucro sem caixa, dívida curta ou em moeda estrangeira, item não recorrente, queda de margem",
-        "Diferenças de período, moeda e definição",
-        "Leitura das diferenças, sem eleger vencedora",
-        "O que monitorar no setor: de 4 a 6 variáveis ou indicadores, com o valor atual, o que mudaria a leitura e a data do próximo dado",
-        "Lacunas",
-        "Leitura para o cliente em linguagem simples (em que cada empresa difere, sem eleger a melhor) e a resposta pronta para quando ele perguntar qual escolher"
+        "Em uma frase (negrito): o que mais diferencia as empresas na pergunta que eu fiz",
+        "Comparabilidade em 2 linhas: janela, moeda, consolidação e definições",
+        "UMA tabela lado a lado (linhas: indicadores do negócio, múltiplos, rentabilidade e volatilidade contra o IBOV, variação do último balanço t/t e a/a; colunas: as empresas), no máximo 12 linhas, com período, data da cotação e fonte no rodapé; célula sem dado fica com –",
+        "Casas de research em UMA tabela (Empresa | Casas | Recomendações | Alvo mediano | Data); opinião delas",
+        "Forte e fraco de cada empresa em UMA tabela (Empresa | Forte | Fraco), uma linha cada, com número",
+        "Atenção em UMA tabela (Empresa | Sinais encontrados): só o que existe; lucro sem caixa, dívida curta ou em moeda estrangeira, item não recorrente, queda de margem",
+        "Monitorar no setor em UMA tabela de até 5 linhas (Variável | Hoje | Muda a leitura se | Quando sai o dado)",
+        "Cliente: em que cada empresa difere, sem eleger a melhor, e a resposta pronta para quando ele perguntar qual escolher",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens, sem repetir o que já aparece acima"
       ],
       "insumos": [
         "Empresas (tickers) ou setor",
@@ -735,20 +730,17 @@
     "fii": {
       "obj": "Entender um fundo imobiliário: composição, preço e origem dos rendimentos.",
       "entrega": [
-        "Em uma frase: que tipo de fundo é, o que ele paga e o ponto que mais pesa agora (se eu informei a pergunta do cliente, abra respondendo a ela)",
-        "Segmento (tijolo, papel, fundo de fundos ou híbrido) e como isso muda a leitura",
-        "Histórico e rentabilidade comparados com o IFIX na mesma janela, com data-base (Análise de Ativo do CaptaMais)",
-        "Indicadores em tabela: P/VP (com a data da cota e a do valor patrimonial), distribuição dos últimos 12 meses sobre o preço datado (rotulada como histórica, não como retorno), patrimônio e liquidez diária, cada um com a referência para comparar (IFIX, histórico do fundo ou pares do segmento)",
-        "Composição e concentração em tabela: os 5 maiores imóveis, devedores ou fundos investidos, com a participação na receita ou na carteira",
-        "Operação do segmento: tijolo (vacância física e financeira, inadimplência, vencimento de contratos por ano, carências); papel (indexadores, garantias, atrasos, provisões, maiores devedores); fundo de fundos (fundos investidos e custos em cada camada)",
-        "Origem das distribuições dos últimos 12 meses, mês a mês: resultado recorrente, ganho não repetível e uso de reserva, com resultado, caixa e distribuição reconciliados",
-        "O que as casas de research dizem, em tabela: casa, data, recomendação, preço-alvo e premissa. É opinião delas, cite a casa e a data",
-        "Pontos fortes (até 4) e pontos fracos (até 4), cada um com número, período e fonte",
-        "Onde desconfiar, cada sinal como encontrado, descartado ou sem dado: distribuição acima do resultado, vacância ou inadimplência subindo, provisão crescente, concentração alta, alavancagem, rendimento pago com ganho não recorrente, desconto grande sem explicação, emissão de cotas que dilui",
-        "O que monitorar daqui para frente: de 5 a 7 indicadores, cada um com o valor atual, o nível que mudaria a leitura e a data do próximo dado (relatório gerencial, vencimento de contratos ou de operações)",
-        "O que falta: as seções que dependem do relatório gerencial e onde achá-lo",
-        "Leitura para o cliente em linguagem simples (3 a 5 frases, sem recomendação)",
-        "Perguntas que o cliente pode fazer, com resposta descritiva"
+        "Em uma frase (negrito): que tipo de fundo é, o que ele paga e o ponto que mais pesa agora; se eu informei a pergunta do cliente, abra respondendo a ela",
+        "Ficha em UMA tabela (Grupo | Indicador | Valor | Referência | Leitura): segmento, P/VP (com as duas datas), distribuição dos últimos 12 meses sobre o preço datado (histórica, não retorno), patrimônio, liquidez, rentabilidade e volatilidade contra o IFIX; no máximo 10 linhas",
+        "Carteira em UMA tabela: os 5 maiores imóveis, devedores ou fundos investidos, com a participação, e uma linha sobre a concentração",
+        "Operação do segmento em UMA tabela de 4 a 6 linhas: tijolo (vacância física e financeira, inadimplência, vencimento de contratos); papel (indexadores, garantias, atrasos, provisões); fundo de fundos (camadas de custo)",
+        "Distribuições dos últimos 12 meses em uma tabela curta (por trimestre): valor e origem (recorrente, não repetível ou reserva)",
+        "Casas de research em UMA tabela (Casa | Data | Recomendação | Alvo) e uma linha com mediana e dispersão; opinião delas",
+        "Fortes e fracos em UMA tabela de duas colunas, até 3 de cada, uma linha cada",
+        "Atenção em UMA tabela (Sinal | Status | Dado): só o encontrado ou parcial (▼ encontrado, ● parcial, – sem dado); descartados numa linha. Distribuição acima do resultado, vacância ou inadimplência subindo, provisão crescente, concentração, alavancagem, ganho não recorrente pagando rendimento, emissão que dilui",
+        "Monitorar em UMA tabela de até 5 linhas (Indicador | Hoje | Muda a leitura se | Quando sai o dado)",
+        "Cliente: leitura em 3 a 5 frases, sem recomendação, e as 3 perguntas mais difíceis com a resposta em uma frase cada",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (o que depende do relatório gerencial e onde achá-lo), sem repetir o que já aparece acima"
       ],
       "insumos": [
         "Fundo (ticker)",
@@ -760,19 +752,15 @@
     "rf": {
       "obj": "Comparar títulos de renda fixa na mesma base, com imposto e liquidez.",
       "entrega": [
-        "Em uma frase: o que mais separa os títulos para o prazo e o perfil informados",
-        "Base da comparação: data da cotação, prazo do cliente, pessoa física ou jurídica e fontes",
-        "Tabela comparável: emissor, indexador, taxa, prazo, carência, liquidez, garantia, risco de crédito e imposto",
-        "Equivalência bruta × líquida com a fórmula, os fatores acumulados no mesmo intervalo e as convenções explícitas (use o script de cálculos da skill nos casos simples)",
-        "Sensibilidade ao prazo, só nos prazos que eu informei, com hipóteses rotuladas",
-        "Risco do emissor e cobertura do FGC, com limite e vigência conferidos na fonte, e o que a cobertura não resolve",
-        "Saída antes do vencimento: resgate contratual, venda no mercado secundário e marcação a mercado dos títulos públicos",
-        "Imposto conferido em fonte oficial, com a data da consulta; o que ficou pendente aparece como pendente",
-        "Onde desconfiar: taxa muito acima do mercado para o risco, emissor sem histórico, liquidez só no vencimento, concentração em um emissor, percentual do CDI comparado com outro indexador sem converter",
-        "Pontos de atenção de cada título",
-        "O que monitorar: Selic, IPCA, o crédito do emissor, a data de carência e de vencimento e o uso do limite do FGC",
-        "Lacunas que alteram a comparação",
-        "Leitura para o cliente em linguagem simples: o que muda entre os títulos, sem escolher por ele, e as 3 perguntas mais difíceis com a resposta em uma frase"
+        "Em uma frase (negrito): o que mais separa os títulos para o prazo e o perfil informados",
+        "Base em 1 linha: data da cotação, prazo do cliente, pessoa física ou jurídica",
+        "UMA tabela comparável (Título | Taxa | Prazo e carência | Liquidez | Garantia | Risco de crédito | Equivalente líquido), com a fórmula, os fatores acumulados no mesmo intervalo e as convenções em uma nota curta abaixo (use o script de cálculos da skill nos casos simples)",
+        "Sensibilidade ao prazo só nos prazos que eu informei, com hipóteses rotuladas, numa tabela curta",
+        "Atenção em UMA tabela (Sinal | Status | Título): taxa muito acima do mercado para o risco, emissor sem histórico, liquidez só no vencimento, concentração acima do limite do FGC, percentual do CDI comparado com outro indexador sem converter; só o que foi encontrado ou parcial, o resto numa linha",
+        "O que a cobertura do FGC e a saída antes do vencimento não resolvem, em 2 linhas",
+        "Monitorar em UMA tabela de até 4 linhas (Indicador | Hoje | Muda a leitura se | Quando sai o dado)",
+        "Cliente: o que muda entre os títulos, sem escolher por ele, e as 3 perguntas mais difíceis com a resposta em uma frase cada",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (imposto, FGC e dados que faltam, com a data da consulta), sem repetir o que já aparece acima"
       ],
       "insumos": [
         "Os títulos: emissor, indexador, taxa, vencimento e liquidez",
@@ -832,13 +820,8 @@
       "Fora das mensagens, em 2 linhas: fonte e data de cada número e o que eu devo conferir antes de enviar",
     ];
     if (/fundo/i.test(uso)) return [
-      "Explicação direta em linguagem simples, em até 8 linhas: o que é, por que importa agora e o que muda",
-      ...base.filter((x) => !/^(Lacunas|Perguntas que o cliente)/.test(x)),
-      "Como funciona o mecanismo, passo a passo, com um exemplo numérico sintético e identificado como exemplo",
-      "Onde pesquisar para aprofundar: de 3 a 5 fontes primárias, na ordem em que vale abrir, cada uma com o que procurar ali e o endereço",
-      "Glossário dos termos novos, uma linha cada",
-      "As 3 perguntas mais difíceis que um cliente poderia fazer e a resposta em uma frase",
-      "O que ainda não dá para afirmar (lacunas) e como confirmar",
+      ...base,
+      "Seções recolhidas ao final, cada uma com título começando por + e sem repetir nada do que já está acima: + Como funciona (o mecanismo em 5 passos, com um exemplo numérico sintético e identificado); + Onde pesquisar (de 3 a 5 fontes primárias, na ordem em que vale abrir, com o que procurar e o endereço); + Glossário (só os termos que aparecem na resposta, no máximo 8, uma linha cada)",
     ];
     return base;
   };
@@ -1213,7 +1196,8 @@
 
   const REGRAS_PEDIDO = "Regras: descreva, não recomende compra, venda nem alocação, e não prometa retorno. Todo número com fonte, data e unidade. " +
     "Marque com [CONFERIR] o que eu preciso validar (compliance, dado do cliente, número sem fonte). Sem nome nem CPF de cliente. " +
-    "Comece pela resposta em uma frase, em negrito, sem preâmbulo; frases curtas; todo número com uma referência para comparar (período anterior, índice ou meta); feche com o próximo passo e o que conferir.";
+    "Comece pela resposta em uma frase, em negrito, sem preâmbulo; frases curtas; todo número com uma referência para comparar (período anterior, índice ou meta); feche com o próximo passo e o que conferir. " +
+    "Não repita informação entre seções (cada número aparece uma vez); use tabelas curtas no lugar de parágrafos; o que é aprofundamento vai em seções recolhidas, com título começando por +. O Conferir é sempre a última coisa da resposta, em texto simples, sem título nem destaque (no PDF, a última seção).";
 
   let perfil = null, captamais = null;
   const PDF_OK = ["relatorio-mensal", "carteira", "primeira-reuniao", "segunda-reuniao"];
@@ -1870,14 +1854,21 @@
   function mdHtml(texto) {
     estiloWa = ehEstiloWa(texto);
     const f = document.createDocumentFragment();
+    let alvo = f;
     for (const b of blocosMd(texto)) {
-      if (b.tipo === "hr") f.append(el("hr"));
-      else if (b.tipo === "tit") { const h = el("h4"); inlineDom(b.v, h); f.append(h); }
-      else if (b.tipo === "cod") f.append(el("pre", "", esc(b.linhas.join("\n"))));
-      else if (b.tipo === "cit") { const q = el("blockquote"); b.linhas.forEach((x, k) => { if (k) q.append(el("br")); inlineDom(x, q); }); f.append(q); }
-      else if (b.tipo === "ul" || b.tipo === "ol") { const u = el(b.tipo); b.itens.forEach((x) => { const li = el("li"); inlineDom(x, li); u.append(li); }); f.append(u); }
-      else if (b.tipo === "tab") { const t = el("table"); b.linhas.forEach((r, k) => { const tr = el("tr"); r.forEach((c) => { const td = el(k === 0 ? "th" : "td"); inlineDom(c, td); tr.append(td); }); t.append(tr); }); f.append(t); }
-      else { const p = el("p"); b.linhas.forEach((x, k) => { if (k) p.append(el("br")); inlineDom(x, p); }); f.append(p); }
+      if (b.tipo === "tit" && /^\+\s+/.test(b.v)) { const d = el("details", "recolhida"), s = el("summary"); inlineDom(b.v.replace(/^\+\s+/, ""), s); d.append(s); f.append(d); alvo = d; continue; }
+      if (b.tipo === "tit") alvo = f;
+      if (b.tipo === "hr") alvo.append(el("hr"));
+      else if (b.tipo === "tit") { const h = el("h4"); inlineDom(b.v, h); alvo.append(h); }
+      else if (b.tipo === "cod") alvo.append(el("pre", "", esc(b.linhas.join("\n"))));
+      else if (b.tipo === "cit") { const q = el("blockquote"); b.linhas.forEach((x, k) => { if (k) q.append(el("br")); inlineDom(x, q); }); alvo.append(q); }
+      else if (b.tipo === "ul" || b.tipo === "ol") { const u = el(b.tipo); b.itens.forEach((x) => { const li = el("li"); inlineDom(x, li); u.append(li); }); alvo.append(u); }
+      else if (b.tipo === "tab") {
+        const t = el("table"), w = el("div", "tab");
+        b.linhas.forEach((r, k) => { const tr = el("tr"); r.forEach((c) => { const td = el(k === 0 ? "th" : "td"); inlineDom(c, td); if (k) { const x = c.trim(); if (/^▲/.test(x)) td.className = "s-up"; else if (/^▼/.test(x)) td.className = "s-down"; else if (/^●/.test(x)) td.className = "s-mid"; else if (/^✓/.test(x)) td.className = "s-ok"; } tr.append(td); }); t.append(tr); });
+        w.append(t); alvo.append(w);
+      }
+      else { const p = el("p"); b.linhas.forEach((x, k) => { if (k) p.append(el("br")); inlineDom(x, p); }); alvo.append(p); }
     }
     return f;
   }
@@ -1889,7 +1880,7 @@
     const partes = [];
     for (const b of blocosMd(texto)) {
       if (b.tipo === "hr") continue;
-      if (b.tipo === "tit") partes.push(modo === "wa" ? `*${inlineTxt(b.v, "plano")}*` : inlineTxt(b.v, "plano"));
+      if (b.tipo === "tit") partes.push(modo === "wa" ? `*${inlineTxt(b.v.replace(/^\+\s+/, ""), "plano")}*` : inlineTxt(b.v.replace(/^\+\s+/, ""), "plano"));
       else if (b.tipo === "cod") partes.push(modo === "wa" ? "```\n" + b.linhas.join("\n") + "\n```" : b.linhas.join("\n"));
       else if (b.tipo === "cit") partes.push(b.linhas.map((x) => (modo === "wa" ? "> " : "") + inlineTxt(x, modo)).join("\n"));
       else if (b.tipo === "ul") partes.push(b.itens.map((x) => "- " + inlineTxt(x, modo)).join("\n"));

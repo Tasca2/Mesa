@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { montarPaginas, imagemEmbutida, W, H } from './layouts.mjs';
 
 export const ARQUIVO_GERACAO = path.join(os.tmpdir(), 'mesa-do-assessor-geracao.json');
@@ -220,7 +220,7 @@ function mdParaHtml(texto) {
   for (const l of linhas) {
     if (/^\s*\|.*\|\s*$/.test(l)) { fechaLista(); tab.push(l.trim()); continue; }
     fechaTab();
-    if (/^\s*[-*•] /.test(l)) { if (!lista) { out += '<ul>'; lista = true; } out += `<li>${inl(l.replace(/^\s*[-*•] /, ''))}</li>`; continue; }
+    if (/^\s*([-*•]|\d+[.)]) /.test(l)) { if (!lista) { out += '<ul>'; lista = true; } out += `<li>${inl(l.replace(/^\s*([-*•]|\d+[.)]) /, ''))}</li>`; continue; }
     fechaLista();
     if (/^#{1,4} /.test(l)) out += `<h3>${inl(l.replace(/^#{1,4} /, ''))}</h3>`;
     else if (l.trim()) out += `<p>${inl(l)}</p>`;
@@ -229,25 +229,60 @@ function mdParaHtml(texto) {
   return out;
 }
 
+const AQUI_GERADOR = path.dirname(fileURLToPath(import.meta.url));
+const logoCaptaMais = () => {
+  try {
+    const f = path.join(AQUI_GERADOR, 'assets', 'captamais.png');
+    return existsSync(f) ? `data:image/png;base64,${readFileSync(f).toString('base64')}` : '';
+  } catch { return ''; }
+};
+const AVISO_CURTO = 'Material informativo e educacional. Não é recomendação de compra, venda ou alocação de ativos, nem promessa de retorno.';
+const AVISO_LONGO = 'Este material tem caráter informativo e educacional. Não constitui recomendação, oferta ou solicitação de compra, venda ou alocação de ativos, nem promessa ou garantia de retorno. Rentabilidade passada não garante resultado futuro. Preços-alvo e recomendações de casas de research são opiniões das próprias casas. Confira os dados nas fontes citadas e avalie qualquer decisão à luz do perfil, dos objetivos e do prazo de cada pessoa.';
+
 export async function gerarDocumento(a, marcaBase = {}) {
   const secoes = Array.isArray(a.secoes) ? a.secoes.slice(0, 30) : [];
   if (!secoes.length) throw new Error('Envie pelo menos uma seção.');
   const cor = /^#[0-9a-fA-F]{6}$/.test(a.cor || '') ? a.cor : /^#[0-9a-fA-F]{6}$/.test(marcaBase.cor || '') ? marcaBase.cor : '#A8741A';
   const logo = imagemEmbutida(marcaBase.logo, [], 'logo');
+  const cm = logoCaptaMais();
   const quem = [marcaBase.escritorio, marcaBase.nome].filter(Boolean).map(esc).join(' · ');
-  const marca = (logo ? `<img class="logo" src="${logo}">` : '') + (quem ? `<span>${quem}</span>` : '');
+  const dono = (logo ? `<img class="logo" src="${logo}">` : '') + (quem ? `<span>${quem}</span>` : '');
+  const mesa = '<span class="mesa">Mesa<i></i><small>do Assessor</small></span>';
   const destaque = (h) => h.replace(/\[CONFERIR[^\]]*\]/g, (m) => `<mark>${m}</mark>`);
+  const estado = (h) => h
+    .replace(/<td>(▲|✓)/g, (m, s) => `<td class="up">${s}`)
+    .replace(/<td>▼/g, '<td class="down">▼')
+    .replace(/<td>●/g, '<td class="mid">●')
+    .replace(/<h3>\+\s+/g, '<h3>');
+  const corpo = secoes.map((s, i) => {
+    let h = estado(destaque(mdParaHtml(s.texto || '')));
+    if (i === 0) h = h.replace(/^<p><b>(.*?)<\/b><\/p>/, '<p class="resumo"><b>$1</b></p>');
+    return `<section${/^\s*conferir/i.test(s.titulo || '') ? ' class="conferir"' : ''}>${s.titulo ? `<h2>${esc(s.titulo)}</h2>` : ''}${h}</section>`;
+  }).join('\n');
+  const hoje = new Date().toLocaleDateString('pt-BR');
   const html = `<!doctype html><meta charset="utf-8"><title>${esc(a.titulo)}</title><style>
-@page{size:A4;margin:16mm 16mm 18mm}*{box-sizing:border-box}body{font-family:${FONTE};font-size:10.5pt;line-height:1.55;color:#1b1b1d;margin:0}
-.marca{display:flex;align-items:center;gap:10px;font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#6b6b70;margin-bottom:14px}.marca .logo{height:26px;width:auto}
-header{border-bottom:3px solid ${cor};padding-bottom:12px;margin-bottom:20px}h1{font-size:23pt;line-height:1.15;margin:0 0 5px;color:#12202b}.sub{color:#6b6b70;font-size:11pt}
-h2{font-size:13.5pt;margin:22px 0 7px;color:#0b3d5c;break-after:avoid;padding-left:10px;border-left:4px solid ${cor}}h3{font-size:11.5pt;margin:12px 0 4px;break-after:avoid}p{margin:0 0 8px}ul{margin:0 0 8px;padding-left:20px}li{margin-bottom:3px}li::marker{color:${cor}}
-table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:9.5pt;break-inside:avoid}th,td{border:1px solid #d9dbe0;padding:6px 9px;text-align:left;vertical-align:top}th{background:${cor}26;color:#12202b;border-bottom:2px solid ${cor}}tr:nth-child(even) td{background:#f6f7f9}
+@page{size:A4;margin:12mm 15mm 14mm}*{box-sizing:border-box}body{font-family:${FONTE};font-size:10.3pt;line-height:1.5;color:#1b1b1d;margin:0}
+.faixa{height:6px;background:linear-gradient(90deg,${cor},#12202b);border-radius:3px;margin-bottom:12px}
+.topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.dono{display:flex;align-items:center;gap:10px;font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#6b6b70}.dono .logo{height:28px;width:auto}
+.mesa{font-weight:800;font-size:15pt;letter-spacing:-.02em;color:#12202b;display:inline-flex;align-items:baseline;gap:1px}.mesa i{display:inline-block;width:6px;height:6px;border-radius:50%;background:${cor};margin-left:1px}.mesa small{font-weight:600;font-size:7.5pt;letter-spacing:.14em;text-transform:uppercase;color:#6b6b70;margin-left:8px}
+header{padding-bottom:14px;margin-bottom:18px;border-bottom:1px solid #d9dbe0}.eyebrow{font-size:8pt;letter-spacing:.2em;text-transform:uppercase;color:${cor};font-weight:700;margin-bottom:6px}h1{font-size:23pt;line-height:1.12;margin:0 0 6px;color:#12202b;letter-spacing:-.01em}.sub{color:#555a63;font-size:11pt}
+h2{font-size:9pt;letter-spacing:.16em;text-transform:uppercase;margin:20px 0 8px;color:#12202b;break-after:avoid;display:flex;align-items:center;gap:8px}h2::before{content:"";width:16px;height:3px;background:${cor};border-radius:2px}
+h3{font-size:11pt;margin:12px 0 4px;break-after:avoid;color:#12202b}p{margin:0 0 8px}ul{margin:0 0 8px;padding-left:20px}li{margin-bottom:3px}li::marker{color:${cor}}
+.resumo{font-size:12pt;line-height:1.4;padding:11px 15px;margin:0 0 14px;background:${cor}14;border-left:4px solid ${cor};border-radius:0 8px 8px 0;color:#12202b}
+table{border-collapse:separate;border-spacing:0;width:100%;margin:6px 0 14px;font-size:9pt;break-inside:avoid;border:1px solid #d9dbe0;border-radius:8px;overflow:hidden}th,td{padding:6px 9px;text-align:left;vertical-align:top;border-bottom:1px solid #e6e8ec}tr:last-child td{border-bottom:0}th{background:#12202b;color:#fff;font-size:7.8pt;letter-spacing:.08em;text-transform:uppercase;font-weight:700}tr:nth-child(even) td{background:#f6f7f9}
+td.up{color:#1f7a3a;font-weight:600}td.down{color:#b3261e;font-weight:600}td.mid{color:#a86a00;font-weight:600}
 mark{background:#fff1c2;color:#6a4b00;padding:0 4px;border-radius:3px;font-size:.92em}
-footer{margin-top:28px;padding-top:10px;border-top:1px solid #cfcfd4;color:#6b6b70;font-size:8.8pt}</style>
-${marca ? `<div class="marca">${marca}</div>` : ''}<header><h1>${esc(a.titulo)}</h1>${a.subtitulo ? `<div class="sub">${destaque(esc(a.subtitulo))}</div>` : ''}</header>
-${secoes.map((s) => `<section>${s.titulo ? `<h2>${esc(s.titulo)}</h2>` : ''}${destaque(mdParaHtml(s.texto || ''))}</section>`).join('\n')}
-${a.rodape ? `<footer>${esc(a.rodape)}</footer>` : ''}`;
+.aviso{margin-top:22px;padding:10px 14px;border:1px solid #d9dbe0;border-radius:8px;background:#f6f7f9;color:#555a63;font-size:8.3pt;line-height:1.45;break-inside:avoid}.aviso b{color:#12202b}
+.ident{margin-top:10px;color:#6b6b70;font-size:8.6pt}
+table.mold{border:0;border-radius:0;margin:0;font-size:inherit;overflow:visible;break-inside:auto}.mold>tbody>tr>td,.mold>tfoot>tr>td{padding:0;border:0;background:none}
+.conferir{margin-top:6px;color:#6b6b70;font-size:8.8pt}.conferir h2{color:#6b6b70;font-size:8pt}.conferir h2::before{display:none}.conferir li::marker{color:#9a9aa0}
+.fixo{display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid #d9dbe0;padding-top:6px;margin-top:10px;font-size:7.3pt;color:#6b6b70}.fixo .m{display:flex;align-items:center;gap:10px;white-space:nowrap}.fixo img{height:26px;width:auto}.fixo .mesa{font-size:10pt}.fixo .mesa small{display:none}</style>
+<table class="mold"><tbody><tr><td>
+<div class="faixa"></div><div class="topo"><div class="dono">${dono}</div>${mesa}</div>
+<header><div class="eyebrow">Material de apoio ao atendimento · ${hoje}</div><h1>${esc(a.titulo)}</h1>${a.subtitulo ? `<div class="sub">${destaque(esc(a.subtitulo))}</div>` : ''}</header>
+${corpo}
+<div class="aviso"><b>Aviso importante.</b> ${AVISO_LONGO}${a.rodape ? `<div class="ident">${esc(a.rodape)}</div>` : ''}</div>
+</td></tr></tbody><tfoot><tr><td><div class="fixo"><span>${AVISO_CURTO}</span><span class="m">${mesa}${cm ? `<img src="${cm}">` : ''}</span></div></td></tr></tfoot></table>`;
   const pdf = path.join(pastaBase(), `${slug(a.titulo)}-${carimbo()}.pdf`);
   await renderizar(html, pdf, 'pdf', [794, 1123]);
   const r = { tipo: 'pdf', titulo: a.titulo, pasta: path.dirname(pdf), imagens: [], pdf, em: Date.now() };
