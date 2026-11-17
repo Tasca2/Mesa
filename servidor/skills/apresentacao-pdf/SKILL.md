@@ -29,6 +29,7 @@ Entregar um PDF que pareça feito por um designer do escritório: poucas palavra
 - `secao`: divisor de capítulo (`etiqueta` com o número, `titulo`, `subtitulo`); dá ritmo e separa os atos da apresentação.
 - `templo`: pilares de valores sustentando o escritório (ética, transparência, compromisso), 2 a 4 itens com `titulo` e `texto` curto; `subtitulo` é o nome do escritório no frontão. O texto de cada pilar é o que o assessor disse que significa na prática; sem isso, `[CONFERIR]`.
 - `ilustracao`: ilustração em traço ao lado do texto. Nomes: conquista, pessoas, escritorio, crescimento, parceria, bussola, protecao. Use quando o assunto pede uma imagem (reconhecimento, quem é atendido, o escritório, o caminho, a parceria, o propósito, a proteção do patrimônio) e o assessor não tem foto. A Mesa não gera foto de pessoas, aperto de mão nem ambiente corporativo: se o assessor quiser esse tipo de imagem, ele coloca a dele em "Minhas imagens" e você usa `imagem` (com a `ilustracao` como reserva na mesma página).
+- `galeria`: 2 ou 3 colunas com foto em moldura em arco, título e uma linha (`itens` com `imagem`, `titulo`, `texto`). Use para pessoas: o assessor, a equipe, o público que ele atende, o escritório. Cada `imagem` é o nome de um arquivo em "Minhas imagens"; item sem imagem usa o `icone` (padrão `pessoa`).
 - `fechamento`: sempre a última: `passos` (até 5) e `contato` (nome, atuação, e-mail, telefone, só o que o assessor informou).
 
 ## Uma história, não uma lista de páginas
@@ -36,6 +37,12 @@ Entregar um PDF que pareça feito por um designer do escritório: poucas palavra
 - `etiqueta` mostra onde a pessoa está na história ("02 · Quem sou", "04 · Soluções"). Mantenha os mesmos nomes de ato do começo ao fim e repita os do `agenda`.
 - Abra com uma promessa na capa e feche voltando a ela. O assunto central é o assessor e as soluções dele; o prospect aparece como destinatário, não como tema.
 - Se a conversa tem pessoa física e empresa, cada público ganha a sua página de soluções.
+
+## Visual private e imagens
+- O visual padrão é o estilo private: fundo com degradê da cor da marca, cartões com borda e brilho, números e títulos em degradê, molduras em arco para fotos e capa com a foto do assessor em diagonal. O estilo `minimo` devolve o visual enxuto antigo, só se o assessor pedir.
+- **Peça as imagens antes de montar a apresentação** (junto da pergunta da marca, uma vez só): foto do assessor, foto da equipe ou do escritório e fotos de pessoas para a página de quem ele atende. Diga que ele guarda os arquivos em **Documentos › Mesa do Assessor › Minhas imagens**; se não tiver fotos de pessoas, pode baixar de bancos gratuitos com uso comercial liberado (Unsplash, Pexels) e salvar na mesma pasta. A Mesa não baixa nem gera foto de pessoa.
+- Com foto do assessor: ela vai na `capa` (marca) e no `perfil`. Com fotos de pessoas ou da equipe: use `galeria`. Sem foto, a capa usa o monograma em anéis e o `perfil` usa as iniciais; não deixe a apresentação toda sem imagem se o assessor tem as dele.
+- Em `pilares` e `lista`, use `icone` em todos os itens que tenham ícone de sentido: os ícones aparecem em círculos com brilho e dão cor à página.
 
 ## Ícones e imagens
 - Em `pilares`, `etapas`, `lista` e `diagrama`, cada item pode ter `icone`. Biblioteca (traço fino, na cor da marca): investimentos, alocacao, cambio, previdencia, sucessao, credito, planejamento, juridico, equipe, pessoa, empresa, imovel, exterior, carteira, protecao, documento, prazo, calendario, conversa, custodia, instituicao, confirmar, seta.

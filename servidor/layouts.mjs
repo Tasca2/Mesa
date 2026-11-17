@@ -10,8 +10,9 @@ const TEMAS = {
   marinho: { fundo: '#0B1F33', painel: '#12304C', tinta: '#F1F4F7', suave: '#A3B3C4', cor: '#D8B26A', linha: 'rgba(255,255,255,.17)' },
 };
 const ESTILOS = {
-  serifada: { titulo: "Georgia,'Times New Roman',serif", peso: 400, espaco: '-0.012em' },
-  moderna: { titulo: "'Segoe UI','Helvetica Neue',Arial,sans-serif", peso: 600, espaco: '-0.02em' },
+  serifada: { titulo: "Georgia,'Times New Roman',serif", peso: 400, espaco: '-0.012em', pv: true },
+  moderna: { titulo: "'Segoe UI','Helvetica Neue',Arial,sans-serif", peso: 600, espaco: '-0.02em', pv: true },
+  minimo: { titulo: "Georgia,'Times New Roman',serif", peso: 400, espaco: '-0.012em' },
 };
 const CORPO = "'Segoe UI','Helvetica Neue',Arial,sans-serif";
 const NUMS = "Cambria,'Times New Roman',Palatino,serif";
@@ -125,7 +126,61 @@ td{font-size:30px;line-height:1.35;padding:28px 24px 28px 0;border-bottom:1px so
 .metade .foto2{position:absolute;right:0;top:0;bottom:0;width:860px}.metade .foto2 img{width:100%;height:100%;object-fit:cover}.metade .foto2::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,${t.fundo} 0%,${t.fundo}00 30%)}
 .metade .c{right:960px}.metade .pe{right:960px}.metade .pe .a{max-width:none}
 .cheia .bg{position:absolute;inset:0}.cheia .bg img{width:100%;height:100%;object-fit:cover}.cheia .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,${t.fundo}f2 6%,${t.fundo}b8 42%,${t.fundo}33 100%)}
-.cheia .c{z-index:2}.cheia .corpo{justify-content:flex-end;padding-bottom:30px}.cheia .pe{z-index:2;border-top-color:${t.linha}}`;
+.cheia .c{z-index:2}.cheia .corpo{justify-content:flex-end;padding-bottom:30px}.cheia .pe{z-index:2;border-top-color:${t.linha}}${galeriaCss(t, est, cor)}${est.pv ? pvCss(t, est, cor) : ''}`;
+}
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mixar = (a, b, p) => { const A = hexRgb(a), B = hexRgb(b); return '#' + A.map((v, k) => Math.round(v + (B[k] - v) * p).toString(16).padStart(2, '0')).join(''); };
+
+function galeriaCss(t, est, cor) {
+  return `.galeria{display:grid;gap:52px;margin-top:60px}.galeria .gl{display:flex;flex-direction:column}
+.galeria .arc{height:390px;border-radius:195px 195px 26px 26px;overflow:hidden;border:1px solid ${cor}77;position:relative;background:${t.painel};box-shadow:0 34px 70px -34px rgba(0,0,0,.7)}.galeria .arc img{width:100%;height:100%;object-fit:cover;display:block}
+.galeria .arc.vazio{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 28%,${cor}38,${cor}0a 70%),${t.painel}}
+.galeria h3{font-family:${est.titulo};font-weight:${est.peso};font-size:40px;line-height:1.15;margin:30px 0 10px}.galeria p{font-size:27px;line-height:1.45;color:${t.suave}}`;
+}
+
+function pvCss(t, est, cor) {
+  const c2 = mixar(cor, '#ffffff', 0.42);
+  const tom = mixar(t.fundo, cor, 0.09);
+  const cartao = `linear-gradient(165deg,${cor}33 0%,rgba(255,255,255,.025) 52%,rgba(255,255,255,0) 100%),${t.painel}`;
+  return `
+.s{background:radial-gradient(1200px 800px at 98% -8%,${cor}4a 0%,${cor}00 62%),radial-gradient(1000px 700px at -10% 110%,${cor}38 0%,${cor}00 60%),linear-gradient(155deg,${t.fundo} 0%,${tom} 100%)}
+.s::before{right:-330px;top:-330px;width:900px;height:900px;background:none;border:1px solid ${cor}38;box-shadow:0 0 0 80px ${cor}0b,0 0 0 160px ${cor}07,0 0 0 240px ${cor}04}
+.s::after{content:"";position:absolute;left:0;top:0;bottom:0;width:9px;background:linear-gradient(180deg,${cor} 0%,${c2} 46%,${cor}00 100%)}
+.et{align-self:flex-start;padding:11px 24px;border:1px solid ${cor}77;border-radius:999px;background:${cor}1a;font-size:17px;letter-spacing:.22em;margin-bottom:34px}.et::after{display:none}
+span.cf{background:${cor}33}
+.pe{border-top-color:${cor}33}
+.cols-p{gap:34px;margin-top:70px;align-items:stretch}
+.cols-p .p{border:1px solid ${t.linha};border-radius:28px;padding:48px 40px 44px;background:${cartao};box-shadow:0 36px 70px -34px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.07);overflow:hidden;border-top:1px solid ${t.linha}}
+.cols-p .p::before{left:0;top:0;width:100%;height:6px;background:linear-gradient(90deg,${cor},${c2})}
+.cols-p .nn{font-size:92px;background:linear-gradient(180deg,${c2},${cor});-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.02em}
+.cols-p .ico{width:108px;height:108px;border-radius:50%;justify-content:center;background:radial-gradient(circle at 30% 28%,${cor}44,${cor}0f 72%);border:1px solid ${cor}77;box-shadow:0 0 50px ${cor}25}
+.cols-p h3{font-size:44px;margin:30px 0 16px}.cols-p p{font-size:28px}
+.et-l{gap:34px;margin-top:100px}.et-l::before{display:none}
+.et-l .e{padding:64px 38px 40px;border:1px solid ${t.linha};border-radius:28px;background:${cartao};box-shadow:0 36px 70px -34px rgba(0,0,0,.75)}
+.et-l .e::before{left:38px;top:-20px;width:40px;height:40px;border:0;background:linear-gradient(135deg,${c2},${cor});box-shadow:0 0 30px ${cor}66}.et-l .e::after{display:none}
+.et-l .e .ico2{margin:6px 0 18px}.et-l h3{font-size:42px}.et-l p{font-size:28px}
+.nums{border:0;gap:30px;margin-top:80px}.nums .n1,.nums .n1+.n1{padding:48px 42px 42px;border:1px solid ${t.linha};border-radius:28px;background:${cartao};box-shadow:0 36px 70px -34px rgba(0,0,0,.75)}
+.nums .v{background:linear-gradient(180deg,${c2},${cor});-webkit-background-clip:text;background-clip:text;color:transparent;font-size:118px}
+.grade{gap:28px 36px}.grade .it{padding:36px 36px 34px;border:1px solid ${t.linha};border-left:5px solid ${cor};border-radius:22px;background:${cartao}}.grade .it::before{display:none}
+.grade .it.ci .ico{width:84px;height:84px;border-radius:50%;justify-content:center;align-items:center;padding:0;background:radial-gradient(circle at 30% 28%,${cor}44,${cor}0f 72%);border:1px solid ${cor}66}
+.ag{padding:44px 38px;border:1px solid ${t.linha};border-radius:22px;background:${cartao};margin-bottom:22px;border-top:1px solid ${t.linha}}.agenda{gap:0 40px}.ag i{background:linear-gradient(180deg,${c2},${cor});-webkit-background-clip:text;background-clip:text;color:transparent}
+.fech .dir{border-radius:30px;border:1px solid ${cor}77;background:${cartao};box-shadow:0 0 110px ${cor}22,0 36px 70px -34px rgba(0,0,0,.75)}
+.frase .corpo{border-left:0;padding-left:30px;position:relative}.frase .corpo::before{content:"\\201C";position:absolute;left:-20px;top:calc(50% - 340px);font-family:Georgia,serif;font-size:420px;line-height:1;color:${cor}30}
+.secao .corpo{border-left:0;padding-left:0}.secao .gn{font-size:190px;background:linear-gradient(180deg,${c2},${cor});-webkit-background-clip:text;background-clip:text;color:transparent}
+.secao::before{right:-200px;top:50%;margin-top:-450px;width:900px;height:900px}
+.fluxo .circ,.circ{border:1.5px solid ${cor}99;background:radial-gradient(circle at 32% 28%,${cor}3d,${cor}0d 72%),${t.painel};box-shadow:0 0 56px ${cor}2e}
+.hc{border-color:${cor};background:radial-gradient(circle at 32% 28%,${cor}55,${cor}14 72%),${t.painel};box-shadow:0 0 90px ${cor}33}
+.templo .txts h3{color:${c2}}
+.metade .foto2{right:90px;top:92px;bottom:150px;width:780px;border-radius:390px 390px 30px 30px;overflow:hidden;border:1px solid ${cor}77;box-shadow:0 40px 90px -30px rgba(0,0,0,.8)}.metade .foto2::after{display:none}
+.metade .c{right:1000px}.metade .pe{right:1000px}
+.capa .foto{width:800px;clip-path:polygon(17% 0,100% 0,100% 100%,0 100%)}.capa .foto img{filter:saturate(1)}.capa .foto::after{background:linear-gradient(90deg,${t.fundo}cc 0%,${t.fundo}00 40%),linear-gradient(0deg,${cor}33 0%,${cor}00 40%)}
+.capa .diag{position:absolute;left:0;top:0;pointer-events:none}.capa .orn{position:absolute;right:0;top:0;width:900px;height:1080px}.capa .orn svg{display:block}
+.capa.pv .c{right:900px}.capa.pv .com-foto .c{right:900px}.capa.pv h2{font-size:84px}
+.capa .regua{width:140px;height:5px;background:linear-gradient(90deg,${cor},${c2});border-radius:3px}
+.perfil .fotoq{width:540px;margin:0 0 24px 0}.perfil .fotoq img,.perfil .fotoq .ini{border-radius:270px 270px 28px 28px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8)}
+.perfil .fotoq::before{left:-22px;top:22px;right:22px;bottom:-22px;border-radius:270px 270px 34px 34px;border:1px solid ${cor}88}
+.perfil .ini{background:radial-gradient(circle at 50% 30%,${cor}55,${cor}12 70%),${t.painel};background-clip:border-box;font-size:200px}
+.fatos{border:0;display:grid;gap:14px;margin-top:36px}.fato{border:1px solid ${t.linha};border-radius:18px;padding:20px 30px;background:${cartao}}.fato .r{width:230px}`;
 }
 
 const rodapePagina = (rodape, escritorio, i, n) => `<div class="pe"><div class="a">${lim(rodape || escritorio || '')}</div><div class="n">${num(i)} / ${String(n).padStart(2, '0')}</div></div>`;
@@ -195,6 +250,18 @@ const svgIlustracao = (nome, m) => `<svg viewBox="0 0 600 600" fill="none" strok
 
 const LAYOUTS = {
   capa(s, m) {
+    if (m.pv) {
+      const inicial = (m.nome || m.escritorio || '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+      const lado = m.foto
+        ? `<div class="foto"><img src="${m.foto}"></div><svg class="diag" width="1920" height="1080" viewBox="0 0 1920 1080"><line x1="1297" y1="0" x2="1160" y2="1080" stroke="${m.cor}" stroke-width="3"/><line x1="1317" y1="0" x2="1180" y2="1080" stroke="${m.cor}" stroke-opacity=".35" stroke-width="1.5"/></svg>`
+        : `<div class="orn"><svg viewBox="0 0 900 1080" width="900" height="1080"><defs><linearGradient id="gcp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${m.cor2}"/><stop offset="1" stop-color="${m.cor}"/></linearGradient></defs>${[440, 360, 280].map((r, k) => `<circle cx="470" cy="540" r="${r}" fill="none" stroke="${m.cor}" stroke-opacity="${(0.52 - k * 0.14).toFixed(2)}" stroke-width="${k ? 1.5 : 2}"/>`).join('')}<circle cx="470" cy="540" r="196" fill="url(#gcp)" fill-opacity=".16" stroke="${m.cor}" stroke-width="2"/><circle cx="880" cy="380" r="9" fill="${m.cor2}"/><circle cx="130" cy="780" r="6" fill="${m.cor}" fill-opacity=".7"/><circle cx="560" cy="120" r="5" fill="${m.cor2}" fill-opacity=".8"/><text x="470" y="596" text-anchor="middle" font-family="Georgia,serif" font-size="176" fill="url(#gcp)">${esc(inicial)}</text></svg></div>`;
+      const logo = m.logo ? `<img src="${m.logo}">` : `<span class="marca-t">${lim(m.escritorio)}</span>`;
+      return `<section class="s capa pv"><div class="${m.foto ? 'com-foto' : ''}">${lado}<div class="c">
+      <div class="topo">${logo}</div>
+      <div class="meio"><h2 style="font-size:${tamTitulo(s.titulo, 84)}px">${lim(s.titulo)}</h2><div class="regua"></div>${s.subtitulo ? `<div class="sub">${lim(s.subtitulo, true)}</div>` : ''}</div>
+      <div class="base">${m.nome ? `<div><b>${lim(m.nome)}</b>${lim(m.cargo || '')}</div>` : ''}${m.escritorio && m.logo ? `<div><b>${lim(m.escritorio)}</b></div>` : ''}${s.texto ? `<div><b>${lim(s.texto)}</b></div>` : ''}</div>
+    </div></div></section>`;
+    }
     const foto = m.foto ? `<div class="foto"><img src="${m.foto}"></div>` : '';
     const logo = m.logo ? `<img src="${m.logo}">` : `<span class="marca-t">${lim(m.escritorio)}</span>`;
     return `<section class="s capa"><div class="${m.foto ? 'com-foto' : ''}">${foto}<div class="c">
@@ -288,6 +355,16 @@ const LAYOUTS = {
     }
     return `<section class="s metade"><div class="foto2"><img src="${src}"></div><div class="c">${etiqueta(s)}<div class="corpo">${titulo(s, 70)}${subt(s)}</div>${fonteTxt(s)}</div>${rodapePagina(m.rodape, m.escritorio, i, n)}</section>`;
   },
+  galeria(s, m, i, n) {
+    const its = itensDe(s, 3);
+    const k = Math.max(2, its.length);
+    const cartoes = its.map((x) => {
+      const src = x.imagem ? imagemDe(x.imagem, m) : '';
+      const vis = src ? `<div class="arc"><img src="${src}"></div>` : `<div class="arc vazio">${icone(x.icone || 'pessoa', m, 110)}</div>`;
+      return `<div class="gl">${vis}<h3>${lim(x.titulo)}</h3>${x.texto ? `<p>${lim(x.texto, true)}</p>` : ''}</div>`;
+    }).join('');
+    return `<section class="s ctr"><div class="c">${etiqueta(s)}${titulo(s, 70)}${subt(s)}<div class="corpo"><div class="galeria" style="grid-template-columns:repeat(${k},1fr)">${cartoes}</div></div>${fonteTxt(s)}</div>${rodapePagina(m.rodape, m.escritorio, i, n)}</section>`;
+  },
   fechamento(s, m, i, n) {
     const passos = (s.passos || []).slice(0, 5).map((p, k) => `<div class="passo"><i>${num(k)}</i><span>${lim(p)}</span></div>`).join('');
     const contato = (s.contato || []).slice(0, 5).map((l) => `<div class="ln">${lim(l)}</div>`).join('');
@@ -301,7 +378,7 @@ export function montarPaginas(slides, marca, deslocamento = 0, total = slides.le
   const t = TEMAS[marca.tema] ?? TEMAS.escuro;
   const est = ESTILOS[marca.estilo] ?? ESTILOS.serifada;
   const cor = /^#[0-9a-fA-F]{6}$/.test(marca.cor || '') ? marca.cor : t.cor;
-  const m = { ...marca, cor, suave: t.suave };
+  const m = { ...marca, cor, suave: t.suave, pv: !!est.pv, cor2: mixar(cor, '#ffffff', 0.42) };
   const html = slides.map((s, i) => {
     const h = (LAYOUTS[s.layout] ?? LAYOUTS.frase)(s, m, i + deslocamento, total);
     return s.ponte ? h.replace(/<\/section>\s*$/, `<div class="ponte">${lim(s.ponte)}</div></section>`) : h;

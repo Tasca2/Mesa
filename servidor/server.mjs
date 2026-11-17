@@ -534,13 +534,13 @@ function buildServer() {
         'agenda (titulo + itens {titulo, texto}: o roteiro da conversa) · secao (divisor de capítulo: etiqueta com o número, titulo, subtitulo) · templo (titulo + itens {titulo, texto}, 2 a 4: pilares de valores sustentando o escritório, subtitulo = nome no frontão) · ilustracao (titulo, subtitulo, ilustracao: ' + NOMES_ILUSTRACAO.join(', ') + ') · ' +
         'diagrama (titulo + itens {titulo, texto, icone, ligacao}, modelo "fluxo" com 2 a 5 nós ligados por seta, ou "hub" com o primeiro item no centro e até 6 ao redor) · imagem (titulo, subtitulo, imagem do assessor, modelo "metade" ou "cheia") · ' +
         'ícones da biblioteca (use em itens de pilares, etapas, lista e diagrama): ' + NOMES_ICONE.join(', ') + '; o assessor também pode usar a própria imagem, citando o nome do arquivo guardado na pasta "Minhas imagens" · ' +
-        'tabela (titulo, cabecalho[], linhas[][]) · barras (titulo + itens {rotulo, valor em %, valor2 opcional}, legenda[] se houver valor2) · frase (titulo como frase-conclusão) · lista (titulo + itens {titulo, texto}, até 6) · fechamento (titulo, passos[], contato[]). ' +
+        'tabela (titulo, cabecalho[], linhas[][]) · barras (titulo + itens {rotulo, valor em %, valor2 opcional}, legenda[] se houver valor2) · frase (titulo como frase-conclusão) · lista (titulo + itens {titulo, texto}, até 6) · galeria (titulo, subtitulo opcional, itens {titulo, texto, imagem, icone}, 2 a 3 colunas com a foto do assessor ou de pessoas em moldura em arco; sem imagem, usa o ícone) · fechamento (titulo, passos[], contato[]). ' +
         'Regras: um título-conclusão por página, textos curtos, sem emoji, sem dado inventado; use só os layouts que o assunto pede e varie-os (não repita o mesmo em páginas seguidas). Nome, escritório, logo e foto vêm do perfil (mesa_perfil, campo marca); se faltarem, a página sai sem eles. ' +
         'O rodapé leva a identificação do profissional e o aviso de compliance. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF, e diga onde o arquivo ficou. Se vier "avisos", conte ao assessor.',
       inputSchema: {
         titulo: z.string().min(2).max(120).describe('Nome da peça (vira o nome da pasta)'),
         tema: z.enum(['escuro', 'claro', 'marinho']).optional().describe('Padrão: o do perfil, ou escuro'),
-        estilo: z.enum(['serifada', 'moderna']).optional().describe('Fonte dos títulos. Padrão: o do perfil, ou serifada'),
+        estilo: z.enum(['serifada', 'moderna', 'minimo']).optional().describe('serifada e moderna: visual private, com cartões, degradês e molduras (padrão: serifada); minimo: o visual enxuto antigo'),
         cor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Cor de destaque; padrão: a do perfil ou a do tema'),
         rodape: z.string().max(260).optional().describe('Identificação do profissional e aviso, em uma linha, em todas as páginas'),
         termosConfirmados: z.array(z.string().max(40)).max(8).optional().describe('Só quando o assessor afirmou de fato algo que a trava de compliance bloqueou (ex.: "independência"); nunca por conta própria'),
@@ -556,6 +556,7 @@ function buildServer() {
           modelo: z.enum(['fluxo', 'hub', 'metade', 'cheia']).optional().describe('diagrama: fluxo (padrão) ou hub; imagem: metade (padrão) ou cheia'),
           imagem: z.string().max(400).optional().describe('layout imagem: caminho de uma imagem do assessor ou só o nome do arquivo guardado na pasta "Minhas imagens"'),
           itens: z.array(z.object({
+            imagem: z.string().max(400).optional().describe('layout galeria: imagem do assessor (nome do arquivo em "Minhas imagens" ou caminho)'),
             icone: z.string().max(400).optional().describe('Nome de um ícone da biblioteca ou imagem do assessor (caminho ou nome do arquivo em "Minhas imagens")'),
             ligacao: z.string().max(40).optional().describe('diagrama fluxo: texto curto da seta que sai deste item'),
             rotulo: z.string().max(80).optional(), titulo: z.string().max(90).optional(), texto: z.string().max(260).optional(),
