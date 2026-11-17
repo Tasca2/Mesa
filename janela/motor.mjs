@@ -87,6 +87,13 @@ const PROTOCOLO = 'Você é o assistente dentro da janela da Mesa do Assessor. A
   'Quando o Resultado for "Texto no chat", a resposta final traz o TEXTO COMPLETO da entrega, pronto para copiar, e não só um resumo; as dúvidas e o que conferir vêm depois, em poucas linhas. ' +
   'ENTREGA COMPLETA: nunca entregue só a lista ou a descrição do que cada peça contém ("3 peças entregues: roteiro, resumo..."). O texto integral e pronto de cada peça vai na resposta final, cada um em sua marca <peca>; o cartão da entrega leva o mesmo conteúdo. ' +
   'REVISÃO: antes de entregar texto para cliente ou público, confira sem promessa nem projeção de retorno, sem "compre/venda/indico", com a identificação do profissional, e com [CONFERIR] em todo número sem fonte; corrija antes de entregar.';
+const VERSAO = '1.1.0';
+const MODELOS = [['', 'Padrão do Claude Code'], ['claude-fable-5-2', 'Fable 5.2'], ['claude-opus-5-5', 'Opus 5.5'], ['claude-sonnet-5-5', 'Sonnet 5.5'], ['claude-haiku-5-5', 'Haiku 5.5']];
+const ARQ_MODELO = path.join(PASTA_DADOS, 'modelo.json');
+let modeloEscolhido = ''; let modeloUsado = '';
+try { const m = JSON.parse(readFileSync(ARQ_MODELO, 'utf8')).modelo; if (MODELOS.some((x) => x[0] === m)) modeloEscolhido = m; } catch {   }
+const nomeModelo = (id) => { const x = MODELOS.find((m) => m[0] === id); if (x) return x[1]; return String(id || '').replace(/^claude-/, '').replace(/-(\d+)-(\d+)(-.*)?$/, ' $1.$2').replace(/^./, (c) => c.toUpperCase()); };
+const infoModelo = () => ({ versao: VERSAO, modelo: modeloEscolhido, usado: modeloUsado, nome: nomeModelo(modeloEscolhido || modeloUsado) || 'Padrão do Claude Code', opcoes: MODELOS.map(([id, nome]) => ({ id, nome })) });
 const estado = { rodando: false, inicio: 0, sessao: null, turnos: [], erro: '', meta: null, video: null };
 let filho = null;
 const ARQ_CONVERSA = path.join(PASTA_DADOS, 'janela-conversa.json');
@@ -227,6 +234,7 @@ function rodarClaude(texto, contexto, exibir) {
   if (video) args.push('--disallowedTools', NEGADAS_VIDEO.join(','));
   const viaShell = !!CLAUDE && precisaShell(CLAUDE);
   if (!viaShell) args.push('--append-system-prompt', PROTOCOLO);
+  if (modeloEscolhido) args.push('--model', modeloEscolhido);
   if (estado.sessao) args.push('--resume', estado.sessao);
   let saida = '', erroTxt = '';
   try { filho = abrirClaude(args, video ? estado.video.dir : undefined); }
@@ -241,6 +249,7 @@ function rodarClaude(texto, contexto, exibir) {
     try {
       const j = JSON.parse(saida.trim().split('\n').pop());
       if (j.session_id) estado.sessao = j.session_id;
+      try { const k = Object.keys(j.modelUsage || {}); if (k.length) modeloUsado = k.sort((a, b) => ((j.modelUsage[b] || {}).outputTokens || 0) - ((j.modelUsage[a] || {}).outputTokens || 0))[0].replace(/\[.*\]$/, ''); } catch {   }
       if (j.is_error) return terminar(String(j.result || 'O Claude não conseguiu concluir.'));
       estado.turnos.push({ papel: 'claude', texto: String(j.result ?? '').trim() || '(sem texto)' });
       terminar('');
@@ -470,6 +479,14 @@ const servidor = http.createServer(async (req, res) => {
         if (!email || !senha) return json(res, 400, { status: 'erro', mensagem: 'Escreva o e-mail e a senha.' });
         return json(res, 200, await entrarComSenha(email, senha));
       }
+      case '/api/modelo': {
+        if (typeof corpo.modelo === 'string') {
+          if (!MODELOS.some((x) => x[0] === corpo.modelo)) return json(res, 400, { erro: 'Modelo desconhecido.' });
+          modeloEscolhido = corpo.modelo;
+          try { mkdirSync(PASTA_DADOS, { recursive: true }); writeFileSync(ARQ_MODELO, JSON.stringify({ modelo: modeloEscolhido })); } catch {   }
+        }
+        return json(res, 200, infoModelo());
+      }
       case '/api/novo':
         if (!estado.rodando) {
           estado.sessao = null; estado.erro = '';
@@ -481,7 +498,7 @@ const servidor = http.createServer(async (req, res) => {
         if (!estado.rodando) { if (!corpo.descartar) arquivar(estado.turnos, estado.sessao, estado.meta, estado.video); estado.sessao = null; estado.turnos = []; estado.erro = ''; estado.meta = null; estado.video = null; guardarConversa(); }
         return json(res, 200, { ok: true });
       case '/api/diag': {
-        return json(res, 200, { versao: '1.0.2', plataforma: `${process.platform} ${os.release()}`, node: process.version, claude: !!CLAUDE, edvid: existsSync(EDVID_DIR),
+        return json(res, 200, { versao: VERSAO, modelo: modeloEscolhido || 'padrão', modeloUsado, plataforma: `${process.platform} ${os.release()}`, node: process.version, claude: !!CLAUDE, edvid: existsSync(EDVID_DIR),
           ffmpeg: await new Promise((ok) => { try { const p = spawn('ffmpeg', ['-version'], { windowsHide: true }); p.on('error', () => ok(false)); p.on('close', (c) => ok(c === 0)); } catch { ok(false); } }),
           rodando: estado.rodando, ultimoErro: String(estado.erro || '').slice(0, 300), conversasNoHistorico: lerHist().length, modoVideo: !!estado.video?.ativo });
       }

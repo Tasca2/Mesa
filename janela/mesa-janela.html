@@ -137,6 +137,10 @@
   .md pre { margin: 0 0 9px; padding: 9px 11px; background: rgba(255,255,255,.05); border-radius: 9px; overflow-x: auto; font-size: .9em; }
   .md code { background: rgba(255,255,255,.08); padding: 1px 5px; border-radius: 5px; font-size: .92em; }
   .md table { border-collapse: collapse; margin: 0 0 9px; font-size: .94em; } .md th, .md td { border: 1px solid var(--line2); padding: 5px 9px; text-align: left; } .md th { background: rgba(255,255,255,.05); }
+  .md > p:first-child:has(> strong:first-child:last-child) { font-size: 1.1em; line-height: 1.45; padding: 10px 14px; margin-bottom: 12px; background: rgba(232,200,142,.09); border-left: 3px solid var(--gold2); border-radius: 0 10px 10px 0; }
+  .md h4 { text-transform: uppercase; letter-spacing: .12em; font-size: .76em; margin: 16px 0 6px; }
+  .md strong { color: var(--ink); } .md tr:nth-child(even) td { background: rgba(255,255,255,.03); }
+  .md th { color: var(--gold2); font-size: .85em; letter-spacing: .06em; text-transform: uppercase; }
   .md a { color: var(--gold2); }
   .texto-md { margin-top: 10px; max-height: 38vh; overflow-y: auto; padding: 12px 14px; background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; font-size: 14.5px; }
   .campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; margin: 14px 0 6px; }
@@ -305,6 +309,8 @@
     "#conversa .ic:hover{background:rgba(255,255,255,.09)}#conversa .ic svg{width:20px;height:20px}",
     "#conversa .env{background:#7a7a7a;color:#1b1b1b}#conversa .env.pronto{background:var(--gold);color:#101113}#conversa .env.pronto:hover{background:var(--gold2)}",
     "#conversa .env:disabled{cursor:default;opacity:.55}",
+    "#conversa .modelo{flex:1;min-width:0;margin:0 8px;background:transparent;border:0;color:var(--faint,#9a9a9a);font:inherit;font-size:12.5px;text-align:left;padding:6px 8px;border-radius:9px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    "#conversa .modelo:hover,#conversa .modelo:focus-visible{background:rgba(255,255,255,.08);color:#e8e8e8;outline:0}",
     "#conversa .menu{position:absolute;left:12px;bottom:64px;min-width:250px;background:#262626;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:6px;box-shadow:0 18px 50px rgba(0,0,0,.6);z-index:8}",
     "#conversa .menu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:#e8e8e8;padding:9px 12px;border-radius:9px;font:inherit;font-size:14px;cursor:pointer}",
     "#conversa .menu button:hover,#conversa .menu button:focus-visible{background:rgba(255,255,255,.09);outline:0}",
@@ -473,7 +479,7 @@
     s.innerHTML = '<div class="cv-painel" id="cvPainel"><div class="cv-cab">Conversa com o Claude</div><div class="cv-corpo" id="cvCorpo"></div>'
       + '<div class="estado-cv" id="cvEstado" role="status" aria-live="polite"></div><div class="ajustes" id="cvAjustes"></div></div>'
       + '<div class="caixa" id="cvCaixa"><textarea id="cvTxt" rows="1" placeholder="Peça ao Claude: ajustar este pedido, criar uma tarefa, buscar dados…" aria-label="Mensagem para o Claude"></textarea>'
-      + '<div class="barra"><button type="button" class="ic" id="cvMais" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções">' + ICONE_MAIS + '</button><button type="button" class="ic env" id="cvEnv" aria-label="Enviar" disabled>' + ICONE_ENVIAR + '</button></div></div>'
+      + '<div class="barra"><button type="button" class="ic" id="cvMais" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções">' + ICONE_MAIS + '</button><button type="button" class="modelo" id="cvModelo" aria-haspopup="menu" title="Versão da Mesa e modelo do Claude em uso. Clique para trocar.">Mesa · Claude</button><button type="button" class="ic env" id="cvEnv" aria-label="Enviar" disabled>' + ICONE_ENVIAR + '</button></div></div>'
       + '<div class="menu" id="cvMenu" role="menu" hidden></div>';
     palco.append(s); raiz = s; painelEl = s.querySelector("#cvPainel"); corpoEl = s.querySelector("#cvCorpo"); estadoEl = s.querySelector("#cvEstado"); ajustesEl = s.querySelector("#cvAjustes"); txt = s.querySelector("#cvTxt"); botaoEnviar = s.querySelector("#cvEnv");
     corpoEl.addEventListener("scroll", () => { posCv = corpoEl.scrollTop; }, { passive: true });
@@ -491,6 +497,19 @@
       menu.append(document.createElement("hr"));
       menu.append(item(painelEl.classList.contains("grande") ? "Reduzir a conversa" : "Ampliar a conversa", () => painelEl.classList.toggle("grande")));
       menu.append(item("Limpar a conversa", async () => { if (rodando || !confirm("Apagar o histórico desta conversa?")) return; try { await api("/api/limpar", { descartar: true }); ultimo = null; atualizar(); } catch {   } }));
+    };
+    const modeloBt = s.querySelector("#cvModelo");
+    const pintaModelo = (m) => { modeloBt.textContent = "Mesa " + m.versao + " · " + (m.modelo ? m.nome : (m.usado ? m.nome + " (padrão)" : "Claude (padrão)")) + " ▾"; modeloBt.dataset.info = JSON.stringify(m); };
+    const carregaModelo = async (corpo) => { try { pintaModelo(await api("/api/modelo", corpo)); } catch {   } };
+    carregaModelo(); setInterval(() => { if (menu.hidden) carregaModelo(); }, 8000);
+    modeloBt.onclick = () => {
+      if (!menu.hidden) { fechaMenu(); return; }
+      let m = {}; try { m = JSON.parse(modeloBt.dataset.info || "{}"); } catch {   }
+      menu.textContent = "";
+      const t = document.createElement("div"); t.textContent = "Modelo do Claude (vale para os próximos pedidos)"; t.style.cssText = "padding:8px 12px 6px;font-size:12px;color:#9a9a9a"; menu.append(t);
+      for (const o of (m.opcoes || [])) menu.append(item((o.id === (m.modelo || "") ? "✓ " : "") + o.nome, async () => { if (rodando && !confirm("O Claude está trabalhando. A troca vale a partir do próximo pedido. Trocar mesmo assim?")) return; await carregaModelo({ modelo: o.id }); }));
+      if (m.usado) { const u = document.createElement("div"); u.textContent = "Último pedido rodou em: " + m.usado; u.style.cssText = "padding:8px 12px 4px;font-size:12px;color:#9a9a9a"; menu.append(u); }
+      menu.hidden = false; mais.setAttribute("aria-expanded", "true");
     };
     mais.onclick = () => { if (menu.hidden) { montaMenu(); menu.hidden = false; mais.setAttribute("aria-expanded", "true"); menu.querySelector("button").focus(); } else fechaMenu(); };
     document.addEventListener("pointerdown", (e) => { if (!menu.hidden && !menu.contains(e.target) && !mais.contains(e.target)) fechaMenu(); });
@@ -549,11 +568,17 @@
     if (!zerarAoEntrar) return;
     let e; try { e = await api("/api/estado"); } catch { return; }
     if (e.rodando) return;
-    if (reabertaAgora && e.videoAtivo && e.turnos.length) { reabertaAgora = false; zerarAoEntrar = false; try { window.__mesaAcompanhar && window.__mesaAcompanhar(); } catch {   } return; }
+    if (reabertaAgora && e.videoAtivo && e.turnos.length && c0 && c0.tarefaId === "editar-reels") { reabertaAgora = false; zerarAoEntrar = false; try { window.__mesaAcompanhar && window.__mesaAcompanhar(); } catch {   } return; }
     reabertaAgora = false;
     try { await api("/api/limpar"); feitos.clear(); ultimo = null; esperandoAcao = false; zerarAoEntrar = false; atualizar(); } catch {   }
   }
   setInterval(vigiarTarefa, 600);
+  window.__mesaParar = () => api("/api/parar");
+  window.__mesaEncerrar = async () => {
+    try { await api("/api/parar"); } catch {   }
+    await api("/api/limpar");
+    feitos.clear(); ultimo = null; esperandoAcao = false; zerarAoEntrar = false; atualizar();
+  };
   window.__mesaHistorico = {
     async listar() { return (await api("/api/historico")).itens || []; },
     async abrir(id) { const r = await api("/api/historico/abrir", { id }); ultimo = null; feitos.clear(); esperandoAcao = false; zerarAoEntrar = false; atualizar(); return r; },
@@ -758,10 +783,11 @@
         { nome: "Panorama", tarefas: ["macro", "fato", "grafico"] },
         { nome: "Ativos", tarefas: ["estudo", "acao", "setor", "fii", "rf"] },
       ] },
-    { id: "instagram", nome: "Post para Instagram", desc: "Do tema ao texto pronto, com a revisão das regras feita antes de publicar.", glifo: "quadros",
+    { id: "instagram", nome: "Marketing Profissional", desc: "Posts, vídeos e páginas para atrair clientes, com a revisão das regras feita antes de publicar.", glifo: "quadros",
       grupos: [
-        { nome: "Criar", tarefas: ["post", "post-mercado", "calendario"] },
-        { nome: "Vídeo", tarefas: ["editar-reels"] },
+        { nome: "Post para Instagram", pasta: true, desc: "Do tema ao texto pronto, com a revisão das regras feita antes de publicar.", tarefas: ["post", "pauta", "calendario"] },
+        { nome: "Editar um Reels", tarefas: ["editar-reels"] },
+        { nome: "Landing Page", tarefas: ["landing"] },
       ] },
   ];
 
@@ -769,6 +795,8 @@
     opcoes: [{ t: "Assessor de investimento", d: "Vinculado a um escritório" }, { t: "Consultor de valores mobiliários", d: "Registro na CVM" }, { t: "Planejador financeiro", d: "Certificação de planejamento" }] };
   const RESULTADO = { id: "resultado", curto: "Resultado", titulo: "Como você quer o resultado?",
     opcoes: [{ t: "PDF", d: "Arquivo para salvar ou imprimir" }, { t: "Texto no chat", d: "Para ler e copiar aqui" }] };
+  const USO_MERCADO = { id: "uso", curto: "Uso", titulo: "Para que você vai usar esta leitura?", ajuda: "Muda o formato da entrega; os dados e as fontes são os mesmos.",
+    opcoes: [{ t: "Conversa de WhatsApp", d: "Mensagens curtas, prontas para enviar" }, { t: "Entender a fundo", d: "Explicação, onde pesquisar e glossário" }, { t: "Material para o cliente", d: "Texto completo para enviar ou apresentar" }] };
 
   const T = {
     "relacionamento": { nome: "Ritmo e indicação", linha: "Agenda de contatos, pedido de indicação e parceiros.", ref: "skill relacionamento-e-indicacao", acao: "Montar o plano", perguntas: [
@@ -805,7 +833,7 @@
       { id: "tipo", curto: "Para quem", titulo: "Para quem é a proposta?", opcoes: [{ t: "Cliente novo" }, { t: "Cliente atual (ampliar)" }] }, RESULTADO ] },
     "followup": { nome: "Follow-up da proposta", linha: "3 toques para descobrir o que falta decidir.", ref: "skill relatorio-e-proposta", acao: "Montar o follow-up", perguntas: [
       { id: "tempo", curto: "Enviada há", titulo: "Há quanto tempo você enviou a proposta?", opcoes: [{ t: "2 dias" }, { t: "5 dias" }, { t: "10 dias ou mais" }] } ] },
-    "calendario": { nome: "Calendário da semana", linha: "5 posts com tema, gancho e legenda.", ref: "skill calendario-de-conteudo", acao: "Montar a semana", perguntas: [
+    "calendario": { nome: "Calendário de post", linha: "5 posts da semana com tema, gancho e legenda.", ref: "skills pauta-de-conteudo e calendario-de-conteudo", acao: "Montar a semana", perguntas: [
       { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo da semana?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] } ] },
     "editar-reels": { nome: "Editar um vídeo (Reels)", linha: "Escolha o vídeo no computador e o edvid faz a edição.", ref: "", acao: "Escolher o vídeo e editar", perguntas: [
       { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo do vídeo?", opcoes: [{ t: "Captar novos clientes" }, { t: "Educar iniciantes" }, { t: "Relacionamento com clientes" }, { t: "Bastidores do escritório" }] } ] },
@@ -832,19 +860,23 @@
       { id: "parado", curto: "Parado há", titulo: "Há quanto tempo o contato parou?", opcoes: [{ t: "Menos de 30 dias" }, { t: "De 1 a 3 meses" }, { t: "Mais de 3 meses" }] } ] },
     "estudo": { nome: "Estudo e apresentação", linha: "Dados da Análise de Ativo do CaptaMais em um material completo.", ref: "skill estudo-de-ativo", acao: "Montar o estudo",
       extra: "Os números vêm da Análise de Ativo do CaptaMais; sem fonte, não entram.", perguntas: [
-      { id: "formato", curto: "Formato", titulo: "O que você vai levar para o cliente?", opcoes: [{ t: "Apresentação (slides)", d: "Até 8 slides" }, { t: "Estudo em PDF", d: "Para ler e enviar" }, { t: "Resumo de uma página", d: "Para a conversa" }] } ] },
-    "macro": { nome: "Juros, inflação e câmbio", linha: "Selic, IPCA e dólar direto do Banco Central.", ref: "skill macro-brasil", acao: "Montar o panorama" },
-    "fato": { nome: "Fato relevante", linha: "Resumo do comunicado e o que muda na tese.", ref: "skill resumo-de-fato-relevante", acao: "Resumir o fato" },
-    "grafico": { nome: "Leitura de gráfico", linha: "Descrição de preço e indicadores, sem previsão.", ref: "skill leitura-grafica", acao: "Ler o gráfico" },
-    "acao": { nome: "Analisar uma ação", linha: "Uma empresa pelo método: números, critérios e lacunas.", ref: "skill fundamentalista-metodo", acao: "Analisar a ação" },
-    "setor": { nome: "Comparar o setor", linha: "Empresas lado a lado, na mesma base.", ref: "skill comparativo-setorial", acao: "Comparar" },
-    "fii": { nome: "Fundo imobiliário", linha: "Imóveis, crédito, P/VP e origem dos rendimentos.", ref: "skill analise-fii", acao: "Analisar o fundo" },
-    "rf": { nome: "Renda fixa", linha: "Títulos comparados com imposto e liquidez.", ref: "skill comparacao-renda-fixa", acao: "Comparar os títulos" },
-    "post": { nome: "Criar um post", linha: "Tema, texto e revisão das regras.", ref: "skill conteudo-para-cliente", acao: "Criar o post",
+      { id: "formato", curto: "Formato", titulo: "O que você vai levar para o cliente?", opcoes: [{ t: "Apresentação (slides)", d: "Até 8 slides" }, { t: "Estudo em PDF", d: "Para ler e enviar" }, { t: "Resumo de uma página", d: "Para a conversa" }] }, USO_MERCADO ] },
+    "macro": { nome: "Juros, inflação e câmbio", linha: "Selic, IPCA e dólar direto do Banco Central.", ref: "skill macro-brasil", acao: "Montar o panorama", perguntas: [USO_MERCADO] },
+    "fato": { nome: "Fato relevante", linha: "Resumo do comunicado e o que muda na tese.", ref: "skill resumo-de-fato-relevante", acao: "Resumir o fato", perguntas: [USO_MERCADO] },
+    "grafico": { nome: "Leitura de gráfico", linha: "Descrição de preço e indicadores, sem previsão.", ref: "skill leitura-grafica", acao: "Ler o gráfico", perguntas: [USO_MERCADO] },
+    "acao": { nome: "Analisar uma ação", linha: "Uma empresa pelo método: números, critérios e lacunas.", ref: "skill fundamentalista-metodo", acao: "Analisar a ação", perguntas: [USO_MERCADO] },
+    "setor": { nome: "Comparar o setor", linha: "Empresas lado a lado, na mesma base.", ref: "skill comparativo-setorial", acao: "Comparar", perguntas: [USO_MERCADO] },
+    "fii": { nome: "Fundo imobiliário", linha: "Imóveis, crédito, P/VP e origem dos rendimentos.", ref: "skill analise-fii", acao: "Analisar o fundo", perguntas: [USO_MERCADO] },
+    "rf": { nome: "Renda fixa", linha: "Títulos comparados com imposto e liquidez.", ref: "skill comparacao-renda-fixa", acao: "Comparar os títulos", perguntas: [USO_MERCADO] },
+    "pauta": { nome: "Ideias para postar hoje", linha: "O que seu público procura e o que está em alta hoje, com nota de impacto.", ref: "skill pauta-de-conteudo", acao: "Montar a pauta", perguntas: [
+      { id: "objetivo", curto: "Objetivo", titulo: "O que você quer com o conteúdo desta semana?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] } ] },
+    "post": { nome: "Criar um post", linha: "Tema, texto e revisão das regras.", ref: "skills pauta-de-conteudo e conteudo-para-cliente", acao: "Criar o post",
       extra: "Depois do texto, faça o parecer de revisão da própria peça.", perguntas: [
       { id: "formato", curto: "Formato", titulo: "Qual formato?", ajuda: "O tema você escreve na conversa.", opcoes: [{ t: "Carrossel" }, { t: "Post único" }, { t: "Roteiro de Reels" }] }, ATUACAO ] },
     "post-mercado": { nome: "Post do mercado de hoje", linha: "Um indicador do dia vira conteúdo.", ref: "skills macro-brasil e conteudo-para-cliente", acao: "Criar o post", perguntas: [
       { id: "tema", curto: "Tema", titulo: "Qual assunto do dia?", opcoes: [{ t: "Juros" }, { t: "Inflação" }, { t: "Dólar" }, { t: "Os três juntos" }] }, ATUACAO ] },
+    "landing": { nome: "Landing page", linha: "Página de captação no CaptaMais, com o link para a bio.", ref: "skill landing-page-captacao", acao: "Montar a landing page", perguntas: [
+      { id: "modelo", curto: "Modelo", titulo: "Qual modelo de página?", ajuda: "O conteúdo é o mesmo; muda o visual. Dá para trocar depois no CaptaMais.", opcoes: [{ t: "Diagnóstico", d: "Escuro e completo, convida para um diagnóstico" }, { t: "Anúncio direto", d: "Claro, formulário no topo, para quem vem do Instagram" }, { t: "Confiança", d: "Escuro, com a sua foto em destaque" }, { t: "Autoridade", d: "Depoimentos e credenciais" }] }, ATUACAO ] },
   };
 
   const ENTREGA_POST = () => {
@@ -988,6 +1020,17 @@
         "Quando parar e o que registrar no CRM"
       ]
     },
+    "pauta": {
+      "obj": "Descobrir o que postar: as dúvidas que meu público mais tem, cruzadas com o que está acontecendo agora, com nota de impacto para cada ideia.",
+      "entrega": [
+        "Resumo de 2 linhas: o público, o gatilho mais forte de agora e a ideia que você faria primeiro",
+        "Sinais usados, em tabela curta: sinal, fonte ou origem e data",
+        "De 5 a 6 ideias ranqueadas, cada uma com formato, dor do público, por que agora, gancho, o que a pessoa leva e nota nos cinco critérios",
+        "Como medir o resultado depois de postar",
+        "O que conferir antes de usar (datas, prazos, números, regras do escritório)"
+      ],
+      "fonte": "Busca na web das dúvidas e temas do meu público, com fonte e data; panorama do mercado e gatilhos do calendário (skills macro-brasil e pauta-de-conteudo). Diga o que é sinal e o que é hipótese; sem métrica do meu perfil, não invente alcance."
+    },
     "calendario": {
       "obj": "Ter os 5 posts da semana pensados, no jeito do assessor, para só aprovar e publicar.",
       "entrega": [
@@ -996,7 +1039,7 @@
         "Texto de cada slide dos posts em carrossel, em peça separada",
         "O que conferir antes de publicar (dados, fontes, regras do escritório)"
       ],
-      "fonte": "Panorama do mercado da semana com fonte e data (skill macro-brasil)"
+      "fonte": "Pauta pela skill pauta-de-conteudo (dúvidas do meu público e momento de agora), mais o panorama do mercado da semana com fonte e data (skill macro-brasil)"
     },
     "cliente-novo": {
       "obj": "Abrir a ficha de um cliente novo e saber o que ainda preciso pedir a ele.",
@@ -1138,7 +1181,7 @@
         "Para qual perfil de cliente é o material (sem nome)",
         "Período que quero destacar"
       ],
-      "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo) e complete com fontes oficiais. Só me peça o que não achar por lá."
+      "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo; em ações e FIIs use pesquisa=true para trazer também múltiplos, preço-alvo das casas, relatórios resumidos e balanços) e complete com fontes oficiais. Só me peça o que não achar por lá."
     },
     "macro": {
       "obj": "Ver o cenário de juros, inflação e câmbio hoje, com fonte e data.",
@@ -1184,44 +1227,69 @@
     "acao": {
       "obj": "Ler uma empresa pelos meus critérios, mostrando evidências e lacunas.",
       "entrega": [
-        "Histórico e rentabilidade do ativo (Análise de Ativo do CaptaMais)",
-        "Números da empresa por critério, com fonte e data",
-        "O que atende e o que não atende ao método",
+        "Em uma frase: o que a empresa é, como está no último balanço e o ponto que mais pesa agora",
+        "Enquadramento do negócio em 3 linhas: o que vende, onde ganha dinheiro e o que mexe nos resultados dela",
+        "Histórico e rentabilidade comparados com o IBOV na mesma janela, com data-base (Análise de Ativo do CaptaMais)",
+        "Múltiplos e indicadores em tabela (P/L, P/VP, EV/EBITDA, dividend yield, ROE, margens e o que mais vier): valor, referência para comparar (histórico da própria empresa, setor ou índice, quando houver) e leitura de uma linha; sem chamar de barato ou caro; denominador negativo é não significativo",
+        "Último balanço e os 4 trimestres anteriores em tabela: receita, resultado operacional, lucro, margem, dívida líquida e caixa, com variação contra o trimestre anterior e contra o mesmo trimestre do ano passado, data e fonte",
+        "O que as casas de research dizem, em tabela: casa, data, recomendação, preço-alvo e a premissa principal; ajustes de alvo nos últimos 30 dias e a dispersão entre as casas. É opinião delas, cite a casa e a data",
+        "Pontos fortes (até 4) e pontos fracos (até 4), cada um com número, período e fonte",
+        "Onde desconfiar: sinais de alerta encontrados ou descartados (lucro sem caixa, item não recorrente, dívida de curto prazo ou em moeda estrangeira, queda de margem, receita concentrada, casas muito divergentes), cada um com o dado que o sustenta",
+        "Solidez financeira em 4 linhas: dívida líquida sobre resultado operacional, cobertura de juros, caixa e vencimentos, com o que sustenta e o que preocupa",
+        "O que monitorar daqui para frente: de 5 a 7 indicadores, cada um com o valor atual, o nível que mudaria a leitura e a data do próximo dado (resultado trimestral, fato relevante)",
+        "O que atende e o que não atende ao método (só se eu tiver informado indicadores e faixas)",
         "Lacunas de informação",
         "Leitura para o cliente em linguagem simples (3 a 5 frases, sem recomendação)",
-        "Perguntas que o cliente pode fazer, com resposta descritiva"
+        "Perguntas que o cliente pode fazer, com resposta descritiva",
+        "Se eu pedir na conversa: uma mini-apresentação com a ferramenta mesa_apresentacao (5 a 7 slides: múltiplos, balanço, casas, pontos fortes e fracos, o que monitorar), sem refazer a pesquisa"
       ],
       "insumos": [
         "Empresa (ticker)",
         "Meu método: indicadores e faixas (se eu não tiver, escreva \"sem método\" e defina comigo)",
         "Documentos que tenho (ITR, DFP, release)"
       ],
-      "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo) e complete com fontes oficiais. Só me peça o que não achar por lá."
+      "fonte": "Chame analise_ativo com tipo acoes e pesquisa=true e use todos os blocos que voltarem, não só o histórico: multiplosEIndicadores, balancosTrimestrais, precoAlvoPorCasa, ajustesDeAlvoEm30Dias, declaradoNosRelatorios, ultimosRelatorios (aFavor e riscos), resumoPorIA e lacunas. Chame também com tipo indice e IBOV na mesma janela. Complete o que faltar com fontes oficiais (CVM e RI da empresa) e só me peça o que não achar. Se um bloco vier vazio, diga qual e siga com o resto, sem inventar."
     },
     "setor": {
       "obj": "Comparar empresas na mesma base, sem eleger vencedora.",
       "entrega": [
-        "Tabela lado a lado com indicadores adequados ao setor",
-        "Rentabilidade comparada no mesmo período (Análise de Ativo do CaptaMais)",
+        "Em uma frase: o que mais diferencia as empresas na pergunta que eu fiz",
+        "Escopo e o que torna as empresas comparáveis (janela, moeda, consolidação, definição)",
+        "Tabela lado a lado com indicadores adequados ao setor: indicador, definição, período e fonte para cada empresa (receita, crescimento, margens, geração de caixa, dívida, retorno sobre capital ou os próprios do setor)",
+        "Múltiplos lado a lado (P/L, P/VP, EV/EBITDA, dividend yield) com a data da cotação, sem chamar nenhuma de barata ou cara",
+        "Rentabilidade e volatilidade no mesmo período, contra o IBOV (Análise de Ativo do CaptaMais)",
+        "Último balanço de cada empresa: variação contra o trimestre anterior e contra o mesmo trimestre do ano passado",
+        "Preço-alvo e recomendação das casas de research para cada empresa, com casa e data (opinião delas)",
+        "Em cada empresa, 1 ponto forte e 1 ponto fraco, com número e fonte",
+        "Onde desconfiar em cada empresa: lucro sem caixa, dívida curta ou em moeda estrangeira, item não recorrente, queda de margem",
         "Diferenças de período, moeda e definição",
-        "Leitura das diferenças",
-        "Leitura para o cliente em linguagem simples (em que cada empresa difere, sem eleger a melhor)"
+        "Leitura das diferenças, sem eleger vencedora",
+        "O que monitorar no setor: de 4 a 6 variáveis ou indicadores, com o valor atual, o que mudaria a leitura e a data do próximo dado",
+        "Lacunas",
+        "Leitura para o cliente em linguagem simples (em que cada empresa difere, sem eleger a melhor) e a resposta pronta para quando ele perguntar qual escolher"
       ],
       "insumos": [
         "Empresas (tickers) ou setor",
         "Aspecto a comparar (rentabilidade, endividamento, crescimento…)",
         "Período"
       ],
-      "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo) e complete com fontes oficiais. Só me peça o que não achar por lá."
+      "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo; em ações e FIIs use pesquisa=true para trazer também múltiplos, preço-alvo das casas, relatórios resumidos e balanços) e complete com fontes oficiais. Chame analise_ativo com pesquisa=true uma vez por empresa (de 3 a 4; se eu só falei do setor, proponha as empresas e espere eu confirmar) e use todos os blocos: multiplosEIndicadores, balancosTrimestrais, precoAlvoPorCasa, ultimosRelatorios e lacunas; chame também tipo indice e IBOV na mesma janela. Indicadores do negócio vêm dos documentos oficiais de cada companhia. Célula sem dado na mesma base fica não informado, com o motivo."
     },
     "fii": {
       "obj": "Entender um fundo imobiliário: composição, preço e origem dos rendimentos.",
       "entrega": [
-        "Histórico e rentabilidade do fundo (Análise de Ativo do CaptaMais)",
-        "Composição: imóveis, crédito e fundos de fundos",
-        "Concentração (ativos, inquilinos, devedores)",
-        "P/VP e origem das distribuições",
-        "Pontos de atenção",
+        "Em uma frase: que tipo de fundo é, o que ele paga e o ponto que mais pesa agora (se eu informei a pergunta do cliente, abra respondendo a ela)",
+        "Segmento (tijolo, papel, fundo de fundos ou híbrido) e como isso muda a leitura",
+        "Histórico e rentabilidade comparados com o IFIX na mesma janela, com data-base (Análise de Ativo do CaptaMais)",
+        "Indicadores em tabela: P/VP (com a data da cota e a do valor patrimonial), distribuição dos últimos 12 meses sobre o preço datado (rotulada como histórica, não como retorno), patrimônio e liquidez diária, cada um com a referência para comparar (IFIX, histórico do fundo ou pares do segmento)",
+        "Composição e concentração em tabela: os 5 maiores imóveis, devedores ou fundos investidos, com a participação na receita ou na carteira",
+        "Operação do segmento: tijolo (vacância física e financeira, inadimplência, vencimento de contratos por ano, carências); papel (indexadores, garantias, atrasos, provisões, maiores devedores); fundo de fundos (fundos investidos e custos em cada camada)",
+        "Origem das distribuições dos últimos 12 meses, mês a mês: resultado recorrente, ganho não repetível e uso de reserva, com resultado, caixa e distribuição reconciliados",
+        "O que as casas de research dizem, em tabela: casa, data, recomendação, preço-alvo e premissa. É opinião delas, cite a casa e a data",
+        "Pontos fortes (até 4) e pontos fracos (até 4), cada um com número, período e fonte",
+        "Onde desconfiar, cada sinal como encontrado, descartado ou sem dado: distribuição acima do resultado, vacância ou inadimplência subindo, provisão crescente, concentração alta, alavancagem, rendimento pago com ganho não recorrente, desconto grande sem explicação, emissão de cotas que dilui",
+        "O que monitorar daqui para frente: de 5 a 7 indicadores, cada um com o valor atual, o nível que mudaria a leitura e a data do próximo dado (relatório gerencial, vencimento de contratos ou de operações)",
+        "O que falta: as seções que dependem do relatório gerencial e onde achá-lo",
         "Leitura para o cliente em linguagem simples (3 a 5 frases, sem recomendação)",
         "Perguntas que o cliente pode fazer, com resposta descritiva"
       ],
@@ -1230,21 +1298,31 @@
         "Relatório gerencial mais recente (cole o texto ou anexe)",
         "Para que cliente ou pergunta estou olhando"
       ],
-      "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo) e complete com fontes oficiais. Só me peça o que não achar por lá."
+      "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo; em ações e FIIs use pesquisa=true para trazer também múltiplos, preço-alvo das casas, relatórios resumidos e balanços) e complete com fontes oficiais. Chame analise_ativo com tipo fii e pesquisa=true e use todos os blocos que voltarem: multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias, declaradoNosRelatorios, ultimosRelatorios (aFavor e riscos), resumoPorIA e lacunas; chame também com tipo indice e IFIX na mesma janela. Composição, vacância, inadimplência e origem das distribuições vêm do relatório gerencial: se eu não colei, diga onde achar e siga com o resto. Se um bloco vier vazio, diga qual, sem inventar."
     },
     "rf": {
       "obj": "Comparar títulos de renda fixa na mesma base, com imposto e liquidez.",
       "entrega": [
-        "Tabela comparável (taxa, prazo, imposto, liquidez, risco)",
-        "Equivalência bruta × líquida, com as convenções explícitas",
+        "Em uma frase: o que mais separa os títulos para o prazo e o perfil informados",
+        "Base da comparação: data da cotação, prazo do cliente, pessoa física ou jurídica e fontes",
+        "Tabela comparável: emissor, indexador, taxa, prazo, carência, liquidez, garantia, risco de crédito e imposto",
+        "Equivalência bruta × líquida com a fórmula, os fatores acumulados no mesmo intervalo e as convenções explícitas (use o script de cálculos da skill nos casos simples)",
+        "Sensibilidade ao prazo, só nos prazos que eu informei, com hipóteses rotuladas",
+        "Risco do emissor e cobertura do FGC, com limite e vigência conferidos na fonte, e o que a cobertura não resolve",
+        "Saída antes do vencimento: resgate contratual, venda no mercado secundário e marcação a mercado dos títulos públicos",
+        "Imposto conferido em fonte oficial, com a data da consulta; o que ficou pendente aparece como pendente",
+        "Onde desconfiar: taxa muito acima do mercado para o risco, emissor sem histórico, liquidez só no vencimento, concentração em um emissor, percentual do CDI comparado com outro indexador sem converter",
         "Pontos de atenção de cada título",
-        "Leitura para o cliente em linguagem simples: o que muda entre os títulos, sem escolher por ele"
+        "O que monitorar: Selic, IPCA, o crédito do emissor, a data de carência e de vencimento e o uso do limite do FGC",
+        "Lacunas que alteram a comparação",
+        "Leitura para o cliente em linguagem simples: o que muda entre os títulos, sem escolher por ele, e as 3 perguntas mais difíceis com a resposta em uma frase"
       ],
       "insumos": [
         "Os títulos: emissor, indexador, taxa, vencimento e liquidez",
         "Prazo do cliente e data da cotação",
         "Cliente pessoa física ou jurídica"
-      ]
+      ],
+      "fonte": "Taxas do dia: Tesouro Direto e ANBIMA. CDI, Selic e IPCA do período, se precisar: analise_ativo com tipo indice (CDI, IPCA). Imposto, IOF e limite do FGC: confira nas fontes primárias e cite a data da consulta; sem acesso, entregue o bruto e deixe o líquido pendente. Não projete indexador."
     },
     "post": {
       "obj": "Criar um conteúdo educativo para o meu público, com a revisão das regras já feita.",
@@ -1253,7 +1331,19 @@
         "Tema do post",
         "Público e objetivo (educar, relacionamento ou captação)",
         "Dado ou notícia que quero usar, se houver", "Estilo da arte: fundo escuro ou claro e cor de destaque em hexadecimal (em branco, usa o padrão)"
-      ]
+      ],
+      "fonte": "Se eu não escrever o tema, use a skill pauta-de-conteudo para propor 3 ideias ligadas ao que meu público pergunta e ao momento de agora, diga por que esse tema agora e só então escreva a peça escolhida. Se o objetivo for captar novos clientes, feche com a chamada para o link da bio e diga que a página de captação sai pela rotina Landing Page."
+    },
+    "landing": {
+      "obj": "Montar a landing page que o meu post vai divulgar, no formato da Landing Page do CaptaMais, e deixar o rascunho criado na minha conta.",
+      "entrega": [
+        "Resumo de 2 linhas: o modelo escolhido, a promessa da página e o link",
+        "O texto da página seção a seção: título, apresentação, o que a pessoa recebe, como funciona, para quem é, formulário e botão",
+        "Rascunho criado na minha conta CaptaMais com a ferramenta landing_captamais (não publique): o endereço final e os passos para eu revisar e publicar",
+        "Chamada para o post, em peça separada: legenda com link na bio e o texto do botão do story",
+        "O que conferir antes de publicar (foto, depoimentos, números, identificação e aviso, regras do escritório)"
+      ],
+      "fonte": "Use a skill landing-page-captacao. Modelo: Diagnóstico = diagnostico, Anúncio direto = direto, Confiança = confianca, Autoridade = autoridade. A página fica no domínio captamais.me (captamais.me/landingpage/link); domínio próprio não existe neste fluxo. Crie só o rascunho e nunca diga que publicou."
     },
     "post-mercado": {
       "obj": "Transformar o indicador do dia em conteúdo simples para o cliente.",
@@ -1263,6 +1353,44 @@
       ]
     }
   };
+  const ONDE_PESQUISAR = {
+    macro: "Selic e Copom: bcb.gov.br (comunicados e atas do Copom); Selic, IPCA e dólar em série: API do Banco Central (api.bcb.gov.br, SGS); expectativas de mercado: relatório Focus, em bcb.gov.br; IPCA oficial: IBGE (SIDRA, tabela 1737, servicodados.ibge.gov.br).",
+    fato: "O documento original: sistema Rad da CVM (rad.cvm.gov.br) ou a página de Relações com Investidores da empresa; confira data e hora do envio; compare com o último ITR ou DFP (dados.cvm.gov.br) para ver o que de fato mudou.",
+    grafico: "Histórico de preço e rentabilidade: Análise de Ativo do CaptaMais (analise_ativo); cotação e volume: b3.com.br; proventos, desdobramentos e eventos que distorcem o gráfico: RI da empresa e B3.",
+    estudo: "Dados do ativo: Análise de Ativo do CaptaMais (analise_ativo); demonstrações e fatos relevantes: CVM (dados.cvm.gov.br e rad.cvm.gov.br); contexto macro: Banco Central e IBGE; para fundos, lâmina e regulamento no site da CVM.",
+    acao: "Demonstrações (ITR, DFP) e fatos relevantes: CVM (dados.cvm.gov.br, rad.cvm.gov.br) e RI da empresa; preço, rentabilidade e, conectado, múltiplos e pesquisa das casas: Análise de Ativo do CaptaMais (analise_ativo); setor e regulação: agências e ministérios em gov.br.",
+    setor: "Mesma data-base para todas as empresas: CVM (dados.cvm.gov.br) e RI de cada empresa; rentabilidade: Análise de Ativo do CaptaMais (analise_ativo); dados do setor: IBGE e a agência reguladora em gov.br.",
+    fii: "Composição e distribuições: relatório gerencial e fatos relevantes do fundo (site do gestor e Fundos.NET da B3; o Claude não abre o Fundos.NET, então diga o caminho para eu abrir); regulamento e dados cadastrais: CVM; preço, P/VP e histórico: Análise de Ativo do CaptaMais (analise_ativo).",
+    rf: "Tesouro Direto: tesourodireto.com.br (taxas e preços do dia); debêntures e curvas de juros: data.anbima.com.br; limite e cobertura do FGC: fgc.org.br; tabela de imposto de renda: gov.br (Receita Federal); CDI e Selic: api.bcb.gov.br.",
+  };
+  const USO_ENTREGA = (base) => () => {
+    const uso = (estado.respostas.uso ?? [])[0] ?? "";
+    if (/WhatsApp/i.test(uso)) return [
+      "Antes, pesquise tudo o que a rotina pede (dados, fontes e datas), mas entregue só o que eu vou mandar e o que preciso para sustentar a conversa",
+      "Resumo para mim em 2 linhas: o que aconteceu e o que muda na conversa com o cliente",
+      "Mensagem principal de WhatsApp, pronta para colar, em peça separada (tipo whatsapp): 3 a 5 linhas, começa pelo que importa para a pessoa, traduz o termo técnico e usa uma analogia do dia a dia",
+      "Versão de 2 linhas, em peça separada, para quando o cliente só quer saber o essencial",
+      "Resposta pronta, em peça separada, para as 2 perguntas que o cliente mais provavelmente fará depois",
+      "Uma pergunta aberta no fim da mensagem para continuar a conversa e entender a situação dele",
+      "Fora das mensagens, em 2 linhas: fonte e data de cada número e o que eu devo conferir antes de enviar",
+    ];
+    if (/fundo/i.test(uso)) return [
+      "Explicação direta em linguagem simples, em até 8 linhas: o que é, por que importa agora e o que muda",
+      ...base.filter((x) => !/^(Lacunas|Perguntas que o cliente)/.test(x)),
+      "Como funciona o mecanismo, passo a passo, com um exemplo numérico sintético e identificado como exemplo",
+      "Onde pesquisar para aprofundar: de 3 a 5 fontes primárias, na ordem em que vale abrir, cada uma com o que procurar ali e o endereço",
+      "Glossário dos termos novos, uma linha cada",
+      "As 3 perguntas mais difíceis que um cliente poderia fazer e a resposta em uma frase",
+      "O que ainda não dá para afirmar (lacunas) e como confirmar",
+    ];
+    return base;
+  };
+  ["macro", "fato", "grafico", "estudo", "acao", "setor", "fii", "rf"].forEach((id) => {
+    const p = PEDIDO[id]; if (!p) return;
+    p.entrega = USO_ENTREGA(Array.isArray(p.entrega) ? p.entrega : []);
+    p.fonte = (p.fonte ? p.fonte + " " : "") + "Onde pesquisar, nesta ordem: " + ONDE_PESQUISAR[id] + " Cite a fonte e a data de cada número.";
+    if (["estudo", "acao", "setor", "fii", "grafico"].includes(id)) p.fonte += " Índice de comparação na mesma janela: analise_ativo com tipo indice (IFIX para FII, IBOV para ações, CDI para renda fixa).";
+  });
   const hojeBR = () => new Date().toLocaleDateString("pt-BR");
   const CAMPOS = {
     "relacionamento": [
@@ -1328,6 +1456,11 @@
     "followup": [
       { rotulo: "O que foi proposto e o que o cliente disse (se disse algo)", longo: true, dica: "Ex.: enviei a proposta de assessoria em 05/11; disse que ia ver com a esposa" },
       { rotulo: "Data que ele combinou de responder (opcional)", opcional: true },
+    ],
+    "pauta": [
+      { rotulo: "Para quem quero falar", dica: "Ex.: profissional liberal que só usa poupança", opcional: true },
+      { rotulo: "Dúvidas que clientes e prospects mais me fazem (opcional)", opcional: true, dica: "Ex.: onde investir o 13º, CDB ou Tesouro", longo: true },
+      { rotulo: "Meus posts que mais salvaram ou geraram conversa (opcional)", opcional: true, dica: "Ex.: carrossel sobre imposto no CDB", longo: true },
     ],
     "calendario": [
       { rotulo: "Semana ou período", dica: "Ex.: semana de 17 a 21/11", padrao: "Próxima semana" },
@@ -1417,6 +1550,13 @@
       { rotulo: "Dado ou notícia que quero usar", opcional: true },
       { rotulo: "Estilo da arte", opcoes: ["Fundo escuro", "Fundo claro"], padrao: "Fundo escuro" },
     ],
+    "landing": [
+      { rotulo: "Post de origem ou tema da página", dica: "Ex.: carrossel 3 erros ao investir em renda fixa" },
+      { rotulo: "O que a pessoa recebe ao deixar o contato", dica: "Ex.: diagnóstico gratuito de 30 minutos" },
+      { rotulo: "Meu WhatsApp (opcional)", opcional: true, dica: "Ex.: 11 99999-0000" },
+      { rotulo: "Meu Instagram (opcional)", opcional: true, dica: "Ex.: @meuperfil" },
+      { rotulo: "Link desejado da página (opcional)", opcional: true, dica: "Ex.: henri-diagnostico (em branco, eu sugiro)" },
+    ],
     "post-mercado": [
       { rotulo: "Ângulo ou público do post", opcoes: ["Educar iniciantes", "Clientes atuais", "Explicar a decisão do dia"], padrao: "Educar iniciantes" },
     ],
@@ -1436,7 +1576,7 @@
   ];
   const DADOS_RE = /Dados que vou te passar[^\n]*\n(?:(?:- |  )[^\n]*(?:\n|$))*/;
 
-  const SKILLS_CONHECIDAS = ["comparador-de-carteira", "primeira-reuniao", "segunda-reuniao", "relacionamento-e-indicacao", "explicar-ao-cliente", "planejamento-sucessorio", "roteiro-comercial", "relatorio-e-proposta", "calendario-de-conteudo", "analise-fii", "comparacao-renda-fixa", "comparativo-setorial", "conteudo-para-cliente", "diagnostico-financeiro", "estudo-de-ativo", "fundamentalista-metodo", "leitura-grafica", "macro-brasil", "objecoes", "prospeccao-abordagem", "resumo-de-fato-relevante", "retomada-lead-frio", "prospect-intake", "pre-meeting", "post-meeting", "portfolio-rebalance-review"];
+  const SKILLS_CONHECIDAS = ["comparador-de-carteira", "primeira-reuniao", "segunda-reuniao", "relacionamento-e-indicacao", "explicar-ao-cliente", "planejamento-sucessorio", "roteiro-comercial", "relatorio-e-proposta", "calendario-de-conteudo", "pauta-de-conteudo", "landing-page-captacao", "analise-fii", "comparacao-renda-fixa", "comparativo-setorial", "conteudo-para-cliente", "diagnostico-financeiro", "estudo-de-ativo", "fundamentalista-metodo", "leitura-grafica", "macro-brasil", "objecoes", "prospeccao-abordagem", "resumo-de-fato-relevante", "retomada-lead-frio", "prospect-intake", "pre-meeting", "post-meeting", "portfolio-rebalance-review"];
   let tarefasUsuario = [], tarefasQuebradas = [];
   const textoDe = (x) => (x && typeof x === "object" ? (x.t ?? x.texto ?? x.nome ?? x.rotulo ?? x.titulo ?? x.label ?? "") : x);
   const limpa = (x, n) => { const v = textoDe(x); return (typeof v === "object" ? "" : String(v ?? "")).replace(/[<>\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, n); };
@@ -1513,7 +1653,7 @@
   let ajustes = { tarefas: {}, skills: {} };
   const BASE_PERGUNTAS = {};
   const regrasLimpas = (x) => lista(x, 12, 200);
-  const PERGUNTAS_FIXAS = ["resultado", "atuacao"];
+  const PERGUNTAS_FIXAS = ["resultado", "atuacao", "uso"];
   function aplicarAjusteTarefa(id) {
     const t = T[id]; if (!t) return;
     if (!BASE_PERGUNTAS[id]) BASE_PERGUNTAS[id] = JSON.parse(JSON.stringify(t.perguntas ?? [RESULTADO]));
@@ -1615,10 +1755,14 @@
   });
 
   const REGRAS_PEDIDO = "Regras: descreva, não recomende compra, venda nem alocação, e não prometa retorno. Todo número com fonte, data e unidade. " +
-    "Marque com [CONFERIR] o que eu preciso validar (compliance, dado do cliente, número sem fonte). Sem nome nem CPF de cliente.";
+    "Marque com [CONFERIR] o que eu preciso validar (compliance, dado do cliente, número sem fonte). Sem nome nem CPF de cliente. " +
+    "Comece pela resposta em uma frase, em negrito, sem preâmbulo; frases curtas; todo número com uma referência para comparar (período anterior, índice ou meta); feche com o próximo passo e o que conferir.";
 
   let perfil = null, captamais = null;
-  const perguntasDe = (t) => (t.perguntas ?? [RESULTADO]).filter((p) => !(p.id === "atuacao" && perfil?.atuacao));
+  const PDF_OK = ["relatorio-mensal", "carteira", "primeira-reuniao", "segunda-reuniao"];
+  const PDF_NOMES = ["Relatório mensal ao cliente", "Revisão de carteira", "Primeira reunião", "Segunda reunião"];
+  const permitePdf = (t) => PDF_OK.includes(Object.keys(T).find((k) => T[k] === t)) || PDF_NOMES.includes(t && t.nome);
+  const perguntasDe = (t) => (t.perguntas ?? [RESULTADO]).filter((p) => !(p.id === "atuacao" && perfil?.atuacao) && (p.id !== "resultado" || permitePdf(t)));
 
   const $ = (s) => document.querySelector(s);
   const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
@@ -1643,9 +1787,9 @@
   }
 
   function voltarTela() {
-    if (estado.tela === "lista") ir("inicio");
+    if (estado.tela === "lista") ir(estado.pasta ? "lista" : "inicio", estado.pasta ? { pasta: null } : {});
     else if (estado.tela === "guia") voltarPasso();
-    else if (estado.tela === "fim") ir("guia", { passo: perguntasDe(T[estado.tarefa]).length - 1 });
+    else if (estado.tela === "fim") perguntasDe(T[estado.tarefa]).length ? ir("guia", { passo: perguntasDe(T[estado.tarefa]).length - 1 }) : ir("lista");
     else if (estado.tela === "acompanhar") ir("lista");
   }
 
@@ -1656,7 +1800,9 @@
     if (estado.tela === "inicio") return;
     const area = AREAS.find((a) => a.id === estado.area);
     add("Início", () => ir("inicio"));
-    add(area.nome, estado.tela === "lista" ? null : () => ir("lista"));
+    const gp = AREAS.flatMap((x) => x.grupos).find((g) => g.pasta && (estado.tela === "lista" ? g.nome === estado.pasta : g.tarefas.includes(estado.tarefa)));
+    add(area.nome, estado.tela === "lista" && !gp ? null : () => ir("lista", { pasta: null }));
+    if (gp) add(gp.nome, estado.tela === "lista" ? null : () => ir("lista", { pasta: gp.nome }));
     if (estado.tarefa) add(T[estado.tarefa].nome, null);
   }
 
@@ -1674,10 +1820,12 @@
     } finally { escolhendoVideo = false; }
   }
   function ir(tela, extra = {}) {
+    if (tela === "guia") { const tid = extra.tarefa || estado.tarefa; if (tid && T[tid] && perguntasDe(T[tid]).length === 0) tela = "fim"; }
     if (tela === "guia" && extra.tarefa === "editar-reels" && !videoEscolhido) { escolherVideoPrimeiro(tela, extra); return; }
     if (tela === "inicio" || tela === "lista") videoEscolhido = "";
+    if (tela === "lista" && !("pasta" in extra)) { const gp = AREAS.flatMap((x) => x.grupos).find((g) => g.pasta && g.tarefas.includes(estado.tarefa)); extra = { ...extra, pasta: gp ? gp.nome : null }; }
     Object.assign(estado, { tela }, extra);
-    if (tela === "inicio") Object.assign(estado, { area: null, tarefa: null });
+    if (tela === "inicio") Object.assign(estado, { area: null, tarefa: null, pasta: null });
     if (tela === "lista") Object.assign(estado, { tarefa: null });
     if (tela !== "acompanhar") { clearInterval(vigia); vigia = null; estado.historico = null; }
     render();
@@ -1872,12 +2020,20 @@
 
   function telaLista(v) {
     const a = AREAS.find((x) => x.id === estado.area);
-    const itens = a.grupos.flatMap((g) => g.tarefas.map((id) => ({ id, grupo: g.nome })));
+    const pastaAtual = a.grupos.find((g) => g.pasta && g.nome === estado.pasta);
+    const itens = pastaAtual ? pastaAtual.tarefas.map((id) => ({ id, grupo: pastaAtual.nome })) : a.grupos.flatMap((g) => g.pasta ? [{ pasta: g }] : g.tarefas.map((id) => ({ id, grupo: g.nome })));
     const n = itens.length, cols = n <= 3 ? n : n === 4 ? 2 : n <= 6 ? 3 : 4;
-    v.append(el("h1", "titulo", esc(a.nome)), el("p", "sub", esc(a.desc)));
+    v.append(el("h1", "titulo", esc(pastaAtual ? pastaAtual.nome : a.nome)), el("p", "sub", esc(pastaAtual ? pastaAtual.desc : a.desc)));
     const portas = el("div", "portas grade"); portas.style.setProperty("--cols", cols);
-    itens.forEach(({ id, grupo }, i) => {
-      const t = T[id], larga = i === 0 && n % cols !== 0 && (n + 1) % cols === 0;
+    itens.forEach((it, i) => {
+      const larga = i === 0 && n % cols !== 0 && (n + 1) % cols === 0;
+      if (it.pasta) {
+        portas.append(porta("porta tarefa" + (larga ? " larga" : ""),
+          `${GLIFOS[a.glifo](i + 1)}<div class="n">${String(i + 1).padStart(2, "0")} · ${it.pasta.tarefas.length} opções</div><h3>${esc(it.pasta.nome)}</h3><p>${esc(it.pasta.desc)}</p><div class="ir"><b></b>Abrir</div>`,
+          () => ir("lista", { pasta: it.pasta.nome })));
+        return;
+      }
+      const { id, grupo } = it, t = T[id];
       const cartao = porta("porta tarefa" + (larga ? " larga" : ""),
         `${GLIFOS[a.glifo](i + 1)}<div class="n">${String(i + 1).padStart(2, "0")} · ${esc(grupo)}</div><h3>${esc(t.nome)}</h3><p>${esc(t.linha)}</p><div class="ir"><b></b>Começar</div>`,
         () => ir("guia", { tarefa: id, passo: 0, respostas: {}, campos: {} }));
@@ -2023,7 +2179,7 @@
     }
     const rod = el("div", "rodape");
     const voltar = el("button", "fantasma", "← Ajustar");
-    voltar.onclick = () => ir("guia", { passo: ps.length - 1 });
+    voltar.onclick = () => (ps.length ? ir("guia", { passo: ps.length - 1 }) : ir("lista"));
     const enviar = el("button", "seguir", `${esc(t.acao)} <span>→</span>`);
     enviar.onclick = () => enviarPedido(t, ps);
     rod.append(voltar, el("span", "dica", ""), enviar);
@@ -2101,8 +2257,22 @@
     vidro.append(meio);
     const rod = el("div", "rodape");
     const outra = el("button", "fantasma", "← Outra tarefa");
-    outra.onclick = () => ir("lista");
-    rod.append(outra, el("span", "dica", pronto ? "" : sv === "sua-vez" ? "Responda na caixa de baixo." : sv === "pensando" ? "Aguarde: o Claude está trabalhando." : "Escreva ou anexe no campo do Claude e envie."));
+    outra.onclick = async () => {
+      if (ehVideo && sv === "pensando" && !confirm("A edição do vídeo ainda está rodando. Parar a edição e ir para outra tarefa?")) return;
+      if (ehVideo && window.__mesaEncerrar) { try { await window.__mesaEncerrar(); } catch {   } }
+      ir("lista");
+    };
+    rod.append(outra);
+    if (ehVideo && sv === "pensando" && window.__mesaParar) {
+      const par = el("button", "fantasma", "■ Parar a edição");
+      par.onclick = async () => { if (confirm("Parar a edição do vídeo agora?")) { try { await window.__mesaParar(); } catch {   } } };
+      rod.append(par);
+    } else if (ehVideo && window.__mesaEncerrar) {
+      const enc = el("button", "fantasma", "Encerrar esta edição");
+      enc.onclick = async () => { try { await window.__mesaEncerrar(); } catch {   } ir("inicio"); };
+      rod.append(enc);
+    }
+    rod.append(el("span", "dica", pronto ? "" : sv === "sua-vez" ? "Responda na caixa de baixo." : sv === "pensando" ? "Aguarde: o Claude está trabalhando." : "Escreva ou anexe no campo do Claude e envie."));
     vidro.append(rod);
     guia.append(vidro, dossie(t, ps, true));
     v.append(guia);
@@ -2195,6 +2365,7 @@
       ...(quem ? [`Assessor: ${quem}`] : []),
       ...(perfil?.publico ? [`Meu público: ${perfil.publico}`] : []),
       ...(perfil?.tom ? [`Meu tom: ${perfil.tom}`] : []),
+      "Papel: você é o analista sênior de apoio de um assessor de investimentos no Brasil, que atende o cliente logo depois de ler a sua resposta. Seja objetivo, preciso e útil para a conversa.",
       ...linhasVoz(),
       `CaptaMais: ${captamais?.estado === "conectado" && captamais.ativos ? "conectado, Análise de Ativo liberada" : captamais?.estado === "conectado" ? "conectado, mas a Análise de Ativo não está disponível agora" : "não conectado (peça os dados ao assessor)"}`,
       ...(c.obj ? ["", `Objetivo: ${c.obj}`] : []),

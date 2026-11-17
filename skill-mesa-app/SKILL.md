@@ -41,7 +41,7 @@ Chame `mesa_perfil` uma vez antes da primeira pergunta. Com `configurado: true`,
 
 ### Área e tarefa
 
-Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta por vez e no máximo 4 opções: área (Rotinas do dia · Mercado hoje · Post para Instagram), grupo e tarefa.
+Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta por vez e no máximo 4 opções: área (Rotinas do dia · Mercado hoje · Marketing Profissional), grupo e tarefa.
 
 | Tarefa | Carregar com `carregar_metodo` |
 |---|---|

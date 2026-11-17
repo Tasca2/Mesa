@@ -14,7 +14,7 @@ Dar ao assessor material que ele leva ao cliente: números certos, com fonte e d
 - Perfil do assessor (`mesa_perfil`) e a atuação (define a identificação e os avisos).
 
 ## Passos
-1. **Dados**: chame `analise_ativo` para cada ativo. Use os números **exatamente** como vierem, com data-base e fonte. Se voltar `SEM_CONEXAO`/`SEM_ANALISE` ou o ativo não for achado, diga em uma frase, peça que o assessor cole os dados da tela (marque "fonte: informado pelo assessor") e **entregue mesmo assim** a estrutura com `[CONFERIR]` onde falta número. Nunca complete número de memória.
+1. **Dados**: chame `analise_ativo` para cada ativo (para ação, com `pesquisa: true`: traz também múltiplos, preço-alvo das casas, relatórios resumidos e balanços; use como opinião das casas, com casa e data, nunca como recomendação sua). Use os números **exatamente** como vierem, com data-base e fonte. Se voltar `SEM_CONEXAO`/`SEM_ANALISE` ou o ativo não for achado, diga em uma frase, peça que o assessor cole os dados da tela (marque "fonte: informado pelo assessor") e **entregue mesmo assim** a estrutura com `[CONFERIR]` onde falta número. Nunca complete número de memória.
 2. **Contexto**, só se agregar (carregue com `carregar_metodo`): `macro-brasil` (Selic, IPCA, câmbio); `resumo-de-fato-relevante` se houve comunicado recente; `analise-fii`, `fundamentalista-metodo` ou `comparativo-setorial` conforme o ativo.
 3. **Escreva para o cliente do perfil informado**: conservador = foco em oscilação e liquidez; arrojado = foco em retorno e risco assumido; sem jargão, termo técnico explicado na primeira vez.
 4. **Compliance**: identificação do profissional conforme a atuação, aviso de que desempenho passado não garante o futuro, fonte e data-base em todo número. Regra específica: `consultar_cofre` (tema `legislacao`) ou `[CONFERIR]`.
@@ -22,7 +22,7 @@ Dar ao assessor material que ele leva ao cliente: números certos, com fonte e d
 ## Modelo de saída
 **Resumo de uma página** (`relatorio`): 
 1. *Em uma frase*: o que é o ativo e por que está na conversa.
-2. *Números do período*: tabela (retorno 12 e 24 meses, ano, índice de referência, pior mês) — cada linha com data-base.
+2. *Números do período*: tabela (retorno 12 e 24 meses, ano, índice de referência, pior mês) — cada linha com data-base. O índice de referência vem de `analise_ativo` com tipo `indice` (IFIX para FII, IBOV para ação, CDI para renda fixa), na mesma janela do ativo.
 3. *Risco observado*: oscilação, concentração, liquidez (só o que há dado).
 4. *Contexto de mercado*: 2 a 3 linhas, com fonte e data.
 5. *O que observar*: eventos e datas, sem previsão.

@@ -15,6 +15,10 @@ Aproveite tema, formato, extensão, público, dúvida original e exemplos aprova
 
 Regras institucionais fornecidas delimitam o texto; não invente aprovação ou norma interna. Dado de mercado exige origem e data; se o pedido incluir pesquisa, procure fonte primária. Sem dado verificável, explique o mecanismo sem introduzir número de mercado.
 
+## Quando falta o tema, ou o assessor pede ideias
+
+Não invente um tema genérico. Carregue a skill `pauta-de-conteudo`, entregue 3 ideias ranqueadas (dor do público, por que agora, gancho e o que a pessoa leva) e, se o assessor não escolher, siga com a de maior nota e diga em uma linha por quê. Todo texto passa no teste de impacto: quem vê entende ou faz algo concreto depois, há motivo datado para ver agora e o gancho aparece nos 3 primeiros segundos.
+
 ## Composição
 
 - Uma ideia central por peça curta; material longo pode desenvolver vários pontos com relação clara.

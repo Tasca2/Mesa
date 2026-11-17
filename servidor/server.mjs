@@ -119,7 +119,7 @@ const pastaDa = (skill) => path.join(ROTINAS.includes(skill) ? PASTA_ROTINAS : P
 
 const AREAS = 'Rotinas do dia (cliente novo, pré-reunião, pós-reunião, revisão de carteira, diagnóstico, primeira abordagem, objeções, retomada de lead frio); ' +
   'Mercado hoje (juros, inflação e câmbio, fato relevante, gráfico, ação, setor, fundo imobiliário, renda fixa, estudo e apresentação de ativo); ' +
-  'Post para Instagram (criar um post, post do mercado de hoje)';
+  'Marketing Profissional (Post para Instagram: criar um post, ideias para postar hoje, calendário de post; editar um Reels; landing page)';
 const COMO_ATUALIZAR = 'Em toda tarefa enviada pela Mesa (mensagem que começa com [Mesa]), chame mesa_perfil para saber quem é o assessor, ' +
   'chame mesa_andamento antes de cada pedido ao assessor, dizendo em uma frase o que ele precisa responder ou anexar no chat, ' +
   'e ao terminar, com concluido=true; depois registre a tarefa com mesa_perfil (registrar).';
@@ -600,7 +600,8 @@ function buildServer() {
     },
     async (args) => {
       try {
-        const r = await gerarDocumento(args);
+        const p = lerPerfil();
+        const r = await gerarDocumento(args, { ...(p.marca || {}), nome: p.nome, escritorio: p.escritorio });
         return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pdf: r.pdf }) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui gerar o PDF: ${e?.message ?? e}. Entregue o texto no chat.` }] };
@@ -653,16 +654,18 @@ function buildServer() {
       title: 'Análise de ativo (CaptaMais)',
       description:
         'Busca na conta CaptaMais do assessor os dados da Análise de Ativo (histórico e rentabilidade mensal, comparação com índice) ' +
-        'de uma ação, FII, ETF ou fundo. Use para estudos e apresentações. Se a conta não estiver conectada, avise o assessor e peça os dados por colagem.',
+        'de uma ação, FII, ETF ou fundo. Use para estudos e apresentações. Se a conta não estiver conectada, avise o assessor e peça os dados por colagem. ' +
+        'Índice de comparação: use tipo=indice e o código (CDI, IPCA, IBOV, IFIX, SMLL, IDIV, SP500-BRL, dólar), na mesma janela do ativo. Com pesquisa=true, para ações e FIIs, traz também preço-alvo e recomendação das casas de research, múltiplos e indicadores, números dos relatórios, resumo por IA, últimos relatórios, balanços trimestrais e a lista de arquivos da CVM.',
       inputSchema: {
         ticker: z.string().max(40).optional().describe('Ticker, ex.: PETR4, HGLG11, IVVB11'),
         tipo: z.enum(['acoes', 'fii', 'etf', 'fundo', 'indice']).optional(),
         nome: z.string().max(120).optional().describe('Nome do fundo, quando não houver ticker'),
         cnpj: z.string().max(20).optional().describe('CNPJ do fundo'),
+        pesquisa: z.boolean().optional().describe('true, para ações e FIIs: inclui a pesquisa das casas, múltiplos, relatórios e balanços'),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ ticker, tipo, nome, cnpj }) => {
+    async ({ ticker, tipo, nome, cnpj, pesquisa }) => {
       if (!ticker && !nome && !cnpj) return { isError: true, content: [{ type: 'text', text: 'Informe ticker, nome do fundo ou CNPJ.' }] };
       const CHAVE = chaveAtual();
       if (!CHAVE) {
@@ -676,7 +679,7 @@ function buildServer() {
           method: 'POST',
           redirect: 'error', signal: AbortSignal.timeout(20000),
           headers: { 'Content-Type': 'application/json', 'x-captamais-market-key': CHAVE, 'x-captamais-client': 'mesa-do-assessor/1.0.0' },
-          body: JSON.stringify({ ticker, tipo, nome, cnpj }),
+          body: JSON.stringify({ ticker, tipo, nome, cnpj, pesquisa: pesquisa === true }),
         });
         const json = await res.json().catch(() => ({}));
         if (res.status === 404) return { content: [{ type: 'text', text: 'Esta versão do CaptaMais ainda não oferece a análise de ativo pelo conector. Peça ao assessor os dados da tela Análise de Ativo (colagem ou print) e siga com eles.' }] };
@@ -685,6 +688,47 @@ function buildServer() {
         if (res.status === 403) return { content: [{ type: 'text', text: `SEM_ANALISE: a Análise de Ativo não está disponível para esta conta agora. Diga isso ao assessor em uma frase e siga com os dados que ele colar.` }] };
         if (!res.ok || json?.success === false) return { isError: true, content: [{ type: 'text', text: String(json?.message || `Falha no CaptaMais (HTTP ${res.status}).`) }] };
         return { content: [{ type: 'text', text: JSON.stringify(json.data ?? json) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: `Não consegui falar com o CaptaMais: ${e?.message ?? e}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'landing_captamais',
+    {
+      title: 'Landing page no CaptaMais (rascunho)',
+      description:
+        'Cria a landing page de captação na conta CaptaMais do assessor, como RASCUNHO. Nunca publica e nunca altera uma página que já exista (cada conta tem uma). ' +
+        'A página fica em captamais.me/landingpage/<slug> depois que o assessor revisar e publicar na tela Landing Page. Use só com a skill landing-page-captacao e depois de mostrar o texto ao assessor.',
+      inputSchema: {
+        slug: z.string().min(3).max(48).describe('Link da página: 3 a 48 caracteres, letras minúsculas, números e hífen'),
+        conteudo: z.record(z.string(), z.any()).describe('Campos da landing nos nomes do CaptaMais: template (diagnostico, direto, confianca ou autoridade), headline, publicName, bio, productTitle, productDescription, differentiators, ctaTitle, whatsapp, instagramUrl, leadFields, wealthOptions, tagline, badges, stats, audiences, steps, formTitle, formIntro etc.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ slug, conteudo }) => {
+      const CHAVE = chaveAtual();
+      if (!CHAVE) {
+        return { content: [{ type: 'text', text: 'SEM_CONEXAO: o assessor ainda não conectou o CaptaMais, então não dá para gravar a página. Diga em uma frase que clicando em Entrar no CaptaMais (canto direito da Mesa) o rascunho passa a ser criado direto, e entregue o texto da página pronto para ele colar na tela Landing Page.' }] };
+      }
+      if (!urlSegura(CAPTAMAIS_URL)) {
+        return { isError: true, content: [{ type: 'text', text: 'Não foi possível conectar ao CaptaMais agora. Entregue o texto da página pronto para colar.' }] };
+      }
+      try {
+        const res = await fetch(`${CAPTAMAIS_URL}/api/mcp/landing/rascunho`, {
+          method: 'POST',
+          redirect: 'error', signal: AbortSignal.timeout(20000),
+          headers: { 'Content-Type': 'application/json', 'x-captamais-market-key': CHAVE, 'x-captamais-client': 'mesa-do-assessor/1.0.0' },
+          body: JSON.stringify({ slug, content: conteudo }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.status === 404) return { content: [{ type: 'text', text: 'ROTA_INDISPONIVEL: esta versão do CaptaMais ainda não cria a landing pelo conector. Entregue o texto da página pronto para o assessor colar na tela Landing Page.' }] };
+        if (res.status === 401) return { content: [{ type: 'text', text: 'SEM_CONEXAO: a conexão com o CaptaMais expirou. Peça ao assessor para clicar em Reconectar CaptaMais (canto direito da Mesa) e entregue o texto pronto para colar.' }] };
+        if (res.status === 429) return { content: [{ type: 'text', text: 'LIMITE: muitas consultas em pouco tempo. Não repita agora: entregue o texto pronto para colar.' }] };
+        if (res.status === 409) return { content: [{ type: 'text', text: `${json?.code === 'slug_em_uso' ? 'SLUG_EM_USO' : 'JA_EXISTE'}: ${String(json?.message || '')} ${json?.data ? JSON.stringify(json.data) : ''}` }] };
+        if (!res.ok || json?.success === false) return { isError: true, content: [{ type: 'text', text: String(json?.message || `Falha no CaptaMais (HTTP ${res.status}).`) }] };
+        return { content: [{ type: 'text', text: `OK_RASCUNHO: ${JSON.stringify(json.data ?? json)}. A página NÃO está publicada: o assessor revisa, sobe a foto e publica em ${json?.data?.editar || CAPTAMAIS_URL + '/landing-page'}.` }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui falar com o CaptaMais: ${e?.message ?? e}` }] };
       }

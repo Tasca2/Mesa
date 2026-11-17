@@ -229,17 +229,24 @@ function mdParaHtml(texto) {
   return out;
 }
 
-export async function gerarDocumento(a) {
+export async function gerarDocumento(a, marcaBase = {}) {
   const secoes = Array.isArray(a.secoes) ? a.secoes.slice(0, 30) : [];
   if (!secoes.length) throw new Error('Envie pelo menos uma seção.');
+  const cor = /^#[0-9a-fA-F]{6}$/.test(a.cor || '') ? a.cor : /^#[0-9a-fA-F]{6}$/.test(marcaBase.cor || '') ? marcaBase.cor : '#A8741A';
+  const logo = imagemEmbutida(marcaBase.logo, [], 'logo');
+  const quem = [marcaBase.escritorio, marcaBase.nome].filter(Boolean).map(esc).join(' · ');
+  const marca = (logo ? `<img class="logo" src="${logo}">` : '') + (quem ? `<span>${quem}</span>` : '');
+  const destaque = (h) => h.replace(/\[CONFERIR[^\]]*\]/g, (m) => `<mark>${m}</mark>`);
   const html = `<!doctype html><meta charset="utf-8"><title>${esc(a.titulo)}</title><style>
-@page{size:A4;margin:18mm 17mm 20mm}*{box-sizing:border-box}body{font-family:${FONTE};font-size:10.5pt;line-height:1.5;color:#1b1b1d;margin:0}
-header{border-bottom:3px solid #A8741A;padding-bottom:10px;margin-bottom:18px}h1{font-size:22pt;line-height:1.15;margin:0 0 4px}.sub{color:#6b6b70;font-size:11pt}
-h2{font-size:14pt;margin:20px 0 6px;color:#0b3d5c;break-after:avoid}h3{font-size:11.5pt;margin:12px 0 4px;break-after:avoid}p{margin:0 0 8px}ul{margin:0 0 8px;padding-left:20px}li{margin-bottom:3px}
-table{border-collapse:collapse;width:100%;margin:8px 0 12px;font-size:9.5pt;break-inside:avoid}th,td{border:1px solid #cfcfd4;padding:5px 8px;text-align:left;vertical-align:top}th{background:#eef1f4}
-footer{margin-top:26px;padding-top:10px;border-top:1px solid #cfcfd4;color:#6b6b70;font-size:9pt}</style>
-<header><h1>${esc(a.titulo)}</h1>${a.subtitulo ? `<div class="sub">${esc(a.subtitulo)}</div>` : ''}</header>
-${secoes.map((s) => `<section>${s.titulo ? `<h2>${esc(s.titulo)}</h2>` : ''}${mdParaHtml(s.texto || '')}</section>`).join('\n')}
+@page{size:A4;margin:16mm 16mm 18mm}*{box-sizing:border-box}body{font-family:${FONTE};font-size:10.5pt;line-height:1.55;color:#1b1b1d;margin:0}
+.marca{display:flex;align-items:center;gap:10px;font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#6b6b70;margin-bottom:14px}.marca .logo{height:26px;width:auto}
+header{border-bottom:3px solid ${cor};padding-bottom:12px;margin-bottom:20px}h1{font-size:23pt;line-height:1.15;margin:0 0 5px;color:#12202b}.sub{color:#6b6b70;font-size:11pt}
+h2{font-size:13.5pt;margin:22px 0 7px;color:#0b3d5c;break-after:avoid;padding-left:10px;border-left:4px solid ${cor}}h3{font-size:11.5pt;margin:12px 0 4px;break-after:avoid}p{margin:0 0 8px}ul{margin:0 0 8px;padding-left:20px}li{margin-bottom:3px}li::marker{color:${cor}}
+table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:9.5pt;break-inside:avoid}th,td{border:1px solid #d9dbe0;padding:6px 9px;text-align:left;vertical-align:top}th{background:${cor}26;color:#12202b;border-bottom:2px solid ${cor}}tr:nth-child(even) td{background:#f6f7f9}
+mark{background:#fff1c2;color:#6a4b00;padding:0 4px;border-radius:3px;font-size:.92em}
+footer{margin-top:28px;padding-top:10px;border-top:1px solid #cfcfd4;color:#6b6b70;font-size:8.8pt}</style>
+${marca ? `<div class="marca">${marca}</div>` : ''}<header><h1>${esc(a.titulo)}</h1>${a.subtitulo ? `<div class="sub">${destaque(esc(a.subtitulo))}</div>` : ''}</header>
+${secoes.map((s) => `<section>${s.titulo ? `<h2>${esc(s.titulo)}</h2>` : ''}${destaque(mdParaHtml(s.texto || ''))}</section>`).join('\n')}
 ${a.rodape ? `<footer>${esc(a.rodape)}</footer>` : ''}`;
   const pdf = path.join(pastaBase(), `${slug(a.titulo)}-${carimbo()}.pdf`);
   await renderizar(html, pdf, 'pdf', [794, 1123]);
