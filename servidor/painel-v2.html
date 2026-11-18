@@ -1249,7 +1249,7 @@
     "Não repita informação entre seções (cada número aparece uma vez); use tabelas curtas no lugar de parágrafos; o que é aprofundamento vai em seções recolhidas, com título começando por +. O Conferir é sempre a última coisa da resposta, em texto simples, sem título nem destaque (no PDF, a última seção).";
 
   let perfil = null, captamais = null;
-  const PDF_OK = ["relatorio-mensal", "carteira", "primeira-reuniao", "segunda-reuniao"];
+  const PDF_OK = ["relatorio-mensal", "carteira", "primeira-reuniao", "segunda-reuniao", "comparador", "proposta", "diagnostico"];
   const PDF_NOMES = ["Relatório mensal ao cliente", "Revisão de carteira", "Primeira reunião", "Segunda reunião"];
   const permitePdf = (t) => PDF_OK.includes(Object.keys(T).find((k) => T[k] === t)) || PDF_NOMES.includes(t && t.nome);
   const perguntasDe = (t) => (t.perguntas ?? [RESULTADO]).filter((p) => !(p.id === "atuacao" && perfil?.atuacao) && (p.id !== "resultado" || permitePdf(t)));

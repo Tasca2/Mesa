@@ -23,6 +23,8 @@ Tirar do assessor o trabalho de montar do zero o relatório do mês, a proposta 
 **Peças** (cada uma separada, sem comentário dentro): `relatorio` (relatório ou proposta, com título), `whatsapp` (mensagem de envio ou cada toque, até 4 linhas), `email` (quando pedido), `nota-crm` (o que foi enviado e o próximo passo).
 **Conferir** — dados, condições e datas que o assessor valida.
 
+**Em PDF** (Resultado PDF): `mesa_documento` com `cliente` (apelido ou iniciais) e `dataBase`. Relatório mensal: `tipo: "relatorio"`, até 4 `destaques` do mês (patrimônio, variação no período, com o número do texto) e, se o assessor informar os retornos mensais, `grafico` `linha` com `retornos: true` (carteira, CDI e índice, com fonte). Proposta: `tipo: "proposta"` e `capa: true`. WhatsApp, e-mail, nota de CRM e Conferir ficam no chat, fora do PDF.
+
 ## Exemplo
 Bom (envio do relatório): "Oi, Marta! Mandei o resumo de outubro: o patrimônio fechou o mês em R$ 482 mil e abaixo vai o que explicou a variação. Tem dois vencimentos em dezembro que quero combinar com você. Sexta, 10h, funciona?" Ruim: "Seu rendimento foi ótimo, recomendo aumentar a renda variável." (recomendação e juízo sem fonte).
 
