@@ -137,8 +137,12 @@ test('a skill de juros avisa que, na Mesa, vale a tabela do pedido e não a regr
   assert.match(secaoDaMesa('macro-brasil'), /tabela/i);
 });
 
-test('a skill de juros manda dizer quando o Focus foi publicado, sem chamar essa data de data do relatório', () => {
-  assert.match(secaoDaMesa('macro-brasil'), /Focus publicado em/);
+// No passo 1 o Focus vinha da imprensa (data da publicação). Desde o passo 2 vem do serviço oficial pelo painel_macro,
+// com a data da estatística, que é a data do relatório.
+test('a skill de juros manda escrever "o mercado espera" com a data do relatório que o painel_macro devolve', () => {
+  const s = secaoDaMesa('macro-brasil');
+  assert.match(s, /o mercado espera/);
+  assert.match(s, /focus\.data/);
 });
 
 test('a skill de gráfico não cita mais o campo único "Ativo, período e escala", que deixou de existir', () => {

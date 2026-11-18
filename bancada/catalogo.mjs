@@ -77,9 +77,11 @@ export function ferramentasDoServidor(arquivoServidor) {
   return [...readFileSync(arquivoServidor, 'utf8').matchAll(/register(?:App)?Tool\(\s*(?:server,\s*)?'([a-z_]+)'/g)].map((m) => m[1]);
 }
 
-// Tamanho em que a tela corta o pedido antes de enviar.
+// Tamanho em que a tela corta o pedido antes de enviar: a constante CORTE_PEDIDO (desde o passo 2) ou, nas versões
+// anteriores, o número escrito no próprio corte.
 export function corteDaTela(arquivo) {
-  const m = readFileSync(arquivo, 'utf8').match(/promptAtual\(t, ps\)\.texto \|\| ""\)\.trim\(\)\.slice\(0, (\d+)\)/);
+  const s = readFileSync(arquivo, 'utf8');
+  const m = s.match(/\bconst CORTE_PEDIDO = (\d+);/) || s.match(/promptAtual\(t, ps\)\.texto \|\| ""\)\.trim\(\)\.slice\(0, (\d+)\)/);
   if (!m) throw new Error(`Não achei o corte do pedido em ${arquivo}`);
   return Number(m[1]);
 }

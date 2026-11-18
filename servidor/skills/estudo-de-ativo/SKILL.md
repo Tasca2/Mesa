@@ -45,8 +45,9 @@ Em todos: ao final, uma mensagem curta de envio ao cliente (`whatsapp`, sem `**`
 
 ## Na Mesa do Assessor (acrescentado)
 
-- **O material nasce da análise**: chame `analise_ativo` e use todos os blocos que voltarem antes de montar página. Em ação e fundo imobiliário, com `pesquisa=true`.
-- **Formato**: dentro da Mesa vale a lista do pedido. Resumo de uma página e Estudo em PDF usam `mesa_documento`, com as tabelas no texto de cada seção. Apresentação usa `mesa_apresentacao`, com os layouts capa, numeros, tabela, barras, lista, frase e fechamento.
-- **Sem gráfico inventado**: o PDF ainda não desenha gráfico de linha. Não descreva gráfico que não foi gerado; a evolução vai em tabela ou no layout barras.
-- **Título-conclusão**: um por página, com o número que sustenta.
-- **Mais de um ativo**: mesma data-base para todos, ou diga qual ficou diferente.
+1. O material nasce da análise: chame `analise_ativo` com todos os blocos antes de montar página. Em ação e fundo imobiliário, com `pesquisa=true`.
+2. Fatos do período: `documentos_cvm`. Juros e inflação do período: `painel_macro`. Número sem fonte não entra no material.
+3. Resumo de uma página e Estudo em PDF usam `mesa_documento`, com as tabelas no texto de cada seção. Apresentação usa `mesa_apresentacao`, com os layouts capa, numeros, tabela, barras, lista, frase e fechamento.
+4. Sem gráfico inventado: o PDF ainda não desenha gráfico de linha. Não descreva gráfico que não foi gerado; a evolução vai em tabela ou no layout barras.
+5. Um título-conclusão por página, com o número que sustenta.
+6. Mais de um ativo: mesma data-base para todos, ou diga qual ficou diferente.
