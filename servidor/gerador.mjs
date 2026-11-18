@@ -230,7 +230,7 @@ export function revisarCarrossel(slides, termosConfirmados = [], rodape = '') {
   const achados = [];
   const lista = (onde, t) => {
     const n = SEMACENTO(t);
-    for (const [nome, re] of TERMOS_RISCO_MERCADO) { const m = n.match(re); if (m && !liberado(m[0])) achados.push(`${onde}: "${t.trim().slice(0, 90)}" (${nome})`); }
+    for (const [nome, re] of TERMOS_RISCO_MERCADO) { const m = ocorrencia(n, nome, re); if (m && !liberado(m[0])) achados.push(`${onde}: "${t.trim().slice(0, 90)}" (${nome})`); }
   };
   if (typeof rodape === 'string' && rodape.trim()) lista('rodapé', rodape);
   (Array.isArray(slides) ? slides : []).forEach((s, k) => {
@@ -309,13 +309,26 @@ const TERMOS_RISCO = [
 // Lista menor do material de mercado (estudo, juros, fato relevante): fonte, órgão e rentabilidade com período passam;
 // promessa, risco zero e superlativo continuam barrados.
 const TERMOS_RISCO_MERCADO = [
-  ['promessa de retorno', /garantia de (retorno|rentabilidade|resultado|lucro|ganho|rendimento)|(retorno|rentabilidade|resultado|lucro|ganho|rendimento)s? (garantid|cert[oa]s?\b|assegurad)|garantimos|\bgarante (o |a )?(retorno|rentabilidade|resultado|lucro|ganho)|\bvai (render|subir|disparar|valorizar|dobrar)|\brendera\b|\bsubira\b|valorizacao (garantida|certa)|nao tem como perder|dinheiro facil|ganho facil/],
+  ['promessa de retorno', /garantia de (retorno|rentabilidade|resultado|lucro|ganho|rendimento)|(retorno|rentabilidade|resultado|lucro|ganho|rendimento)s? (garantid|cert[oa]s?\b|assegurad)|garantimos|\bgarante (o |a )?(retorno|rentabilidade|resultado|lucro|ganho)|\bvai render\b|\brendera\b|\b(acao|acoes|papel|papeis|ativo|ativos|fundo|fundos|cota|cotas|carteira|bolsa|ibovespa|investimento|investimentos|aplicacao|aplicacoes|titulo|titulos|preco|precos|patrimonio|dinheiro|[a-z]{4}\d{1,2})\b[^.;:!?]{0,40}?\b(vai (subir|disparar|valorizar|dobrar)|subira|valorizara|disparara|dobrara)\b|valorizacao (garantida|certa)|nao tem como perder|dinheiro facil|ganho facil/],
   ['risco', /sem risco|risco zero|zero risco|seguranca total|100% segur/],
   // "o/a melhor" barra antes de produto, de "do/da" (a melhor do ano, da bolsa) e no fim da frase; o resultado da
   // própria empresa contra o próprio histórico ("o melhor resultado trimestral desde 2019") passa.
-  ['superlativo', /\b(o|a|os|as) melhor(es)?(?= (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|carteiras|momento|hora|oportunidade|escolha|escolhas|relacao|alternativa|alternativas|papel|papeis|empresa|empresas|aposta|apostas|compra|entrada|produto|produtos|titulo|titulos)\b| (do|da|dos|das|de)\b|\s*[.,;:!?)]|\s*$)|melhor do mercado|imperdivel|oportunidade unica|unica chance|\bimbativel|retorno extraordinario/],
+  ['superlativo', /\b(o|a|os|as) melhor(es)?(?= (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|carteiras|momento|hora|oportunidade|escolha|escolhas|relacao|alternativa|alternativas|papel|papeis|empresa|empresas|aposta|apostas|compra|entrada|produto|produtos|titulo|titulos)\b| (do|da|dos|das|de)\b|\s*[.,;:!?)]|\s*$)|melhor do mercado|imperdivel|oportunidade unica|unica chance|\bimbativel|retorno extraordinario|(^|[.!?:;]\s*)melhor(es)? (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|carteiras|escolha|alternativa|alternativas|produto|produtos|titulo|titulos)\b/],
 ];
 const RETORNO = /\b(rentabilidade|retorno|rendimento|rende)\b/;
+// Lista menor: termo negado logo antes, na mesma oração ("não constitui garantia de retorno", "nenhuma aplicação tem retorno
+// garantido", "não existe investimento sem risco"), é o aviso de compliance, não a promessa; superlativo em pergunta
+// ("qual é a melhor") também passa. Olha até 4 palavras antes do termo, sem passar de vírgula nem de fim de frase.
+const NEGACAO = /\b(nao|nem|nenhum|nenhuma|sem|jamais|nunca)\b/;
+const PERGUNTA = /\b(qual|quais)\b/;
+function ocorrencia(n, nome, re) {
+  for (const m of n.matchAll(new RegExp(re.source, 'g'))) {
+    const antes = n.slice(0, m.index).split(/[.;:!?,]/).pop().trim().split(/\s+/).slice(-4).join(' ');
+    if (NEGACAO.test(antes) || (nome === 'superlativo' && PERGUNTA.test(antes))) continue;
+    return m;
+  }
+  return null;
+}
 const MESES = 'jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez';
 const PERIODO = new RegExp([
   String.raw`\b\d+\s*(m|meses|mes|anos?|dias?|semanas?|trimestres?|semestres?)\b`, String.raw`\bao (ano|mes|dia)\b`, String.raw`\bno (ano|mes|trimestre|semestre|periodo)\b`,
@@ -347,7 +360,7 @@ function travaMenor(onde, textos, liberado, achados) {
     if (typeof t !== 'string' || !t.trim() || /\[CONFERIR/i.test(t)) continue;
     const n = SEMACENTO(t);
     for (const [nome, re] of TERMOS_RISCO_MERCADO) {
-      const m = n.match(re);
+      const m = ocorrencia(n, nome, re);
       if (m && !liberado(m[0])) achados.push(`${onde}: "${t.trim().slice(0, 90)}" (${nome})`);
     }
   }
@@ -370,7 +383,7 @@ export function revisarApresentacao(slides, termosConfirmados = [], tipo, geral 
       if (/\[CONFERIR/i.test(t)) continue;
       const n = SEMACENTO(t);
       for (const [nome, re] of lista) {
-        const m = n.match(re);
+        const m = lista === TERMOS_RISCO_MERCADO ? ocorrencia(n, nome, re) : n.match(re);
         if (m && !liberado(m[0])) achados.push(`página ${k + 1}: "${t.slice(0, 90)}" (${nome})`);
       }
       if (mercado && !comPeriodo) {

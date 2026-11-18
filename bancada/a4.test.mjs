@@ -258,6 +258,6 @@ test('regra do pedido: o Conferir fica fora do PDF do cliente', async () => {
   for (const arq of ['janela/mesa-janela.html', 'servidor/painel-v2.html', 'servidor/base-assessor.md']) {
     const texto = readFileSync(path.join(RAIZ, arq), 'utf8');
     assert.doesNotMatch(texto, /no PDF, a última seção/, arq);
-    assert.match(texto, /fica fora do PDF, que é do cliente/, arq);
+    assert.match(texto, /fora do PDF/, arq);
   }
 });

@@ -111,3 +111,23 @@ test('rodapé e título da apresentação também passam pela trava de promessa'
   assert.equal(revisarApresentacao([{ layout: 'frase', titulo: 'Objetivo' }], [], undefined, { titulo: 'Carteira sem risco' }).length, 1);
   assert.deepEqual(revisarApresentacao([{ layout: 'frase', titulo: 'Objetivo' }], [], undefined, { rodape: 'Assessor Teste, assessor de investimentos vinculado ao Escritório Teste. Regulado pela CVM.' }), []);
 });
+
+// Revisão final: o aviso de compliance que as skills pedem é negação, não promessa; frases comuns de fato relevante e de
+// pergunta passam; promessa ligada a ativo e "Melhor opção" no começo da frase continuam barradas.
+const { revisarDocumento } = await import(pathToFileURL(path.join(RAIZ, 'servidor', 'gerador.mjs')).href);
+const folha = (texto) => revisarDocumento({ tipo: 'geral', titulo: 'Leitura', secoes: [{ titulo: 'Texto', texto }] }, []);
+test('aviso de compliance com negação passa na trava (rodapé dos slides e folha A4)', () => {
+  for (const t of ['Material informativo. Não constitui oferta, recomendação nem garantia de retorno.', 'Rentabilidade passada não garante resultado futuro.',
+    'Não existe investimento sem risco.', 'Nenhuma aplicação tem retorno garantido.']) {
+    assert.deepEqual(revisarApresentacao([{ layout: 'frase', titulo: 'Objetivo' }], [], undefined, { rodape: t }), [], t);
+    assert.deepEqual(revisarDocumento({ tipo: 'carteira', titulo: 'Revisão', rodape: t, secoes: [{ titulo: 'Leitura', texto: t }] }, []), [], t);
+  }
+});
+test('frases comuns passam; promessa ligada a ativo e "Melhor opção" continuam barradas', () => {
+  for (const t of ['A Petrobras informou que a produção vai subir 10% em 2026.',
+    'A inflação subirá até o fim do ano, segundo o Focus.', 'Cada cliente decide qual estratégia é a melhor.', 'Qual o melhor momento para revisar a carteira?'])
+    assert.deepEqual(folha(t), [], t);
+  for (const t of ['Esta ação vai subir até dezembro.', 'PETR4 subirá 20% até o fim do ano.', 'Melhor opção para a sua reserva.',
+    'Investimento sem risco para a sua reserva.', 'WEGE3 foi a melhor do ano.', 'Sem dúvida, retorno garantido.'])
+    assert.equal(folha(t).length, 1, t);
+});
