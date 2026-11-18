@@ -155,7 +155,7 @@ test('modo chat: Produtos com as duas tarefas, e Mercado sem a renda fixa, nas d
 });
 
 test('skills: produto-raio-x é nova, com os fatos e as fontes; leitura-de-lamina é cópia do livro com a seção da Mesa', () => {
-  const r = ler('servidor', 'skills', 'produto-raio-x', 'SKILL.md');
+  const r = ler('servidor', 'skills', 'produto-raio-x', 'SKILL.md').split(String.fromCharCode(13)).join(''); // sem CR: clone no Windows com autocrlf traz CRLF
   assert.match(r, /^---\nname: produto-raio-x\n/);
   for (const x of ['R$ 250 mil', 'R$ 1 milhão', 'Decreto nº 6.306', 'Lei nº 11.033', '22,5%', '15%', 'Lei nº 12.431', 'Medida Provisória nº 1.303', 'Lei nº 14.754', 'fgc.org.br', 'planalto.gov.br', 'taxas_tesouro', 'painel_macro'])
     assert.ok(r.includes(x), `produto-raio-x não traz ${x}`);

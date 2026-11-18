@@ -251,3 +251,13 @@ test('PDF do cliente: secoesDoCliente diz o que saiu, para a Mesa avisar o Claud
   assert.deepEqual(r.saem, ['CONFERIR', 'Próximos passos']);
   assert.deepEqual(r.ficam.map((s) => s.titulo), ['Resumo', 'Conferência de dados', undefined]);
 });
+
+// A regra que vai em todo pedido e a base do método não podem mais mandar o Conferir para o PDF: o arquivo é do cliente.
+test('regra do pedido: o Conferir fica fora do PDF do cliente', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const arq of ['janela/mesa-janela.html', 'servidor/painel-v2.html', 'servidor/base-assessor.md']) {
+    const texto = readFileSync(path.join(RAIZ, arq), 'utf8');
+    assert.doesNotMatch(texto, /no PDF, a última seção/, arq);
+    assert.match(texto, /fica fora do PDF, que é do cliente/, arq);
+  }
+});
