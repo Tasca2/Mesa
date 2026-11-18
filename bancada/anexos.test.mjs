@@ -166,6 +166,9 @@ test('o aviso dos anexos diz onde está cada arquivo, manda ler antes de respond
   assert.ok(b.includes('C:\\Users\\Ana\\Documents\\Mesa do Assessor\\Anexos\\2026-11-18\\140511-grafico.png'));
   assert.match(b, /2 arquivos/);
   assert.match(b, /Read/);
+  assert.match(b, /PDF inteiro/, 'manda ler o PDF inteiro primeiro: sem o poppler (pdftoppm), a leitura por páginas falha');
+  assert.match(b, /pages/, 'a leitura por partes fica como saída quando a ferramenta recusa o arquivo inteiro');
+  assert.doesNotMatch(b, /mais de 10 páginas: leia por partes/);
   assert.match(b, /página/);
   assert.match(b, /não complete/i);
   assert.match(b, /CPF/);

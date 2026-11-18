@@ -112,7 +112,7 @@ export function blocoDeAnexos(anexos) {
   return [
     '[Anexos desta mensagem]',
     `O assessor anexou ${n === 1 ? '1 arquivo' : n + ' arquivos'} a esta mensagem. ${n === 1 ? 'Ele faz' : 'Eles fazem'} parte do pedido: quando o pedido falar em texto colado, documento, PDF, imagem, gráfico ou print enviado, é deste anexo que se trata.`,
-    'Leia cada arquivo com a ferramenta Read, pelo caminho exato abaixo, antes de responder (PDF com mais de 10 páginas: leia por partes, com o parâmetro pages). A Mesa só deixa ler as pastas Anexos e Fontes dela.',
+    'Leia cada arquivo com a ferramenta Read, pelo caminho exato abaixo, antes de responder. Leia o PDF inteiro de uma vez; só use o parâmetro pages se a ferramenta recusar o arquivo inteiro (a leitura por páginas depende de um programa que nem todo computador tem). A Mesa só deixa ler as pastas Anexos e Fontes dela.',
     'Ao usar um trecho ou número de um anexo, diga de que arquivo e de que página do PDF ele veio (contando a partir da primeira página do arquivo); na imagem, diga que o valor foi lido do gráfico e com que precisão.',
     'Se um anexo não abrir ou estiver ilegível, diga qual e por quê, e não complete o conteúdo de memória. Se um anexo trouxer nome, CPF ou conta de cliente, não repita esses dados na resposta.',
     ...anexos.map((a) => `- ${a.original || a.nome} (${a.tipo === 'pdf' ? 'PDF' : 'imagem'}, ${a.kb} KB): ${a.caminho}`),
