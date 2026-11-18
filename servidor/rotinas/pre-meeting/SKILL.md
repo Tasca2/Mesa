@@ -14,7 +14,7 @@ Chegar à reunião com um roteiro que cabe no tempo, perguntas que descobrem a n
 - Histórico das últimas conversas e o que mudou desde então.
 - Foco da reunião (revisão, aporte, resgate/liquidez, sucessão). Perfil do assessor via `mesa_perfil`; `consultar_cofre` com o tema `reunião SPIN descoberta` se houver.
 
-**Dado que não veio**: não invente. Liste em "Pedir antes da reunião" e use `[CONFERIR]`. Cliente sem nenhum dado = primeira reunião: diga em uma linha que a tarefa Primeira reunião monta o roteiro e a apresentação, e entregue só a lista do que pedir.
+**Dado que não veio**: não invente. Entregue o que dá para montar com o que veio (objetivo e avanço, roteiro com tempo por bloco e perguntas ligadas ao foco), marque com `[CONFERIR]` cada ponto que depende do dado que faltou e liste esse dado em "Pedir antes da reunião". Sem nenhum dado do cliente, faça a mesma entrega e, no fim, peça em uma frase o essencial para completar (resumo da carteira e o combinado na última conversa). Se o assessor disser que a pessoa ainda não é cliente, diga em uma linha que a tarefa Primeira reunião monta o roteiro e a apresentação.
 
 ## Passos
 0. **Objetivo e avanço** (2 linhas, antes de tudo): o que esta reunião precisa resolver e qual é o avanço mínimo aceitável, isto é, o que precisa sair combinado com data (documento enviado, decisão tomada, próxima reunião marcada). Reunião que termina em "vamos nos falando" não avançou. O roteiro inteiro serve a esse avanço.

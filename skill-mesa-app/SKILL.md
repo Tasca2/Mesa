@@ -46,11 +46,23 @@ Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta 
 | Tarefa | Carregar com `carregar_metodo` |
 |---|---|
 | Cliente novo | `prospect-intake` |
-| Pré-reunião | `pre-meeting` |
+| Primeira reunião | `primeira-reuniao` |
+| Segunda reunião | `segunda-reuniao` |
+| Pré-reunião (cliente atual) | `pre-meeting` |
 | Pós-reunião | `post-meeting` |
 | Revisão de carteira | `portfolio-rebalance-review` |
+| Comparador de carteira | `comparador-de-carteira` |
 | Diagnóstico financeiro | `diagnostico-financeiro` |
-| Primeira abordagem | `prospeccao-abordagem` |
+| Relatório mensal ao cliente | `relatorio-e-proposta` |
+| Proposta de assessoria (documento) | `relatorio-e-proposta` |
+| Follow-up da proposta | `relatorio-e-proposta` |
+| Ritmo e indicação | `relacionamento-e-indicacao` |
+| Explicar ao cliente | `explicar-ao-cliente` |
+| Conversa sobre sucessão | `planejamento-sucessorio` |
+| Primeira mensagem | `prospeccao-abordagem` |
+| Ligação de primeiro contato | `roteiro-comercial` |
+| Sequência para lead novo | `roteiro-comercial` |
+| Pitch e e-mail | `roteiro-comercial` |
 | Objeção do cliente | `objecoes` |
 | Retomar lead parado | `retomada-lead-frio` |
 | Juros, inflação e câmbio | `macro-brasil` |

@@ -31,7 +31,11 @@ Senão, pergunte com `AskUserQuestion` (uma pergunta por vez, no máximo 4 opç�
 
 1. **Área**: Rotinas do dia · Mercado hoje · Post para Instagram.
 2. **Grupo**, quando a área tiver mais de 4 tarefas:
-   - Rotinas do dia: Reuniões com cliente (cliente novo, pré-reunião, pós-reunião) · Carteira e cliente (revisão de carteira, diagnóstico) · Prospecção (primeira abordagem, objeção, retomar lead parado).
+   - Rotinas do dia (20 tarefas): pergunte primeiro o momento (Reuniões · Carteira e cliente · Relacionamento · Prospecção) e, quando ele tiver mais de 4 tarefas, o grupo antes da tarefa:
+     - Reuniões: Antes da reunião (cliente novo, primeira reunião, segunda reunião, pré-reunião (cliente atual)) · Depois da reunião (pós-reunião, a única do grupo: vá direto a ela).
+     - Carteira e cliente: Carteira (revisão de carteira, comparador de carteira) · Cliente (diagnóstico financeiro, relatório mensal ao cliente, proposta de assessoria (documento), follow-up da proposta).
+     - Relacionamento: ritmo e indicação, explicar ao cliente, conversa sobre sucessão (pergunte direto a tarefa).
+     - Prospecção: Primeiro contato (primeira mensagem, ligação de primeiro contato, sequência para lead novo, pitch e e-mail) · Objeção e retomada (objeção do cliente, retomar lead parado).
    - Mercado hoje: Panorama (juros/inflação/câmbio, fato relevante, gráfico) · Estudo e ações (estudo de ativo, analisar ação, comparar setor) · Fundos e renda fixa (fundo imobiliário, renda fixa).
 3. **Tarefa** dentro do grupo, com o nome e a linha da tabela abaixo como descrição.
 
@@ -41,13 +45,25 @@ Se a pessoa responder "sem preferência" ou algo vago, mostre as tarefas da áre
 
 | Área | Tarefa | O que entrega | Carregar com `carregar_metodo` | Perguntas da tarefa |
 |---|---|---|---|---|
-| Rotinas | Cliente novo | Ficha de entrada e o que pedir ao cliente | `prospect-intake` | Momento · Resultado |
-| Rotinas | Pré-reunião | Roteiro da conversa, pontos de atenção e perguntas | `pre-meeting` | Foco · Resultado |
-| Rotinas | Pós-reunião | Próximos passos e a mensagem de retorno | `post-meeting` | Saída · Resultado |
-| Rotinas | Revisão de carteira | Desvios frente à política, sem ordens de compra ou venda | `portfolio-rebalance-review` | Comparar com · Resultado |
+| Rotinas | Cliente novo | Ficha de entrada e o que pedir ao cliente | `prospect-intake` | Momento |
+| Rotinas | Primeira reunião | Roteiro, sua apresentação, seu escritório e suas soluções | `primeira-reuniao` | Duração · Perfil · Resultado |
+| Rotinas | Segunda reunião | Devolutiva e material da reunião de decisão | `segunda-reuniao` | Como decide · Resultado |
+| Rotinas | Pré-reunião (cliente atual) | Para reunião com quem já é cliente: roteiro, pontos de atenção e perguntas | `pre-meeting` | Foco |
+| Rotinas | Pós-reunião | Próximos passos e a mensagem de retorno | `post-meeting` | Saída |
+| Rotinas | Revisão de carteira | Desvios frente à política, sem ordens de compra ou venda | `portfolio-rebalance-review` | Resultado |
+| Rotinas | Comparador de carteira | Duas carteiras lado a lado, sem dizer qual é melhor | `comparador-de-carteira` | Comparar · Resultado |
 | Rotinas | Diagnóstico financeiro | Patrimônio, dívidas, fluxo e reserva | `diagnostico-financeiro` | Resultado |
-| Rotinas | Primeira abordagem | Mensagem e perguntas de descoberta | `prospeccao-abordagem` | Canal |
-| Rotinas | Objeção do cliente | A resposta certa para o "não" ou o "vou pensar" | `objecoes` | Onde apareceu |
+| Rotinas | Relatório mensal ao cliente | Resumo descritivo do mês, com fonte e data | `relatorio-e-proposta` | Período · Resultado |
+| Rotinas | Proposta de assessoria (documento) | O documento escrito do serviço, para enviar depois da reunião | `relatorio-e-proposta` | Para quem · Resultado |
+| Rotinas | Follow-up da proposta | 3 toques para descobrir o que falta decidir | `relatorio-e-proposta` | Enviada há |
+| Rotinas | Ritmo e indicação | Agenda de contatos, pedido de indicação e parceiros | `relacionamento-e-indicacao` | Foco |
+| Rotinas | Explicar ao cliente | Um conceito em linguagem simples, com analogia | `explicar-ao-cliente` | Conceito · Para quem |
+| Rotinas | Conversa sobre sucessão | Perguntas e resumo para o advogado e o contador | `planejamento-sucessorio` | Momento |
+| Rotinas | Primeira mensagem | Mensagem e perguntas de descoberta | `prospeccao-abordagem` | Canal |
+| Rotinas | Ligação de primeiro contato | Abertura, valor e fechamento com data e hora | `roteiro-comercial` | Duração · Perfil |
+| Rotinas | Sequência para lead novo | 5 toques em 10 a 14 dias, prontos para copiar | `roteiro-comercial` | Perfil |
+| Rotinas | Pitch e e-mail | Apresentação de 1 minuto e e-mail com 3 assuntos | `roteiro-comercial` | Formato · Perfil |
+| Rotinas | Objeção do cliente | A resposta certa para o "não" ou o "vou pensar" | `objecoes` | Canal |
 | Rotinas | Retomar lead parado | Gancho, canal e sequência de contatos | `retomada-lead-frio` | Parado há |
 | Mercado | Juros, inflação e câmbio | Selic, IPCA e dólar do Banco Central | `macro-brasil` | Resultado |
 | Mercado | Fato relevante | Resumo do comunicado e o que muda na tese | `resumo-de-fato-relevante` | Resultado |
@@ -64,12 +80,24 @@ Se a pessoa responder "sem preferência" ou algo vago, mostre as tarefas da áre
 
 Pule a pergunta **Atuação** quando o perfil já trouxer a atuação.
 
-- **Momento** — Em que ponto está esse cliente? Antes da primeira conversa (o que perguntar e pedir a ele) · Já tenho notas ou documentos (extratos, IR ou carteira).
-- **Foco** — Qual é o foco da conversa? Revisão de carteira · Novo aporte · Resgate ou liquidez · Sucessão e patrimônio.
+- **Momento** (cliente novo) — Em que ponto está esse cliente? Antes da primeira conversa (o que perguntar e pedir a ele) · Já tenho notas ou documentos (extratos, IR ou carteira).
+- **Duração** (primeira reunião) — Quanto tempo dura a reunião? 30 minutos · 45 minutos · 60 minutos.
+- **Perfil** — Como é a pessoa? Empresário · Profissional liberal · Aposentado · Iniciante.
+- **Como decide** (segunda reunião) — Como essa pessoa costuma decidir? Delega (quer segurança e simplicidade) · Valida (quer entender a lógica) · Analisa (quer dados e decide sozinha) · Não sei ainda.
+- **Foco** (pré-reunião) — Qual é o foco da conversa? Revisão de carteira · Novo aporte · Resgate ou liquidez · Sucessão e patrimônio.
 - **Saída** (várias escolhas, `multiSelect: true`) — O que precisa sair daqui? Próximos passos com prazo · Mensagem ao cliente · Registro para o CRM.
-- **Comparar com** — Comparar a carteira com quê? Política do cliente · Carteira modelo do escritório.
-- **Canal** (primeira abordagem) — Por onde vai o primeiro contato? WhatsApp (mensagem curta) · E-mail (com assunto) · Ligação (como abrir a conversa).
-- **Onde apareceu** (objeção) — Onde a objeção apareceu? WhatsApp (resposta curta) · Ligação (frase para falar) · Reunião (pergunta para aprofundar).
+- **Comparar** (comparador) — O que você quer comparar? Atual × modelo do escritório · Atual × cenário em estudo · Atual × outra instituição · A mesma carteira em duas datas.
+- **Período** (relatório mensal) — Qual período? Mês passado · Trimestre · Ano até agora.
+- **Para quem** (proposta) — Para quem é a proposta? Cliente novo · Cliente atual (ampliar).
+- **Enviada há** (follow-up) — Há quanto tempo você enviou a proposta? 2 dias · 5 dias · 10 dias ou mais.
+- **Foco** (ritmo e indicação) — O que você quer organizar? Ritmo de contatos da carteira (mensal, quadrimestral e anual) · Pedir indicação a um cliente (frase e agradecimento prontos) · Abordar contador ou advogado (parceiro que indica clientes).
+- **Conceito** (explicar) — O que você quer explicar? Marcação na curva e a mercado · Diversificação e alocação · Consórcio ou financiamento · Outro conceito (o assessor escreve no chat).
+- **Para quem** (explicar) — Quem vai ler? Iniciante · Empresário · Aposentado · Profissional liberal.
+- **Momento** (sucessão) — Em que ponto está a conversa? Abrir o assunto (o cliente ainda não pensou nisso) · Aprofundar (já falamos e quero as perguntas certas) · Encaminhar (preciso do resumo para o advogado e o contador).
+- **Canal** (primeira mensagem) — Por onde vai o primeiro contato? WhatsApp (mensagem curta) · E-mail (com assunto).
+- **Duração** (ligação) — Quanto tempo dura a ligação? 30 segundos (só para marcar a conversa) · 60 segundos (com valor em uma frase) · 120 segundos (com uma pergunta de descoberta).
+- **Formato** (pitch) — O que você precisa? Pitch de 1 minuto · E-mail com 3 assuntos · Os dois.
+- **Canal** (objeção) — Onde a objeção apareceu? WhatsApp (resposta curta) · Ligação (frase para falar) · Reunião (pergunta para aprofundar).
 - **Parado há** (retomada) — Há quanto tempo o contato parou? Menos de 30 dias · De 1 a 3 meses · Mais de 3 meses.
 - **Formato do estudo** — O que você vai levar para o cliente? Apresentação em slides (até 8 slides) · Estudo em PDF (para ler e enviar) · Resumo de uma página (para a conversa).
 - **Formato do post** — Qual formato? Carrossel · Post único · Roteiro de Reels.
@@ -82,9 +110,10 @@ Pule a pergunta **Atuação** quando o perfil já trouxer a atuação.
 - Revisão de carteira: só a análise do desvio, sem compra, venda nem imposto.
 - Diagnóstico financeiro: não peça nome nem CPF do cliente.
 - Criar um post: depois do texto, faça o parecer de revisão da própria peça.
-- Primeira abordagem: quem é a pessoa e como se conhecem, o assessor escreve no chat.
+- Primeira mensagem: quem é a pessoa e como se conhecem, o assessor escreve no chat.
 - Objeção: peça no chat a frase exata que o cliente disse.
-- Retomar lead parado e pré-reunião: peça no chat o histórico da conversa (últimas mensagens ou resumo dos contatos) e use-o; com ele, diga qual canal funciona melhor e entregue o texto de WhatsApp e o roteiro de ligação.
+- Retomar lead parado: peça no chat o histórico da conversa (últimas mensagens ou resumo dos contatos) e use-o; com ele, diga qual canal funciona melhor e entregue o texto de WhatsApp e o roteiro de ligação.
+- Pré-reunião (cliente atual): peça no chat o resumo da carteira e o histórico das últimas conversas; sem eles, entregue o que dá, marque com `[CONFERIR]` o que falta e peça o resto em uma frase.
 - Analisar ação, fundo imobiliário, comparar setor e estudo: busque os dados com `analise_ativo` antes de pedir ao assessor.
 - Post para Instagram: depois do texto aprovado, gere as imagens com `mesa_carrossel` (carrossel de 5 a 8 slides, ou 1 slide para arte única) e informe a pasta e o PDF; no Reels, entregue o roteiro cena a cena e a capa pronta.
 - Estudo e apresentação: os números vêm da Análise de Ativo (`analise_ativo`); sem fonte, não entram. Veja "CaptaMais" abaixo.
