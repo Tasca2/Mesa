@@ -11,6 +11,7 @@ import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from '@model
 import { z } from 'zod';
 import { gerarCarrossel, gerarDocumento, gerarApresentacao, pastaBase } from './gerador.mjs';
 import { NOMES_LAYOUT, NOMES_ICONE, NOMES_ILUSTRACAO } from './layouts.mjs';
+import { painelMacro, documentosCvm, RECORTES, REFERENCIAS } from './dados-publicos.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const PASTA_SKILLS = process.env.METODO_SKILLS
@@ -691,6 +692,60 @@ function buildServer() {
         return { content: [{ type: 'text', text: JSON.stringify(json.data ?? json) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui falar com o CaptaMais: ${e?.message ?? e}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'painel_macro',
+    {
+      title: 'Painel de juros, inflação e câmbio (Banco Central e IBGE)',
+      description:
+        'Consulta as fontes oficiais direto, por código, e devolve num pacote só: indicadores (Selic, CDI ao ano e no mês, IPCA do mês e em 12 meses, meta de inflação, IGP-M, dólar, euro, poupança e desemprego, ' +
+        'cada um com o código da série, valor, unidade, data e as variações já calculadas no dia, no mês, no ano e contra a referência escolhida), juroReal (Selic contra o IPCA de 12 meses e contra o IPCA esperado, com a conta), ' +
+        'copom (as duas últimas reuniões: data, decisão, placar, texto do comunicado e link da ata), focus (medianas da data mais recente e de 4 semanas antes, deste ano e do próximo), ' +
+        'agenda (divulgações do IBGE nos próximos 30 dias) e lacunas (o que não respondeu, com o motivo). Chame antes de qualquer busca sobre juros, inflação ou câmbio. ' +
+        'Use as variações como vieram, sem refazer as contas; o que estiver em lacunas fica marcado, sem estimar.',
+      inputSchema: {
+        recorte: z.enum(Object.keys(RECORTES)).optional().describe('Padrão: Painel completo'),
+        comparar: z.enum(REFERENCIAS).optional().describe('Referência da coluna Antes. Padrão: Mês passado'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ recorte, comparar }) => {
+      try {
+        const painel = await painelMacro({ recorte, comparar });
+        return { content: [{ type: 'text', text: JSON.stringify(painel) }], structuredContent: painel };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: `Não consegui montar o painel agora: ${e?.message ?? e}. Busque as séries oficiais uma a uma (api.bcb.gov.br, SGS) e marque o que não achar, sem estimar.` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'documentos_cvm',
+    {
+      title: 'Documentos das companhias abertas (CVM)',
+      description:
+        'Lista fatos relevantes e comunicados ao mercado de uma companhia aberta pela base aberta da CVM (dados.cvm.gov.br): data de entrega, categoria, assunto, protocolo e link oficial, do mais recente para o mais antigo. ' +
+        'Com protocolo, baixa o PDF do documento para a pasta Mesa do Assessor/Fontes e devolve o caminho do arquivo; se você não conseguir ler o PDF, diga isso ao assessor e peça o texto colado, sem resumir por notícia. ' +
+        'A base da CVM é atualizada uma vez por semana: o campo aviso diz até que dia ela vai, e documento entregue depois disso não aparece; nesse caso peça ao assessor o texto, o link ou o PDF. ' +
+        'Empresa: nome da companhia ou CNPJ (a analise_ativo devolve o cnpj pelo ticker). Se o nome servir para mais de uma companhia, a resposta traz as candidatas: chame de novo com o CNPJ.',
+      inputSchema: {
+        empresa: z.string().max(120).optional().describe('Nome da companhia ou CNPJ, ex.: Petrobras ou 33.000.167/0001-01'),
+        tipos: z.array(z.string().max(60)).max(6).optional().describe('Categorias da CVM. Padrão: Fato Relevante e Comunicado ao Mercado. Outras: Aviso aos Acionistas, Assembleia, Calendário de Eventos Corporativos'),
+        quantidade: z.number().int().min(1).max(20).optional().describe('Quantos documentos, do mais recente para o mais antigo. Padrão: 5'),
+        protocolo: z.string().max(20).optional().describe('Protocolo de um documento da lista: baixa o PDF e devolve o caminho do arquivo'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ empresa, tipos, quantidade, protocolo }) => {
+      if (!empresa && !protocolo) return { isError: true, content: [{ type: 'text', text: 'Informe o nome ou o CNPJ da companhia, ou o protocolo de um documento.' }] };
+      try {
+        const r = await documentosCvm({ empresa, tipos, quantidade, protocolo });
+        return { content: [{ type: 'text', text: JSON.stringify(r) }], structuredContent: r };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: `Não consegui consultar a CVM agora: ${e?.message ?? e}. Peça ao assessor o texto, o link ou o PDF do comunicado.` }] };
       }
     },
   );

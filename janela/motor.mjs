@@ -534,9 +534,14 @@ const servidor = http.createServer(async (req, res) => {
       }
       case '/api/estado': return json(res, 200, { videos: videosAtuais(), videoAtivo: !!estado.video?.ativo, geracao: geracaoAtual(), rodando: estado.rodando, segundos: estado.rodando ? Math.round((Date.now() - estado.inicio) / 1000) : 0, turnos: estado.turnos, erro: estado.erro });
       case '/api/melhorar': {
-        const texto = String(corpo.texto || '').slice(0, 12000), pedido = String(corpo.pedido || '').slice(0, 1000);
+        // Mesmo corte do /api/send (40.000). O que for cortado volta dito em "aviso", para a tela mostrar.
+        const bruto = String(corpo.texto || ''), pedidoBruto = String(corpo.pedido || '');
+        const texto = bruto.slice(0, 40000), pedido = pedidoBruto.slice(0, 1000);
         if (!texto || !pedido) return json(res, 400, { erro: 'vazio' });
-        return json(res, 200, { texto: await melhorarPedido(texto, pedido) });
+        const avisos = [];
+        if (bruto.length > texto.length) avisos.push(`O pedido tinha ${bruto.length} caracteres e só os primeiros ${texto.length} foram para o Claude reescrever.`);
+        if (pedidoBruto.length > pedido.length) avisos.push(`A melhoria pedida tinha ${pedidoBruto.length} caracteres e só os primeiros ${pedido.length} foram considerados.`);
+        return json(res, 200, { texto: await melhorarPedido(texto, pedido), cortado: avisos.length > 0, ...(avisos.length ? { aviso: avisos.join(' ') } : {}) });
       }
       case '/api/abrir-pasta': {
         const ed = corpo.video ? publicarEditado() : null;

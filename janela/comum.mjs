@@ -27,11 +27,11 @@ export const PASTA_DADOS = process.env.MESA_PERFIL_DIR ?? path.join(os.homedir()
 export const ARQUIVO_MOTOR = path.join(PASTA_DADOS, 'motor.json');
 
 export const SITES_PERMITIDOS = [
-  'api.bcb.gov.br', 'dadosabertos.bcb.gov.br', 'www3.bcb.gov.br', 'www.bcb.gov.br', 'bcb.gov.br',
+  'api.bcb.gov.br', 'olinda.bcb.gov.br', 'dadosabertos.bcb.gov.br', 'www3.bcb.gov.br', 'www.bcb.gov.br', 'bcb.gov.br',
   'www.gov.br', 'www4.planalto.gov.br', 'www.planalto.gov.br',
   'dados.cvm.gov.br', 'www.rad.cvm.gov.br', 'conteudo.cvm.gov.br', 'www.cvm.gov.br',
   'www.b3.com.br', 'sistemaswebb3-listados.b3.com.br',
-  'servicodados.ibge.gov.br', 'sidra.ibge.gov.br', 'www.ibge.gov.br',
+  'servicodados.ibge.gov.br', 'sidra.ibge.gov.br', 'apisidra.ibge.gov.br', 'www.ibge.gov.br',
   'www.tesourotransparente.gov.br', 'www.tesourodireto.com.br', 'tesourodireto.com.br',
   'www.fgc.org.br', 'fgc.org.br', 'www.anbima.com.br', 'data.anbima.com.br',
 ];

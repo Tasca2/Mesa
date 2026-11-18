@@ -241,7 +241,11 @@
       try { await api("/api/send", { texto, contexto, exibir: "Pedido enviado: " + primeira, meta: metaAtual() }); } catch (e) { return { isError: true }; }
       acompanhar(); return {};
     }
-    async melhorarPrompt(texto, pedido) { const r = await api("/api/melhorar", { texto, pedido }); return r.texto; }
+    async melhorarPrompt(texto, pedido) {
+      const r = await api("/api/melhorar", { texto, pedido });
+      if (r.aviso) { const st = document.querySelector(".estado"); if (st) { st.className = "estado erro"; st.textContent = r.aviso; } }
+      return r.texto;
+    }
     async entrarComSenha(email, senha) { return api("/api/entrar", { email, senha }); }
     async requestDisplayMode() { return { mode: "inline" }; }
     async openLink({ url }) { await api("/api/open", { url }); return {}; }
@@ -1192,7 +1196,7 @@
         "Período que quero destacar",
         "Índice de comparação"
       ],
-      "fonte": "Chame analise_ativo para cada ativo com o tipo certo (em ação e fundo imobiliário, pesquisa=true) e use todos os blocos que voltarem, não só o histórico: multiplosEIndicadores, balancosTrimestrais, precoAlvoPorCasa, ajustesDeAlvoEm30Dias, ultimosRelatorios e lacunas. Confira o retorno de 12 meses do resumo contra a composição dos 12 retornos mensais (historicoMensal): se não bater, mostre os dois e marque [CONFERIR]. Só me peça o que não achar."
+      "fonte": "Chame analise_ativo para cada ativo com o tipo certo (em ação e fundo imobiliário, pesquisa=true) e use todos os blocos que voltarem, não só o histórico: multiplosEIndicadores, balancosTrimestrais, precoAlvoPorCasa, ajustesDeAlvoEm30Dias, ultimosRelatorios e lacunas. Confira o retorno de 12 meses do resumo contra a composição dos 12 retornos mensais (historicoMensal): se não bater, mostre os dois e marque [CONFERIR]. Fatos do período: documentos_cvm. Juros e inflação do período: painel_macro. Só me peça o que não achar. Número sem fonte não entra no material."
     },
     "macro": {
       "obj": "Ter o painel de juros, inflação e câmbio de hoje pronto para a conversa: o número, o que mudou, o que o mercado espera, o que vem na agenda e o que isso mexe para cada tipo de cliente.",
@@ -1213,7 +1217,7 @@
         "Recorte do painel",
         "Referência para comparar"
       ],
-      "fonte": "Busque cada número por código, na série oficial, e não em texto de página: os endereços estão na seção Na Mesa do Assessor da skill. O Antes de cada linha é o valor da mesma série na referência que escolhi, com a conta da variação. Série que não responder fica marcada, sem estimar. Com recorte menor que o painel completo, entregue só as linhas e as tabelas do recorte."
+      "fonte": "Chame painel_macro com o recorte e a referência que escolhi e use todos os blocos que voltarem: indicadores (cada um com código da série, data, valor anterior e variação já calculada), juroReal, copom (as duas últimas reuniões com o texto do comunicado), focus (medianas de hoje e de 4 semanas atrás), agenda e lacunas. Não refaça as contas: use as variações que vieram prontas. Se um bloco vier vazio, diga qual e complete pela API do Banco Central (api.bcb.gov.br, SGS) e pelo IBGE (servicodados.ibge.gov.br); o que não achar fica marcado, sem estimar. A data da próxima reunião do Copom só entra com fonte oficial; sem ela, escreva a confirmar. Com recorte menor que o painel completo, entregue só as linhas e as tabelas do recorte."
     },
     "fato": {
       "obj": "Entender um comunicado da empresa em minutos: o que foi dito, quanto pesa no tamanho da empresa, o que muda nas premissas e como falar disso com o cliente.",
@@ -1236,7 +1240,7 @@
         "Minha tese ou o motivo de acompanhar a empresa",
         "Se o cliente tem o papel"
       ],
-      "fonte": "O documento é o texto que colei. Se passei só o link ou só a empresa, tente abrir o original; se o texto integral não abrir, não resuma por notícia: diga isso na primeira linha, entregue só a ficha do que achou e me peça o texto colado. Para o tamanho e as premissas, chame analise_ativo com tipo acoes e pesquisa=true (balancosTrimestrais, multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias). Não complete trecho do comunicado de memória."
+      "fonte": "Se colei o texto, esse é o documento. Se informei só a empresa, chame documentos_cvm pelo nome ou CNPJ (pelo ticker, a analise_ativo traz os dois), com as categorias Fato Relevante e Comunicado ao Mercado: use a lista para a ficha e a sequência e baixe pelo protocolo o documento escolhido para ler o texto integral. A base da CVM é atualizada uma vez por semana: se o comunicado for de hoje e não estiver na lista, diga isso e me peça o texto, o link ou o PDF. Se o texto integral não abrir, não resuma por notícia: diga isso na primeira linha, entregue só a ficha do que achou e me peça o texto colado. Para o tamanho e as premissas, chame analise_ativo com tipo acoes e pesquisa=true (balancosTrimestrais, multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias). Não complete trecho do comunicado de memória."
     },
     "grafico": {
       "obj": "Descrever o gráfico com medidas: onde o preço está, o que fez no período, os níveis que o mercado respeitou e o que mudaria a leitura.",
@@ -1260,7 +1264,7 @@
         "Indicadores que quero ver (ex.: média móvel, IFR)",
         "Imagem do gráfico, série de preços ou descrição"
       ],
-      "fonte": "Se enviei a série de preços ou descrevi o gráfico, comece por aí e diga o que não dá para ler. Sem isso, chame analise_ativo com o ticker e o tipo certo e confira a periodicidade que veio: se forem retornos mensais (sem preço em reais, máxima, mínima nem volume), monte a base 100, calcule só o que a série mensal permite e diga isso na Base. O que pedir outra escala (média móvel de dias, IFR de 14 dias, volume) fica pendente, com o pedido da série ou do print na escala certa. Não desenhe nível nem indicador que os dados não sustentam."
+      "fonte": "Se enviei a série de preços ou descrevi o gráfico, comece por aí e diga o que não dá para ler. Sem isso, chame analise_ativo com o ticker e o tipo certo e confira a periodicidade que veio. Com retornos mensais (sem preço em reais, máxima, mínima nem volume), monte a base 100 e calcule só o que a série mensal permite (retorno contra o índice, faixa e maior queda nos fechamentos de mês, volatilidade mensal) e diga isso na Base. Média móvel de dias, IFR de 14 dias, Bandas de Bollinger, volume e níveis em reais pedem série diária: ficam pendentes, com o pedido da série ou do print na escala certa. Proventos e eventos do período: documentos_cvm e RI da empresa. Não desenhe nível nem indicador que os dados não sustentam."
     },
     "acao": {
       "obj": "Ler uma empresa pelos meus critérios, mostrando evidências e lacunas.",
@@ -1377,10 +1381,10 @@
     }
   };
   const ONDE_PESQUISAR = {
-    macro: "API de séries do Banco Central (api.bcb.gov.br, SGS): 432 Selic, 4389 e 4391 CDI, 433 e 13522 IPCA, 13521 meta de inflação, 189 IGP-M, 1 dólar, 21619 euro, 195 poupança e 24369 desemprego; Copom: comunicados e atas em www.bcb.gov.br; IPCA de conferência e agenda de divulgações: IBGE (servicodados.ibge.gov.br, tabela 1737 e calendário); Focus: o endereço oficial dos dados ainda não abre na Mesa, então busque na web a mediana mais recente e cite quem publicou e a data do relatório.",
-    fato: "O documento original: sistema Rad da CVM (rad.cvm.gov.br; o PDF de lá nem sempre abre na Mesa) ou a página de Relações com Investidores da empresa; confira a data do envio; comunicados anteriores da empresa: busca na web, com a fonte; números da empresa para a comparação: analise_ativo e, de reserva, o último ITR ou DFP (dados.cvm.gov.br).",
-    grafico: "Histórico de preço e rentabilidade: Análise de Ativo do CaptaMais (analise_ativo); cotação e volume: b3.com.br; proventos, desdobramentos e eventos que distorcem o gráfico: RI da empresa e B3.",
-    estudo: "Dados do ativo: Análise de Ativo do CaptaMais (analise_ativo); demonstrações e fatos relevantes: CVM (dados.cvm.gov.br e rad.cvm.gov.br); contexto macro: Banco Central e IBGE; para fundos, lâmina e regulamento no site da CVM.",
+    macro: "painel_macro; de reserva, as séries do SGS por código (432 Selic, 4389 e 4391 CDI, 433 e 13522 IPCA, 13521 meta, 189 IGP-M, 1 dólar, 21619 euro, 195 poupança, 24369 desemprego), o Focus em olinda.bcb.gov.br (Expectativas), o Copom em www.bcb.gov.br e o IBGE (tabela 1737 e calendário).",
+    fato: "documentos_cvm; de reserva, o Rad da CVM (rad.cvm.gov.br) e o site de RI da empresa, com a data do envio; números da empresa: analise_ativo e, de reserva, o último ITR ou DFP (dados.cvm.gov.br).",
+    grafico: "Histórico de preço e rentabilidade: Análise de Ativo do CaptaMais (analise_ativo); proventos, desdobramentos e fatos do período: documentos_cvm e RI da empresa; de reserva, cotação e volume na b3.com.br.",
+    estudo: "Dados do ativo: Análise de Ativo do CaptaMais (analise_ativo); fatos do período: documentos_cvm e, de reserva, dados.cvm.gov.br e rad.cvm.gov.br; juros e inflação: painel_macro e, de reserva, Banco Central e IBGE; para fundos, lâmina e regulamento no site da CVM.",
     acao: "Demonstrações (ITR, DFP) e fatos relevantes: CVM (dados.cvm.gov.br, rad.cvm.gov.br) e RI da empresa; preço, rentabilidade e, conectado, múltiplos e pesquisa das casas: Análise de Ativo do CaptaMais (analise_ativo); setor e regulação: agências e ministérios em gov.br.",
     setor: "Mesma data-base para todas as empresas: CVM (dados.cvm.gov.br) e RI de cada empresa; rentabilidade: Análise de Ativo do CaptaMais (analise_ativo); dados do setor: IBGE e a agência reguladora em gov.br.",
     fii: "Composição e distribuições: relatório gerencial e fatos relevantes do fundo (site do gestor e Fundos.NET da B3; o Claude não abre o Fundos.NET, então diga o caminho para eu abrir); regulamento e dados cadastrais: CVM; preço, P/VP e histórico: Análise de Ativo do CaptaMais (analise_ativo).",
@@ -2138,6 +2142,9 @@
     const area = el("textarea", "prompt"); area.value = pr.texto; area.spellcheck = false; area.setAttribute("aria-label", "Pedido ao Claude");
     const aviso = el("p", "ajuda"); aviso.hidden = !pr.editado; aviso.textContent = "Você editou o pedido à mão: os campos acima não mudam mais o texto.";
     const refazer = el("button", "mini", "Refazer a partir dos campos"); refazer.hidden = !pr.editado;
+    const tamanho = el("p", "ajuda"); tamanho.hidden = true; tamanho.style.color = "#F0A49A"; tamanho.setAttribute("role", "status");
+    const medir = () => { const n = area.value.trim().length; tamanho.hidden = n <= CORTE_PEDIDO; if (!tamanho.hidden) tamanho.textContent = avisoDeCorte(n); };
+    medirPedido = medir;
     const sincronizar = () => {
       pr.base = montarPedido(t, ps);
       if (pr.editado) { aviso.hidden = false; refazer.hidden = false; return; }
@@ -2196,7 +2203,7 @@
       };
       acoes.append(salvar, apagar);
     }
-    meio.append(det, acoes);
+    meio.append(det, acoes, tamanho); medir();
     if (pr.modelo) meio.append(el("p", "ajuda", "Este pedido começou do seu modelo salvo. As respostas e os campos acima foram atualizados nele."));
     if (typeof app?.melhorarPrompt === "function") {
       const desfazer = el("button", "mini", "Desfazer a última mudança do Claude"); desfazer.hidden = true;
@@ -2625,7 +2632,14 @@
   window.__mesaMd = { html: mdHtml, plano: (t) => mdTexto(t, "plano"), whatsapp: (t) => mdTexto(t, "wa") };
 
   let rascunhoTimer = null;
+  // Corte do pedido ao enviar. O que passa do corte chega ao Claude sem o fim do pedido, onde ficam as regras: a tela
+  // avisa enquanto o assessor monta o pedido e, ao enviar, pede um segundo clique antes de mandar cortado.
+  const CORTE_PEDIDO = 40000;
+  let medirPedido = null, corteAvisado = "";
+  const milhar = (n) => n.toLocaleString("pt-BR");
+  const avisoDeCorte = (n) => `O pedido tem ${milhar(n)} caracteres e a janela envia até ${milhar(CORTE_PEDIDO)}: os últimos ${milhar(n - CORTE_PEDIDO)} ficariam de fora, entre eles as regras do fim do pedido. Encurte o texto colado nos campos ou mande o restante depois, na conversa.`;
   function agendarRascunho() {
+    medirPedido?.();
     if (!conectado) return;
     clearTimeout(rascunhoTimer);
     rascunhoTimer = setTimeout(() => {
@@ -2807,8 +2821,9 @@
 
   async function enviarPedido(t, ps) {
     if (enviando) return;
-    const st = $(".estado"); let texto = (promptAtual(t, ps).texto || "").trim().slice(0, 40000);
+    const st = $(".estado"); const inteiro = (promptAtual(t, ps).texto || "").trim(); let texto = inteiro.slice(0, CORTE_PEDIDO);
     if (!texto) { st.className = "estado erro"; st.textContent = "O pedido está vazio."; return; }
+    if (inteiro.length > CORTE_PEDIDO && corteAvisado !== inteiro) { corteAvisado = inteiro; st.className = "estado erro"; st.textContent = avisoDeCorte(inteiro.length) + " Para enviar assim mesmo, cortado, clique de novo."; return; }
     if (typeof window.__mesaStatus === "function" && window.__mesaStatus().estado === "pensando") { st.className = "estado erro"; st.textContent = "O Claude ainda está trabalhando no pedido anterior. Espere terminar ou clique em parar na caixa de baixo."; return; }
     if (!conectado) {
       if (window.parent !== window) { st.className = "estado erro"; st.textContent = "O painel não se conectou ao Claude. Peça a Mesa de novo numa conversa nova."; return; }

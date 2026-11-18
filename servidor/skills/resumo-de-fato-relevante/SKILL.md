@@ -50,8 +50,10 @@ Mantenha valores na moeda original, salvo conversão solicitada e documentada.
 
 ## Na Mesa do Assessor (acrescentado)
 
-- **Documento**: o texto colado pelo assessor é o documento. Com só o link ou só o nome da empresa, tente abrir o original; se o texto integral não abrir (o PDF do sistema Rad da CVM pode chegar ilegível pela leitura de página), não resuma por notícia: diga isso na primeira linha, entregue a ficha do que achou e peça o texto colado.
-- **Formato**: dentro da Mesa vale a lista do pedido (ficha, o que foi divulgado, etapas, tamanho, o que muda, casas de research, sequência, cliente, monitorar e conferir), no lugar do resumo em cinco seções desta skill.
-- **Trecho ao lado**: todo número da tabela "O que foi divulgado" tem o trecho do documento ao lado.
-- **Tamanho**: o número do comunicado é sempre comparado com um número da empresa (receita, lucro, dívida líquida ou valor de mercado), com data-base e a conta. Os números da empresa vêm de `analise_ativo` com `pesquisa=true`.
-- **Casas de research**: é opinião delas. Entra com a data e marcada como anterior ou posterior ao comunicado.
+1. Sem texto colado nem PDF anexado, chame `documentos_cvm` com o nome ou o CNPJ da companhia (pelo ticker, a `analise_ativo` traz os dois). Para o texto integral, chame de novo com o `protocolo` do documento escolhido: o PDF vai para a pasta Mesa do Assessor/Fontes.
+2. A base da CVM é semanal (o campo `aviso` diz até que dia ela vai). Se o comunicado for de hoje, peça o texto, o link ou o PDF.
+3. Se o texto integral não abrir, não resuma por notícia: diga isso na primeira linha, entregue a ficha do que achou e peça o texto colado.
+4. Todo número da tabela "O que foi divulgado" tem o trecho do documento ao lado.
+5. O tamanho do anúncio é sempre comparado com um número da empresa (receita, lucro, dívida líquida ou valor de mercado), com data-base e a conta. Os números da empresa vêm de `analise_ativo` com `pesquisa=true`.
+6. Opinião das casas de research entra com a data e marcada como anterior ou posterior ao comunicado.
+7. Formato: dentro da Mesa vale a lista do pedido (ficha, o que foi divulgado, etapas, tamanho, o que muda, casas de research, sequência, cliente, monitorar e conferir), no lugar do resumo em cinco seções desta skill.
