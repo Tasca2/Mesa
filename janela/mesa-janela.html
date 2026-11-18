@@ -238,8 +238,10 @@
     async sendMessage({ content }) {
       const texto = (content || []).map((c) => c.text).join("\n"); const contexto = ctxPendente; ctxPendente = "";
       const primeira = texto.split("\n")[0].replace(/^\[Mesa\]\s*/, "").slice(0, 120);
-      try { await api("/api/send", { texto, contexto, exibir: "Pedido enviado: " + primeira, meta: metaAtual() }); } catch (e) { return { isError: true }; }
-      acompanhar(); return {};
+      if (anexoSubindo()) { avisoAnexo("Espere o anexo terminar de subir e envie de novo."); return { isError: true }; }
+      const anexos = idsProntos();
+      try { await api("/api/send", { texto, contexto, exibir: "Pedido enviado: " + primeira, meta: metaAtual(), anexos }); } catch (e) { if (anexos.length) avisoAnexo(e.message); return { isError: true }; }
+      tirarEnviados(anexos); acompanhar(); return {};
     }
     async melhorarPrompt(texto, pedido) {
       const r = await api("/api/melhorar", { texto, pedido });
@@ -333,6 +335,15 @@
     "#cvPainel.lateral .peca .acoes{bottom:-8px}",
     "#conversa .acoes[hidden]{display:none}",
     "#cvPainel.oculto{display:none!important}",
+    "#conversa .anexos{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 9px}#conversa .anexos[hidden]{display:none}",
+    "#conversa .chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;background:rgba(243,238,230,.07);border:1px solid var(--line2);border-radius:10px;padding:3px 3px 3px 9px;font-size:12.5px;color:#e6e0d4}",
+    "#conversa .chip b{font-size:10px;letter-spacing:.08em;color:var(--gold2);font-weight:700}",
+    "#conversa .chip .nm{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+    "#conversa .chip small{color:var(--mute);font-size:11.5px;white-space:nowrap}",
+    "#conversa .chip button{border:0;background:transparent;color:#cfcfcf;width:24px;height:24px;border-radius:7px;cursor:pointer;font:inherit;font-size:16px;line-height:1}",
+    "#conversa .chip button:hover,#conversa .chip button:focus-visible{background:rgba(255,255,255,.1);color:#fff;outline:0}",
+    "#conversa .chip.enviando{opacity:.72}",
+    "#conversa .caixa.arrastando{border-color:rgba(232,200,142,.85);box-shadow:0 0 0 3px rgba(232,200,142,.18),0 6px 28px rgba(0,0,0,.35)}",
   ].join("\n").replace(/#conversa /g, ":is(#conversa,#cvPainel) ");
   document.head.append(css);
 
@@ -408,6 +419,7 @@
   const ICONE_MAIS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
   const ICONE_ENVIAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6 11l6-6 6 6"/></svg>';
   const ICONE_PARAR = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>';
+  const ICONE_CLIPE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
 
   let raiz = null, painelEl = null, corpoEl = null, estadoEl = null, ajustesEl = null, txt = null, botaoEnviar = null, rodando = false, vigia = null, ultimo = null, esperandoAcao = false, estadoCv = "ocioso", segundosCv = 0, focoFeito = false, posCv = null, marcaCv = "";
   function posicionar() {
@@ -454,6 +466,76 @@
     };
     x.send(f);
   }
+
+  // Anexar arquivo (PDF ou imagem): sobe para o motor, que guarda uma cópia em Documentos › Mesa do Assessor › Anexos;
+  // a próxima mensagem (da caixa ou do pedido da tarefa) leva os anexos prontos e o Claude lê dali.
+  const TIPOS_ANEXO = { pdf: 20, png: 10, jpg: 10, jpeg: 10, webp: 10 }, MAX_ANEXOS = 6;
+  let anexosUI = [], avisoAnexoTimer = null;
+  const idsProntos = () => anexosUI.filter((a) => a.estado === "pronto" && a.id).map((a) => a.id);
+  const anexoSubindo = () => anexosUI.some((a) => a.estado === "enviando");
+  const tamanhoAnexo = (kb) => kb < 1024 ? kb + " KB" : (kb / 1024).toFixed(1).replace(".", ",") + " MB";
+  function avisoAnexo(t) {
+    const cx = raiz && raiz.querySelector("#cvCaixa"); if (!cx) return;
+    let av = raiz.querySelector("#cvAnexoAviso");
+    if (!av) { av = document.createElement("div"); av.id = "cvAnexoAviso"; av.className = "estado-cv on"; av.setAttribute("role", "status"); av.setAttribute("aria-live", "polite"); cx.before(av); }
+    av.textContent = t || ""; av.style.display = t ? "" : "none";
+    clearTimeout(avisoAnexoTimer); if (t) avisoAnexoTimer = setTimeout(() => { av.style.display = "none"; }, 12000);
+  }
+  function pintarAnexos() {
+    const box = raiz && raiz.querySelector("#cvAnexos"); if (!box) return;
+    box.textContent = ""; box.hidden = !anexosUI.length;
+    for (const a of anexosUI) {
+      const c = document.createElement("span"); c.className = "chip" + (a.estado === "enviando" ? " enviando" : "");
+      const tp = document.createElement("b"); tp.textContent = a.tipo === "pdf" ? "PDF" : "IMAGEM";
+      const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = a.original; nm.title = a.original;
+      const tm = document.createElement("small"); tm.textContent = a.estado === "enviando" ? "enviando… " + (a.progresso || 0) + "%" : tamanhoAnexo(a.kb);
+      const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.title = "Tirar este anexo"; x.setAttribute("aria-label", "Tirar o anexo " + a.original);
+      x.onclick = () => removerAnexo(a);
+      c.append(tp, nm, tm, x); box.append(c);
+    }
+    atualizarBotao();
+  }
+  function tirarEnviados(ids) { if (!ids || !ids.length) return; anexosUI = anexosUI.filter((a) => !ids.includes(a.id)); pintarAnexos(); }
+  async function removerAnexo(a) {
+    if (a.estado === "enviando") { try { a.xhr && a.xhr.abort(); } catch {   } }
+    else if (a.id) { try { await api("/api/anexo/remover", { id: a.id }); } catch {   } }
+    anexosUI = anexosUI.filter((x) => x !== a); pintarAnexos();
+  }
+  function subirAnexo(f) {
+    const ext = String(f.name || "").split(".").pop().toLowerCase(), limite = TIPOS_ANEXO[ext];
+    if (!limite || !/\./.test(f.name || "")) { avisoAnexo((f.name || "Esse arquivo") + ": anexe PDF ou imagem (PNG, JPG ou WEBP)."); return; }
+    if (f.size > limite * 1048576) { avisoAnexo(f.name + ": o arquivo passa de " + limite + " MB."); return; }
+    if (!f.size) { avisoAnexo(f.name + ": o arquivo está vazio."); return; }
+    if (anexosUI.length >= MAX_ANEXOS) { avisoAnexo("Até " + MAX_ANEXOS + " arquivos por mensagem."); return; }
+    const a = { original: f.name, tipo: ext === "pdf" ? "pdf" : "imagem", kb: Math.max(1, Math.round(f.size / 1024)), estado: "enviando", progresso: 0 };
+    const x = new XMLHttpRequest(); a.xhr = x;
+    x.open("POST", "/api/anexo?nome=" + encodeURIComponent(f.name));
+    x.setRequestHeader("x-mesa-token", TOKEN); x.setRequestHeader("content-type", "application/octet-stream");
+    x.upload.onprogress = (ev) => { if (ev.lengthComputable) { a.progresso = Math.round(ev.loaded * 100 / ev.total); pintarAnexos(); } };
+    const sair = (msg) => { anexosUI = anexosUI.filter((y) => y !== a); pintarAnexos(); if (msg) avisoAnexo(msg); };
+    x.onerror = () => sair("Não consegui anexar " + f.name + ". Tente de novo.");
+    x.onabort = () => sair("");
+    x.onload = () => {
+      let r = {}; try { r = JSON.parse(x.responseText); } catch {   }
+      if (x.status !== 200 || !r.ok || !r.anexo) return sair(f.name + ": " + ((r && r.erro) || "não consegui anexar. Tente de novo."));
+      Object.assign(a, { id: r.anexo.id, original: r.anexo.original || f.name, kb: r.anexo.kb, tipo: r.anexo.tipo, estado: "pronto", xhr: null, prontoEm: Date.now() });
+      pintarAnexos();
+    };
+    anexosUI.push(a); pintarAnexos(); avisoAnexo("");
+    x.send(f);
+  }
+  function subirAnexos(lista) { for (const f of Array.from(lista || [])) subirAnexo(f); }
+  function anexarArquivo() { const inp = raiz && raiz.querySelector("#cvArquivo"); if (!inp) return; inp.value = ""; inp.click(); }
+  // Depois de recarregar a tela, os anexos que esperam envio voltam; os que já foram com uma mensagem saem.
+  function sincronizarAnexos(lista, pedidoEm) {
+    if (!Array.isArray(lista)) return;
+    const ids = new Set(lista.map((a) => a.id)); let mudou = false;
+    const antes = anexosUI.length;
+    anexosUI = anexosUI.filter((a) => a.estado !== "pronto" || ids.has(a.id) || (a.prontoEm || 0) >= pedidoEm);
+    if (anexosUI.length !== antes) mudou = true;
+    for (const a of lista) if (!anexosUI.some((x) => x.id === a.id)) { anexosUI.push({ id: a.id, original: a.original || a.nome, tipo: a.tipo, kb: a.kb, estado: "pronto", prontoEm: 0 }); mudou = true; }
+    if (mudou) pintarAnexos();
+  }
   const metaAtual = () => { const c = window.__mesaContexto ? window.__mesaContexto() : null; return c && c.tarefaId ? { tarefa: c.tarefaId, nome: c.tarefa, area: c.areaId, areaNome: c.areaNome } : null; };
   const descreverContexto = () => {
     const c = window.__mesaContexto ? window.__mesaContexto() : null;
@@ -470,7 +552,7 @@
 
   function atualizarBotao() {
     if (!botaoEnviar) return;
-    const temTexto = txt.value.trim().length > 0;
+    const temTexto = txt.value.trim().length > 0 || idsProntos().length > 0;
     if (rodando) { botaoEnviar.innerHTML = ICONE_PARAR; botaoEnviar.className = "ic env pronto"; botaoEnviar.setAttribute("aria-label", "Parar"); botaoEnviar.disabled = false; return; }
     botaoEnviar.innerHTML = ICONE_ENVIAR; botaoEnviar.setAttribute("aria-label", "Enviar");
     botaoEnviar.className = "ic env" + (temTexto ? " pronto" : ""); botaoEnviar.disabled = !temTexto;
@@ -485,8 +567,9 @@
     const s = document.createElement("section"); s.id = "conversa"; s.setAttribute("aria-label", "Conversa com o Claude");
     s.innerHTML = '<div class="cv-painel" id="cvPainel"><div class="cv-cab">Conversa com o Claude</div><div class="cv-corpo" id="cvCorpo"></div>'
       + '<div class="estado-cv" id="cvEstado" role="status" aria-live="polite"></div><div class="ajustes" id="cvAjustes"></div></div>'
-      + '<div class="caixa" id="cvCaixa"><textarea id="cvTxt" rows="1" placeholder="Peça ao Claude: ajustar este pedido, criar uma tarefa, buscar dados…" aria-label="Mensagem para o Claude"></textarea>'
-      + '<div class="barra"><button type="button" class="ic" id="cvMais" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções">' + ICONE_MAIS + '</button><button type="button" class="modelo" id="cvModelo" aria-haspopup="menu" title="Versão da Mesa e modelo do Claude em uso. Clique para trocar.">Mesa · Claude</button><button type="button" class="ic env" id="cvEnv" aria-label="Enviar" disabled>' + ICONE_ENVIAR + '</button></div></div>'
+      + '<div class="caixa" id="cvCaixa"><div class="anexos" id="cvAnexos" aria-label="Arquivos anexados" hidden></div><textarea id="cvTxt" rows="1" placeholder="Peça ao Claude: ajustar este pedido, criar uma tarefa, buscar dados…" aria-label="Mensagem para o Claude"></textarea>'
+      + '<input type="file" id="cvArquivo" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" hidden>'
+      + '<div class="barra"><button type="button" class="ic" id="cvMais" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções">' + ICONE_MAIS + '</button><button type="button" class="ic" id="cvAnexar" aria-label="Anexar arquivo (PDF ou imagem)" title="Anexar arquivo: PDF ou imagem (PNG, JPG, WEBP)">' + ICONE_CLIPE + '</button><button type="button" class="modelo" id="cvModelo" aria-haspopup="menu" title="Versão da Mesa e modelo do Claude em uso. Clique para trocar.">Mesa · Claude</button><button type="button" class="ic env" id="cvEnv" aria-label="Enviar" disabled>' + ICONE_ENVIAR + '</button></div></div>'
       + '<div class="menu" id="cvMenu" role="menu" hidden></div>';
     palco.append(s); raiz = s; painelEl = s.querySelector("#cvPainel"); corpoEl = s.querySelector("#cvCorpo"); estadoEl = s.querySelector("#cvEstado"); ajustesEl = s.querySelector("#cvAjustes"); txt = s.querySelector("#cvTxt"); botaoEnviar = s.querySelector("#cvEnv");
     corpoEl.addEventListener("scroll", () => { posCv = corpoEl.scrollTop; }, { passive: true });
@@ -496,6 +579,7 @@
     const montaMenu = () => {
       menu.textContent = "";
       for (const [rotulo, texto] of ATALHOS) menu.append(item(rotulo, () => sugerir(texto)));
+      menu.append(item("Anexar arquivo (PDF ou imagem)…", anexarArquivo));
       menu.append(item("Anexar vídeo…", anexarVideo));
       menu.append(item("Copiar diagnóstico para o suporte", async () => {
         try { const d = await api("/api/diag"); const t = Object.entries(d).map(([k, v]) => k + ": " + v).join("\n"); await navigator.clipboard.writeText("Mesa do Assessor — diagnóstico\n" + t); alert("Diagnóstico copiado. Cole na mensagem ao suporte; ele não leva conversa, perfil nem chave."); }
@@ -523,12 +607,24 @@
     menu.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); fechaMenu(); mais.focus(); } });
     const enviarTexto = async (t) => {
       if (!t || rodando) return false;
+      if (anexoSubindo()) { avisoAnexo("Espere o anexo terminar de subir e envie de novo."); return false; }
       const pedido = window.__mesaPedido && window.__mesaPedido.get ? window.__mesaPedido.get() : "";
       const texto = descreverContexto() + (pedido ? "[Pedido que está na tela]\n" + pedido + "\n[Fim do pedido]\n" : "") + "\nMensagem do assessor: " + t + "\n\n" + INSTRUCOES;
+      const anexos = idsProntos();
       esperandoAcao = true;
-      try { await api("/api/send", { texto, exibir: t, meta: metaAtual() }); acompanhar(); return true; } catch { esperandoAcao = false; return false; }
+      try { await api("/api/send", { texto, exibir: t, meta: metaAtual(), anexos }); tirarEnviados(anexos); acompanhar(); return true; } catch (e) { esperandoAcao = false; if (anexos.length && e && e.message) avisoAnexo(e.message); return false; }
     };
-    const enviar = async () => { const t = txt.value.trim(); if (!t || rodando) return; txt.value = ""; ajustarAltura(); atualizarBotao(); if (!(await enviarTexto(t))) { txt.value = t; ajustarAltura(); atualizarBotao(); } };
+    const enviar = async () => { const t = txt.value.trim() || (idsProntos().length ? "Leia o que anexei." : ""); if (!t || rodando) return; txt.value = ""; ajustarAltura(); atualizarBotao(); if (!(await enviarTexto(t))) { txt.value = t; ajustarAltura(); atualizarBotao(); } };
+    const arquivoEl = s.querySelector("#cvArquivo"), caixaEl = s.querySelector("#cvCaixa");
+    arquivoEl.addEventListener("change", () => { subirAnexos(arquivoEl.files); arquivoEl.value = ""; });
+    s.querySelector("#cvAnexar").onclick = anexarArquivo;
+    const temArquivos = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+    caixaEl.addEventListener("dragover", (e) => { if (!temArquivos(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = "copy"; caixaEl.classList.add("arrastando"); });
+    caixaEl.addEventListener("dragleave", () => caixaEl.classList.remove("arrastando"));
+    caixaEl.addEventListener("drop", (e) => { if (!temArquivos(e)) return; e.preventDefault(); e.stopPropagation(); caixaEl.classList.remove("arrastando"); subirAnexos(e.dataTransfer.files); });
+    // arquivo solto fora da caixa não pode trocar a tela da Mesa pelo PDF
+    for (const ev of ["dragover", "drop"]) window.addEventListener(ev, (e) => { if (temArquivos(e)) e.preventDefault(); });
+    txt.addEventListener("paste", (e) => { const fs = Array.from((e.clipboardData && e.clipboardData.files) || []).filter((f) => /^image\//.test(f.type)); if (fs.length) { e.preventDefault(); subirAnexos(fs); } });
     window.__mesaEnviar = enviarTexto;
     botaoEnviar.onclick = () => { if (rodando) { api("/api/parar").catch(() => {}); } else enviar(); };
     txt.addEventListener("input", () => { ajustarAltura(); atualizarBotao(); });
@@ -658,7 +754,9 @@
     c.append(b); return c;
   }
   async function atualizar() {
+    const pedidoEm = Date.now();
     let e; try { e = await api("/api/estado"); } catch { return; }
+    sincronizarAnexos(e.anexos, pedidoEm);
     rodando = e.rodando; segundosCv = e.segundos || 0;
     const ult = e.turnos[e.turnos.length - 1];
     const ctx = window.__mesaContexto ? window.__mesaContexto() : null;
