@@ -58,7 +58,7 @@ Como usar: é um sinal do que o público de finanças procura e comenta, no conj
 5. **Ficha "Minhas referências"** (até 15 linhas): perfis (@), padrões que funcionam, ganchos que valem adaptar, temas a evitar. Mostre a ficha e **pergunte antes de gravar**. Com o ok, grave com `mesa_perfil` (`salvar.referencias`): a ficha nova substitui a anterior, então junte o que já estava guardado e ainda vale.
 
 ## Como foram meus posts
-1. Use só números que ele mandou (prints das estatísticas, números colados ou o conector). **Sem número, não avalie o post**: peça os prints das estatísticas de cada post e pare.
+1. Use só números que ele mandou (prints das estatísticas, números colados ou o conector). **Sem número, não avalie o post**: peça os prints das estatísticas de cada post e pare. Para dizer onde achar os números, use só o que a Central de Ajuda da Meta confirma: no Meta Business Suite, selecione a publicação para ver os insights dela (artigo 942827662903020, lido em 18/11/2026). Não cite botão ou menu do aplicativo do Instagram que você não confirmou.
 2. Tabela por post: data, formato, alcance, salvamentos, envios, comentários, seguidores ganhos e uma leitura curta. Campo que não veio fica "não informado".
 3. Contas só com os números dados (ex.: salvamentos por mil contas alcançadas), com a conta à vista. Poucos posts não provam regra: diga que é uma indicação.
 4. Repetir e parar (até 3 de cada, com o número que sustenta) e até 3 testes para a semana (hipótese, como testar, o que medir).
