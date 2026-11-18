@@ -109,7 +109,10 @@ test('enviar leva os anexos ao Claude e limpa os cartões', { skip: PULAR }, asy
   const ch = lerChamadas().at(-1);
   assert.ok(ch && lerChamadas().length > antes, 'o Claude falso não foi chamado');
   assert.ok(ch.entrada.includes('[Anexos desta mensagem]'));
-  assert.ok(ch.entrada.includes('Lâmina do fundo.pdf') && ch.entrada.includes('gráfico.png'));
+  // Cada arquivo vai pelo nome seguro da pasta Anexos, entre aspas; o nome que veio com o arquivo não entra no pedido.
+  assert.match(ch.entrada, /- "\d{6}-Lamina-do-fundo\.pdf" \(PDF,/);
+  assert.match(ch.entrada, /- "\d{6}-grafico\.png" \(imagem,/);
+  assert.ok(!ch.entrada.includes('Lâmina do fundo.pdf') && !ch.entrada.includes('gráfico.png'));
   assert.ok(ch.entrada.includes('Mensagem do assessor: Resuma a lâmina e leia o gráfico.'));
   await ate('document.querySelectorAll("#cvAnexos .chip").length === 0 && document.querySelector("#cvAnexos").hidden');
 });

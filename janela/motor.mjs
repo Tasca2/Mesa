@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { acharClaude, precisaShell, ARQUIVO_MOTOR, FERRAMENTAS_WEB, PASTA_DADOS } from './comum.mjs';
 import { openSync, readSync, closeSync } from 'node:fs';
-import { MAX_ANEXOS, PASTA_ANEXOS, PASTA_FONTES, tipoDoAnexo, assinaturaConfere, erroDeTamanho, dentroDe, destinoDoAnexo, argsDeFerramentas, blocoDeAnexos, pastaCofre, regrasDaMesa, argsDeMelhorar, AVISO_ARQUIVOS } from './anexos.mjs';
+import { MAX_ANEXOS, PASTA_ANEXOS, PASTA_FONTES, tipoDoAnexo, assinaturaConfere, erroDeTamanho, dentroDe, destinoDoAnexo, argsDeFerramentas, blocoDeAnexos, pastaCofre, regrasDaMesa, argsDeMelhorar, AVISO_ARQUIVOS, ANEXO_NO_VIDEO, ANEXO_NO_VIDEO_ENVIO } from './anexos.mjs';
 import { cortarMensagem, cortarFim, paraExibir } from './corte.mjs';
 // Limites do /api/send (os mesmos de antes; agora nenhum é calado: veja corte.mjs). A mensagem vai até 40.000 caracteres;
 // as instruções da tarefa (contexto) e o texto que aparece na conversa, até 4.000.
@@ -245,11 +245,15 @@ function gravarRegras() {
   mkdirSync(TRABALHO, { recursive: true });
   writeFileSync(ARQ_REGRAS, JSON.stringify(regrasDaMesa({ pastasProibidas: PASTAS_PROIBIDAS }), null, 2));
 }
+// Modo vídeo: um vídeo escolhido e a pasta dele no disco. Nele o Claude roda como na 1.13 (terminal e leitura livre),
+// por isso não entra anexo, nem ao anexar nem ao enviar.
+const modoVideo = () => !!estado.video?.ativo && !!estado.video.dir && existsSync(estado.video.dir);
 function receberAnexo(req, res) {
   const nomeOrig = String(new URL(req.url, 'http://x').searchParams.get('nome') || '').slice(0, 200);
   const original = nomeOrig.split(/[\\/]/).pop().trim().slice(0, 100);
   const t = tipoDoAnexo(nomeOrig);
   const recusar = (cod, erro) => { req.resume(); return json(res, cod, { erro }); };
+  if (modoVideo()) return recusar(409, ANEXO_NO_VIDEO);
   if (anexosPendentes.length >= MAX_ANEXOS) return recusar(400, `Até ${MAX_ANEXOS} arquivos por mensagem. Envie estes antes de anexar mais.`);
   if (!t) return recusar(415, 'Anexe PDF ou imagem (PNG, JPG ou WEBP).');
   const declarado = Number(req.headers['content-length'] || 0);
@@ -295,14 +299,17 @@ function separarAnexos(ids) {
   return { lista };
 }
 
+// Devolve '' quando a chamada saiu (ou virou erro na tela) e a frase da recusa quando nem começou.
 function rodarClaude(texto, contexto, exibir, anexos = []) {
+  if (anexos.length && modoVideo()) return ANEXO_NO_VIDEO_ENVIO;
   estado.rodando = true; estado.inicio = Date.now(); estado.erro = '';
   estado.turnos.push({ papel: 'assessor', texto: (exibir || texto) + (anexos.length ? '\nAnexos: ' + anexos.map((a) => a.original).join(', ') : '') }); guardarConversa();
   // Qualquer falha ao preparar a chamada vira erro na tela: a Mesa não pode ficar presa em "respondendo".
   let limite = null;
   try {
   const primeiro = !estado.sessao;
-  const video = !!estado.video?.ativo && !!estado.video.dir && existsSync(estado.video.dir);
+  const video = modoVideo();
+  if (video) estado.video.usado = true;
   const sistema = video ? PROTOCOLO : `${PROTOCOLO} ${AVISO_ARQUIVOS}`; // no vídeo o Claude usa o terminal e a pasta do vídeo
   const viaShell0 = !!CLAUDE && precisaShell(CLAUDE);
   const prompt = (viaShell0 ? `${sistema}\n\n` : '') + (primeiro ? `${AVISO_JANELA}\n${contexto || ''}\n\n` : '') + blocoDeAnexos(anexos) + texto;
@@ -543,7 +550,7 @@ const servidor = http.createServer(async (req, res) => {
     out.on('finish', () => {
       if (falhou) return;
       try { renameSync(parcial, destino); } catch { return falha(500, 'Não consegui concluir o arquivo.'); }
-      estado.video = { ativo: true, dir: pasta, nome: base + ext };
+      estado.video = { ativo: true, dir: pasta, nome: base + ext, usado: false };
       guardarConversa();
       json(res, 200, { ok: true, caminho: destino, pasta, edvid: existsSync(EDVID_DIR), kb: Math.round(recebido / 1024) });
     });
@@ -577,6 +584,9 @@ const servidor = http.createServer(async (req, res) => {
       case '/api/novo':
         if (!estado.rodando) {
           estado.sessao = null; estado.erro = '';
+          // Nova tarefa sai do modo vídeo. Fica só o vídeo escolhido para ela e ainda não usado: a janela escolhe o
+          // vídeo e só depois chama /api/novo e envia o pedido de vídeo.
+          if (estado.video && estado.video.usado !== false) estado.video = null;
           if (estado.turnos.length && estado.turnos[estado.turnos.length - 1].papel !== 'sistema') estado.turnos.push({ papel: 'sistema', texto: 'Nova tarefa' });
           guardarConversa();
         }
@@ -617,11 +627,13 @@ const servidor = http.createServer(async (req, res) => {
         const msg = cortarMensagem(String(corpo.texto || '').trim(), LIMITE_MENSAGEM, corpo.fimProtegido);
         if (msg.erro) return json(res, 413, { erro: msg.erro });
         if (!msg.texto) return json(res, 400, { erro: 'vazio' });
+        if (Array.isArray(corpo.anexos) && corpo.anexos.length && modoVideo()) return json(res, 409, { erro: ANEXO_NO_VIDEO_ENVIO });
         const anexos = separarAnexos(corpo.anexos);
         if (anexos.faltam) return json(res, 400, { faltam: anexos.faltam, erro: `${anexos.nomes.length ? anexos.nomes.join(', ') : 'Um anexo'}: o arquivo não está mais na pasta Anexos. Tirei da mensagem; anexe de novo se precisar e envie.` });
         if (corpo.meta) estado.meta = limpaMeta(corpo.meta);
         const ctx = cortarFim(String(corpo.contexto || ''), LIMITE_CONTEXTO, 'As instruções da tarefa que vão junto com o pedido');
-        rodarClaude(msg.texto, ctx.texto, corpo.exibir ? paraExibir(String(corpo.exibir), LIMITE_EXIBIR) : '', anexos.lista);
+        const recusa = rodarClaude(msg.texto, ctx.texto, corpo.exibir ? paraExibir(String(corpo.exibir), LIMITE_EXIBIR) : '', anexos.lista);
+        if (recusa) return json(res, 409, { erro: recusa });
         const avisos = [msg.aviso, ctx.aviso].filter(Boolean);
         return json(res, 200, { ok: true, cortado: avisos.length > 0, ...(avisos.length ? { aviso: avisos.join(' ') } : {}) });
       }
@@ -676,7 +688,7 @@ const servidor = http.createServer(async (req, res) => {
         const pasta = path.join(VIDEOS_DIR, `${base}-${Date.now().toString(36)}`), destino = path.join(pasta, base + ext);
         try { mkdirSync(pasta, { recursive: true }); copyFileSync(orig, destino); }
         catch { try { rmSync(pasta, { recursive: true, force: true }); } catch {   } return json(res, 500, { erro: 'Não consegui copiar o vídeo para a pasta da Mesa.' }); }
-        estado.video = { ativo: true, dir: pasta, nome: base + ext }; guardarConversa();
+        estado.video = { ativo: true, dir: pasta, nome: base + ext, usado: false }; guardarConversa();
         return json(res, 200, { ok: true, caminho: destino, nome: base + ext, mb: Math.max(1, Math.round(st.size / 1048576)), edvid: existsSync(EDVID_DIR) });
       }
       case '/api/videos': {
@@ -696,7 +708,7 @@ const servidor = http.createServer(async (req, res) => {
         const nomePasta = path.basename(String(corpo.pasta || '')), dir = path.join(VIDEOS_DIR, nomePasta);
         let arq; try { arq = readdirSync(dir).find((n) => EXT_VIDEO.includes(path.extname(n).toLowerCase())); } catch {   }
         if (!nomePasta || !arq) return json(res, 404, { erro: 'Não achei esse vídeo.' });
-        estado.video = { ativo: true, dir, nome: arq }; guardarConversa();
+        estado.video = { ativo: true, dir, nome: arq, usado: false }; guardarConversa();
         return json(res, 200, { ok: true, caminho: path.join(dir, arq), nome: arq, edvid: existsSync(EDVID_DIR) });
       }
       case '/api/editor': { const r = await abrirEditorEdvid(); return json(res, r.erro ? 409 : 200, r); }
