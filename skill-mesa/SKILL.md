@@ -11,7 +11,7 @@ Responda sempre em português do Brasil, com a linguagem simples de quem trabalh
 
 ## Antes de começar
 
-Confira se a ferramenta `carregar_metodo` (servidor `mesa-do-assessor`) está disponível; se estiver só como ferramenta adiada, carregue-a com ToolSearch junto com `mesa_perfil`, `consultar_cofre` e `analise_ativo` (uma busca só). Se `carregar_metodo` não existir, diga em uma frase que o plugin Mesa do Assessor precisa estar instalado e ativo no Claude Desktop, e pare.
+Confira se a ferramenta `carregar_metodo` (servidor `mesa-do-assessor`) está disponível; se estiver só como ferramenta adiada, carregue-a com ToolSearch junto com `mesa_perfil`, `consultar_cofre`, `analise_ativo`, `painel_macro`, `documentos_cvm` e `taxas_tesouro` (uma busca só). Se `carregar_metodo` não existir, diga em uma frase que o plugin Mesa do Assessor precisa estar instalado e ativo no Claude Desktop, e pare.
 
 Não use `abrir_painel`, `mesa_andamento` nem `mesa_conectar`: servem ao painel, que não aparece aqui.
 
@@ -66,9 +66,9 @@ Se a pessoa responder "sem preferência" ou algo vago, mostre as tarefas da áre
 | Rotinas | Pitch e e-mail | Apresentação de 1 minuto e e-mail com 3 assuntos | `roteiro-comercial` | Formato · Perfil |
 | Rotinas | Objeção do cliente | A resposta certa para o "não" ou o "vou pensar" | `objecoes` | Canal |
 | Rotinas | Retomar lead parado | Gancho, canal e sequência de contatos | `retomada-lead-frio` | Parado há |
-| Mercado | Juros, inflação e câmbio | Selic, IPCA e dólar do Banco Central | `macro-brasil` | Resultado |
-| Mercado | Fato relevante | Resumo do comunicado e o que muda na tese | `resumo-de-fato-relevante` | Resultado |
-| Mercado | Leitura de gráfico | Preço e indicadores, sem previsão | `leitura-grafica` | Resultado |
+| Mercado | Juros, inflação e câmbio | Painel do dia: juros, inflação, dólar, expectativas e agenda | `macro-brasil` | Uso · Situações · Recorte · Base de comparação |
+| Mercado | Fato relevante | Resumo do comunicado e o que muda na tese | `resumo-de-fato-relevante` | Uso |
+| Mercado | Leitura de gráfico | Descrição de preço e indicadores, sem previsão | `leitura-grafica` | Uso |
 | Mercado | Estudo e apresentação | Material completo de um ativo com dados da Análise de Ativo do CaptaMais | `estudo-de-ativo` | Formato |
 | Mercado | Analisar uma ação | Uma empresa pelo método: números, critérios e lacunas | `fundamentalista-metodo` | Resultado |
 | Mercado | Comparar o setor | Empresas lado a lado, na mesma base | `comparativo-setorial` | Resultado |
@@ -111,7 +111,10 @@ Pule a pergunta **Atuação** quando o perfil já trouxer a atuação.
 - **Objetivo da semana** — Qual o objetivo da semana? Educar · Atrair conversas · Mostrar o mercado · Misto.
 - **Posts** — Quantos posts? 3 · 5 (padrão: de segunda a sexta) · 7.
 - **Programar** — Como você vai programar? Meta Business Suite (com o passo a passo da Central de Ajuda da Meta) · Conector ligado ao Claude (no Claude Desktop, com o conector já ligado) · Só quero a pasta (imagens e legendas prontas; você programa como quiser).
-- **Tema** — Qual assunto do dia? Juros · Inflação · Dólar · Os três juntos.
+- **Uso** (juros, fato relevante, gráfico) — Para que você vai usar esta leitura? Conversa de WhatsApp · Entender a fundo · Material para o cliente.
+- **Situações** (juros; várias escolhas, `multiSelect: true`) — Que situações de cliente o painel deve cobrir? Reserva em pós-fixado · Prefixado ou IPCA+ · Dólar ou exterior · Aluguel ou contrato reajustado por índice · Vai financiar imóvel.
+- **Recorte** (juros) — Qual parte do painel? Painel completo · Juros e Copom · Inflação · Dólar e câmbio.
+- **Base de comparação** (juros) — Contra qual data? Mês passado · Semana passada · Início do ano.
 - **Atuação** — Você atua como? Assessor de investimento (vinculado a um escritório) · Consultor de valores mobiliários (registro na CVM) · Planejador financeiro (certificação de planejamento). Define a identificação e os avisos que o material precisa trazer.
 - **Resultado** — Como você quer o resultado? PDF (arquivo para salvar ou imprimir) · Texto no chat (para ler e copiar aqui).
 
@@ -125,6 +128,7 @@ Pule a pergunta **Atuação** quando o perfil já trouxer a atuação.
 - Retomar lead parado: peça no chat o histórico da conversa (últimas mensagens ou resumo dos contatos) e use-o; com ele, diga qual canal funciona melhor e entregue o texto de WhatsApp e o roteiro de ligação.
 - Pré-reunião (cliente atual): peça no chat o resumo da carteira e o histórico das últimas conversas; sem eles, entregue o que dá, marque com `[CONFERIR]` o que falta e peça o resto em uma frase.
 - Analisar ação, fundo imobiliário, comparar setor e estudo: busque os dados com `analise_ativo` antes de pedir ao assessor.
+- Juros, inflação e câmbio: os números vêm de `painel_macro`. Fato relevante: peça no chat a empresa e qual comunicado; o documento vem de `documentos_cvm`. Leitura de gráfico: peça no chat o ativo, o período e, se tiver, a imagem do gráfico.
 - Post para Instagram: depois do texto aprovado, gere as imagens com `mesa_carrossel` (carrossel de 5 a 8 slides, ou 1 slide para arte única) e informe a pasta e o PDF; no Reels, entregue o roteiro cena a cena e a capa pronta.
 - Raio-X de produto e Comparar produtos: peça a lâmina, o termo ou o e-mail da mesa (texto colado ou arquivo); título público de prazo parecido com `taxas_tesouro`, CDI, Selic e IPCA esperado com `painel_macro`; FGC, imposto e IOF com fonte primária e data. Analise o produto, sem dizer a um cliente que compre.
 - Estudar perfis de referência e Como foram meus posts: peça os prints, as legendas e links ou os números antes de analisar; sem esse material, não analise nem invente perfil ou número. A ficha "Minhas referências" só é gravada com `mesa_perfil` (`salvar.referencias`) depois do ok.

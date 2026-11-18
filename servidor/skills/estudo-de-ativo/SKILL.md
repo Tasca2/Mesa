@@ -45,6 +45,8 @@ Em todos: ao final, uma mensagem curta de envio ao cliente (`whatsapp`, sem `**`
 
 ## Na Mesa do Assessor (acrescentado)
 
+Na Mesa, o pedido e esta seção prevalecem sobre o Modelo de saída acima.
+
 1. O material nasce da análise: chame `analise_ativo` com todos os blocos antes de montar página. Em ação e fundo imobiliário, com `pesquisa=true`.
 2. Fatos do período: `documentos_cvm`. Juros e inflação do período: `painel_macro`. Número sem fonte não entra no material.
 3. O arquivo leva `tipo: "estudo"`. Resumo de uma página: `mesa_documento` com os quatro números em `destaques` (rótulo, valor e a referência na nota), o histórico em `grafico` `linha` com `retornos: true` (ativo e índice, os retornos mensais que a ferramenta devolveu, `inicio` = o mês anterior ao primeiro retorno, `fonte` com a data e `tabela: false`, porque a tabela do histórico vem logo abaixo, no texto da seção) e os fortes e pontos de atenção. Estudo em PDF: o mesmo, com `capa: true` e as seções na ordem do pedido. Apresentação: `mesa_apresentacao` com os layouts capa, numeros, linha, tabela, lista, comparativo, frase e fechamento.
