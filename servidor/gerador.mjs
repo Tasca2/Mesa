@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync, copyFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { montarPaginas, imagemEmbutida, numeroDe, formatador, casasDe, problemasDosSlides, W, H } from './layouts.mjs';
+import { montarPaginas, imagemEmbutida, numeroDe, formatador, casasDe, problemasDosSlides, somaRuim, W, H } from './layouts.mjs';
 
 export const ARQUIVO_GERACAO = path.join(os.tmpdir(), 'mesa-do-assessor-geracao.json');
 
@@ -144,7 +144,7 @@ const TERMOS_RISCO = [
   ['regulação ou supervisão', /regulad|regulat|supervisionad|fiscalizad|autorizad[oa] (pelo|pela)|banco central|\bcvm\b/],
   ['generalização sobre o mercado', /modelo padrao|padrao do (mercado|setor|assessor)|pratica (comum|de mercado)|comum no mercado|como todo|seguranca para (o|a|os|as) /],
   ['plataforma ou aplicativo de acompanhamento', /plataforma|aplicativo|\bapp\b/], ['garantia', /garantia|garantid[oa]|garantimos|\bgarante\b|garantir (retorno|rentab|resultado)/],
-  ['superlativo', /\b(o|a|os|as) melhor(es)? |\bmelhor (assessor|escritorio|opcao|carteira|solucao|do mercado)|visibilidade total|boas maos|equipe completa|multidisciplinar|\bunic[oa]s?\b|exclusiv|\blider|premiad|referencia (do|no) mercado/],
+  ['superlativo', /\b(o|a|os|as) melhor(es)?\b|\bmelhor (assessor|escritorio|opcao|carteira|solucao|do mercado)|visibilidade total|boas maos|equipe completa|multidisciplinar|\bunic[oa]s?\b|exclusiv|\blider|premiad|referencia (do|no) mercado/],
   ['risco', /sem risco|risco zero|seguranca total/], ['retorno', /rentabilidade|retorno (de|acima)|\brende\b|\brendimento (de|acima)/],
 ];
 // Lista menor do material de mercado (estudo, juros, fato relevante): fonte, órgão e rentabilidade com período passam;
@@ -152,7 +152,9 @@ const TERMOS_RISCO = [
 const TERMOS_RISCO_MERCADO = [
   ['promessa de retorno', /garantia de (retorno|rentabilidade|resultado|lucro|ganho|rendimento)|(retorno|rentabilidade|resultado|lucro|ganho|rendimento)s? (garantid|cert[oa]s?\b|assegurad)|garantimos|\bgarante (o |a )?(retorno|rentabilidade|resultado|lucro|ganho)|\bvai (render|subir|disparar|valorizar|dobrar)|\brendera\b|\bsubira\b|valorizacao (garantida|certa)|nao tem como perder|dinheiro facil|ganho facil/],
   ['risco', /sem risco|risco zero|zero risco|seguranca total|100% segur/],
-  ['superlativo', /\b(o|a|os|as) melhor(es)? (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|momento|hora|oportunidade|escolha)\b|melhor do mercado|imperdivel|oportunidade unica|unica chance|\bimbativel|retorno extraordinario/],
+  // "o/a melhor" barra antes de produto, de "do/da" (a melhor do ano, da bolsa) e no fim da frase; o resultado da
+  // própria empresa contra o próprio histórico ("o melhor resultado trimestral desde 2019") passa.
+  ['superlativo', /\b(o|a|os|as) melhor(es)?(?= (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|carteiras|momento|hora|oportunidade|escolha|escolhas|relacao|alternativa|alternativas|papel|papeis|empresa|empresas|aposta|apostas|compra|entrada|produto|produtos|titulo|titulos)\b| (do|da|dos|das|de)\b|\s*[.,;:!?)]|\s*$)|melhor do mercado|imperdivel|oportunidade unica|unica chance|\bimbativel|retorno extraordinario/],
 ];
 const RETORNO = /\b(rentabilidade|retorno|rendimento|rende)\b/;
 const MESES = 'jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez';
@@ -162,7 +164,8 @@ const PERIODO = new RegExp([
   String.raw`\b(${MESES})[a-z]*\.?\/?\s?(de\s)?((19|20)?\d{2})\b`, String.raw`\bjanela\b`, String.raw`\bytd\b`, String.raw`\bdata-base\b`,
 ].join('|'));
 
-// Textos que a trava lê: tudo o que a página afirma. A linha de fonte (página e número) fica fora: é referência, não afirmação.
+// Textos que a trava lê: tudo o que a página afirma. A linha de fonte, a fonte do item, os valores e os rótulos do gráfico
+// são referência: ficam fora das regras de regulação e de retorno, mas passam pela de promessa, risco zero e superlativo.
 function textosDaPagina(s) {
   const out = [];
   const add = (t) => { if (typeof t === 'string' && t.trim()) out.push(t); };
@@ -173,17 +176,37 @@ function textosDaPagina(s) {
   (s.series || []).forEach((x) => add(x?.nome));
   return out;
 }
-const fontesDaPagina = (s) => [s.fonte, ...(s.itens || []).map((x) => x.fonte), ...(s.rotulos || [])].filter((t) => typeof t === 'string');
+const fontesDaPagina = (s) => [s.fonte, s.inicio, ...(s.itens || []).flatMap((x) => [x?.fonte, x?.valor, x?.valor2]), ...(s.rotulos || [])].filter((t) => typeof t === 'string' && t.trim());
 
-export function revisarApresentacao(slides, termosConfirmados = [], tipo) {
-  const ok = termosConfirmados.map(SEMACENTO);
+const liberador = (termosConfirmados) => {
+  const ok = (Array.isArray(termosConfirmados) ? termosConfirmados : []).map(SEMACENTO);
+  return (m) => ok.some((c) => c && (m.includes(c) || c.includes(m)));
+};
+// Promessa, risco zero e superlativo (a lista menor) num conjunto de textos; linha com [CONFERIR] fica de fora.
+function travaMenor(onde, textos, liberado, achados) {
+  for (const t of textos) {
+    if (typeof t !== 'string' || !t.trim() || /\[CONFERIR/i.test(t)) continue;
+    const n = SEMACENTO(t);
+    for (const [nome, re] of TERMOS_RISCO_MERCADO) {
+      const m = n.match(re);
+      if (m && !liberado(m[0])) achados.push(`${onde}: "${t.trim().slice(0, 90)}" (${nome})`);
+    }
+  }
+}
+const mensagemDaTrava = (risco, onde = 'página') => 'o PDF não foi gerado porque estas frases afirmam algo que o assessor pode não ter dito: ' + risco.join(' | ') +
+  '. Reescreva cada uma só com o que o assessor informou, ou acrescente [CONFERIR] no texto; se o assessor realmente afirmou o termo, repita a chamada com termosConfirmados (a lista dos termos).' +
+  (risco.some((x) => x.endsWith('(retorno sem período)')) ? ` Rentabilidade e retorno precisam do período na mesma ${onde} (ex.: "em 12 meses até out/2026").` : '');
+
+// geral: textos da apresentação fora das páginas (titulo, rodape, cliente), conferidos com a lista menor.
+export function revisarApresentacao(slides, termosConfirmados = [], tipo, geral = {}) {
   const mercado = tipo === 'mercado' || tipo === 'estudo';
   const lista = mercado ? TERMOS_RISCO_MERCADO : TERMOS_RISCO;
-  const liberado = (m) => ok.some((c) => c && (m.includes(c) || c.includes(m)));
+  const liberado = liberador(termosConfirmados);
   const achados = [];
+  for (const [nome, t] of [['título', geral.titulo], ['rodapé', geral.rodape], ['cliente', geral.cliente]]) travaMenor(nome, [t], liberado, achados);
   slides.forEach((s, k) => {
-    const textos = textosDaPagina(s);
-    const comPeriodo = PERIODO.test(SEMACENTO([...textos, ...fontesDaPagina(s)].join(' · ')));
+    const textos = textosDaPagina(s), fontes = fontesDaPagina(s);
+    const comPeriodo = PERIODO.test(SEMACENTO([...textos, ...fontes].join(' · ')));
     for (const t of textos) {
       if (/\[CONFERIR/i.test(t)) continue;
       const n = SEMACENTO(t);
@@ -196,6 +219,37 @@ export function revisarApresentacao(slides, termosConfirmados = [], tipo) {
         if (m && !liberado(m[0])) achados.push(`página ${k + 1}: "${t.slice(0, 90)}" (retorno sem período)`);
       }
     }
+    travaMenor(`página ${k + 1}`, fontes, liberado, achados);
+  });
+  return achados;
+}
+
+// Folha A4: a lista menor (promessa, risco zero e superlativo) vale para todo texto que vai ao cliente: cabeçalho, destaques,
+// seções, gráficos e rodapé, linha por linha. Estudo e mercado também pedem o período junto de rentabilidade e retorno,
+// na mesma seção (texto, gráfico e a fonte dele). A lista completa da reunião não entra: a folha cita órgão, FGC e
+// rentabilidade do período o tempo todo.
+export function revisarDocumento(a, termosConfirmados = a?.termosConfirmados) {
+  const mercado = a?.tipo === 'mercado' || a?.tipo === 'estudo';
+  const liberado = liberador(termosConfirmados);
+  const achados = [];
+  const linhas = (xs) => xs.filter((t) => typeof t === 'string').flatMap((t) => t.split('\n')).map((t) => t.trim()).filter(Boolean);
+  const unidade = (onde, afirmacoes, referencias) => {
+    const af = linhas(afirmacoes), ref = linhas(referencias);
+    travaMenor(onde, [...af, ...ref], liberado, achados);
+    if (!mercado || PERIODO.test(SEMACENTO([...af, ...ref].join(' · ')))) return;
+    for (const t of af) {
+      if (/\[CONFERIR/i.test(t)) continue;
+      const m = SEMACENTO(t).match(RETORNO);
+      if (m && !liberado(m[0])) achados.push(`${onde}: "${t.slice(0, 90)}" (retorno sem período)`);
+    }
+  };
+  const lista = (x) => (Array.isArray(x) ? x : []);
+  unidade('cabeçalho', [a?.titulo, a?.subtitulo], [a?.cliente, a?.dataBase, a?.rodape]);
+  lista(a?.secoes).slice(0, 30).forEach((s, i) => {
+    const g = s?.grafico || {};
+    const cartoes = i === 0 ? lista(a?.destaques).flatMap((x) => [x?.rotulo, x?.valor, x?.nota]) : [];
+    unidade(`seção ${i + 1}${s?.titulo ? ` (${String(s.titulo).slice(0, 40)})` : ''}`, [s?.titulo, s?.texto, g.titulo, ...cartoes],
+      [g.fonte, g.categoria, g.inicio, ...lista(g.rotulos), ...lista(g.series).map((x) => x?.nome)]);
   });
   return achados;
 }
@@ -205,13 +259,8 @@ export async function gerarApresentacao(a, marcaBase = {}) {
   if (!slides.length) throw new Error('Envie pelo menos um slide.');
   const graficos = problemasDosSlides(slides);
   if (graficos.length) throw new Error('o PDF não foi gerado porque um gráfico está com número faltando ou que não é número: ' + graficos.join(' | ') + '. Corrija os valores e chame de novo.');
-  const risco = revisarApresentacao(slides, a.termosConfirmados || [], a.tipo);
-  if (risco.length) {
-    const semPeriodo = risco.some((x) => x.endsWith('(retorno sem período)'));
-    throw new Error('o PDF não foi gerado porque estas frases afirmam algo que o assessor pode não ter dito: ' + risco.join(' | ') +
-      '. Reescreva cada uma só com o que o assessor informou, ou acrescente [CONFERIR] no texto; se o assessor realmente afirmou o termo, repita a chamada com termosConfirmados (a lista dos termos).' +
-      (semPeriodo ? ' Rentabilidade e retorno precisam do período na mesma página (ex.: "em 12 meses até out/2026").' : ''));
-  }
+  const risco = revisarApresentacao(slides, a.termosConfirmados || [], a.tipo, { titulo: a.titulo, rodape: a.rodape, cliente: a.cliente });
+  if (risco.length) throw new Error(mensagemDaTrava(risco));
   const avisos = [];
   const marca = {
     ...marcaBase,
@@ -330,15 +379,26 @@ function dadosDoGrafico(g, onde) {
   const tipo = g?.tipo;
   if (!['barras', 'barras-duplas', 'rosca', 'linha'].includes(tipo)) throw new Error(`${onde}: tipo de gráfico desconhecido (use barras, barras-duplas, rosca ou linha).`);
   let rotulos = (Array.isArray(g.rotulos) ? g.rotulos : []).map((r) => String(r ?? ''));
-  const max = tipo === 'linha' ? 3 : tipo === 'rosca' ? 1 : 2;
+  const max = tipo === 'linha' ? 3 : 2;
   let series = (Array.isArray(g.series) ? g.series : []).slice(0, max).map((s, k) => ({ nome: String(s?.nome || (k ? `Série ${k + 1}` : 'Valor')), valores: (s?.valores || []).map(numeroDe) }));
   if (!rotulos.length || !series.length) throw new Error(`${onde}: o gráfico precisa de rótulos e de pelo menos uma série.`);
   if (tipo === 'rosca' && rotulos.length > 8) throw new Error(`${onde}: a rosca aceita até 8 fatias.`);
   for (const s of series) {
     if (s.valores.length !== rotulos.length || s.valores.some((v) => !Number.isFinite(v))) throw new Error(`${onde}: a série "${s.nome}" precisa de um valor para cada rótulo (${rotulos.length}), só números.`);
   }
-  if (tipo === 'rosca' && series[0].valores.some((v) => v < 0)) throw new Error(`${onde}: a rosca só aceita valores positivos.`);
+  if (tipo === 'rosca' && series.some((s) => s.valores.some((v) => v < 0))) throw new Error(`${onde}: a rosca só aceita valores positivos.`);
   let unidade = String(g.unidade ?? '').trim(), casas;
+  if (tipo === 'rosca' && series.length === 2 && unidade !== '%') throw new Error(`${onde}: a rosca com duas séries (ex.: política × atual) compara participações: mande as duas séries em %, cada uma somando 100%.`);
+  // Bandas de tolerância (ex.: política × atual): uma por rótulo, na unidade do gráfico (em %, pontos percentuais).
+  let bandas = null;
+  if (g.bandas !== undefined && g.bandas !== null) {
+    if (tipo === 'linha' || series.length !== 2) throw new Error(`${onde}: bandas só valem com duas séries (alvo e atual), em barras-duplas ou rosca.`);
+    bandas = (Array.isArray(g.bandas) ? g.bandas : []).map(numeroDe);
+    if (bandas.length !== rotulos.length || bandas.some((b) => !Number.isFinite(b) || b < 0)) throw new Error(`${onde}: mande uma banda para cada rótulo (${rotulos.length}), em números a partir de zero.`);
+  }
+  if (tipo === 'rosca' && unidade === '%') {
+    for (const s of series) { const soma = s.valores.reduce((a, v) => a + v, 0); if (Math.abs(soma - 100) > 1) throw new Error(`${onde}: ${somaRuim(soma)}.`); }
+  }
   if (tipo === 'linha' && (g.retornos || g.base100)) {
     if (g.retornos) {
       rotulos = [String(g.inicio || 'Início'), ...rotulos];
@@ -355,7 +415,7 @@ function dadosDoGrafico(g, onde) {
   }
   const fmt = formatador(unidade, casas);
   const unidadeDif = unidade === '%' ? 'p.p.' : unidade;
-  return { tipo, rotulos, series, unidade, fmt, fmtDif: formatador(unidadeDif, casas), base100: tipo === 'linha' && !!(g.retornos || g.base100) };
+  return { tipo, rotulos, series, unidade, fmt, fmtDif: formatador(unidadeDif, casas), unidadeDif, bandas, base100: tipo === 'linha' && !!(g.retornos || g.base100) };
 }
 
 const svgTexto = (x, y, txt, attrs = '') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${attrs}>${esc(txt)}</text>`;
@@ -381,6 +441,7 @@ function svgBarras(d, cores) {
 }
 
 function svgRosca(d, cores) {
+  if (d.series.length === 2) return svgRoscaDupla(d, cores);
   const LARG = 680, R = 88, r = 54, cx = 100, vals = d.series[0].valores, total = vals.reduce((a, v) => a + v, 0) || 1;
   const linhaLeg = 25, alto = Math.max(200, d.rotulos.length * linhaLeg + 12);
   const ponto = (ang, raio) => [cx + raio * Math.cos(ang), (alto / 2) + raio * Math.sin(ang)];
@@ -400,6 +461,40 @@ function svgRosca(d, cores) {
     o += `<rect x="236" y="${(y - 10).toFixed(1)}" width="11" height="11" rx="2" fill="${cores[k]}"/>` + svgTexto(256, y, rot, ' class="cat"');
     o += svgTexto(LARG - (d.unidade === '%' ? 4 : 64), y, d.fmt(vals[k]), ` class="gv" data-s="0" data-i="${k}" text-anchor="end"`);
     if (d.unidade !== '%') o += svgTexto(LARG - 4, y, `${((vals[k] / total) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`, ' class="gp" text-anchor="end"');
+  });
+  return `<svg viewBox="0 0 ${LARG} ${alto}" width="100%" role="img">${o}</svg>`;
+}
+
+// Fatias de uma rosca centrada em (cx, cy).
+function fatiasRosca(vals, cores, cx, cy, R, r) {
+  const total = vals.reduce((a, v) => a + v, 0) || 1, ponto = (ang, raio) => [cx + raio * Math.cos(ang), cy + raio * Math.sin(ang)];
+  let o = '', ang = -Math.PI / 2;
+  vals.forEach((v, k) => {
+    const f = v / total;
+    if (f <= 0) return;
+    if (f >= 0.9999) { o += `<circle class="fatia" cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none" stroke="${cores[k]}" stroke-width="${R - r}"/>`; return; }
+    const a2 = ang + f * 2 * Math.PI, g = f > 0.5 ? 1 : 0;
+    const [x1, y1] = ponto(ang, R), [x2, y2] = ponto(a2, R), [x3, y3] = ponto(a2, r), [x4, y4] = ponto(ang, r);
+    o += `<path class="fatia" d="M${x1.toFixed(2)} ${y1.toFixed(2)}A${R} ${R} 0 ${g} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}L${x3.toFixed(2)} ${y3.toFixed(2)}A${r} ${r} 0 ${g} 0 ${x4.toFixed(2)} ${y4.toFixed(2)}Z" fill="${cores[k]}" stroke="#fff" stroke-width="1.5"/>`;
+    ang = a2;
+  });
+  return o;
+}
+
+function svgRoscaDupla(d, cores) {
+  const LARG = 680, R = 62, r = 38, linhaLeg = 25, n = d.rotulos.length;
+  const alto = Math.max(186, n * linhaLeg + 40), cy = (alto - 22) / 2;
+  let o = '';
+  d.series.forEach((s, k) => {
+    const cx = 70 + k * 150;
+    o += fatiasRosca(s.valores, cores, cx, cy, R, r) + svgTexto(cx, cy + R + 18, s.nome, ' class="cat" text-anchor="middle"');
+  });
+  const y0 = (alto - n * linhaLeg) / 2 + 20, colunas = [604, LARG - 4];
+  d.series.forEach((s, k) => { o += svgTexto(colunas[k], y0 - 22, s.nome, ' class="gp" text-anchor="end"'); });
+  d.rotulos.forEach((rot, i) => {
+    const y = y0 + i * linhaLeg;
+    o += `<rect x="300" y="${(y - 10).toFixed(1)}" width="11" height="11" rx="2" fill="${cores[i]}"/>` + svgTexto(320, y, rot, ' class="cat"');
+    d.series.forEach((s, k) => { o += svgTexto(colunas[k], y, d.fmt(s.valores[i]), ` class="gv" data-s="${k}" data-i="${i}" text-anchor="end"`); });
   });
   return `<svg viewBox="0 0 ${LARG} ${alto}" width="100%" role="img">${o}</svg>`;
 }
@@ -442,15 +537,20 @@ function blocoGrafico(g, t, onde) {
   const figura = `<figure class="graf">${g.titulo ? `<div class="cap">${esc(g.titulo)}</div>` : ''}${svg}${legenda}</figure>`;
   if (g.tabela === false) return `<div class="bloco-graf">${figura}</div>`;
   const dois = d.tipo !== 'linha' && d.series.length === 2;
-  const cab = [esc(g.categoria || (d.tipo === 'linha' ? 'Período' : 'Item')), ...d.series.map((s) => esc(s.nome)), ...(dois ? ['Diferença'] : []), ...(d.tipo === 'rosca' && d.unidade !== '%' ? ['Participação'] : [])];
+  const cab = [esc(g.categoria || (d.tipo === 'linha' ? 'Período' : 'Item')), ...d.series.map((s) => esc(s.nome)), ...(dois ? ['Diferença'] : []), ...(d.bandas ? ['Banda', 'Situação'] : []), ...(d.tipo === 'rosca' && d.unidade !== '%' ? ['Participação'] : [])];
+  // Situação: dentro quando o desvio (B − A) cabe na banda; a banda sai com as casas com que veio.
+  const banda = (i) => {
+    const b = d.bandas[i], fora = Math.abs(d.series[1].valores[i] - d.series[0].valores[i]) > b + 1e-9;
+    return `<td class="n">±${formatador(d.unidadeDif, Math.min(2, casasDe(b)))(b)}</td><td class="sit${fora ? ' fora' : ''}">${fora ? 'Fora' : 'Dentro'}</td>`;
+  };
   const total = d.tipo === 'rosca' ? g.total !== false : g.total === true && d.tipo !== 'linha';
   const somaRosca = d.series[0].valores.reduce((a, v) => a + v, 0) || 1;
   const dif = (a, b) => { const v = b - a; return v > 0 ? ['n up', `▲ ${d.fmtDif(v)}`] : v < 0 ? ['n down', `▼ ${d.fmtDif(-v)}`] : ['n', d.fmtDif(0)]; };
   const linhas = d.rotulos.map((r, i) => `<tr><td>${esc(r)}</td>${d.series.map((s, k) => `<td class="n" data-s="${k}" data-i="${i}">${d.fmt(s.valores[i])}</td>`).join('')}` +
-    (dois ? (([c, txt]) => `<td class="${c}">${txt}</td>`)(dif(d.series[0].valores[i], d.series[1].valores[i])) : '') +
+    (dois ? (([c, txt]) => `<td class="${c}">${txt}</td>`)(dif(d.series[0].valores[i], d.series[1].valores[i])) : '') + (d.bandas ? banda(i) : '') +
     (d.tipo === 'rosca' && d.unidade !== '%' ? `<td class="n">${((d.series[0].valores[i] / somaRosca) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</td>` : '') + '</tr>').join('');
   const somas = d.series.map((s) => s.valores.reduce((a, v) => a + v, 0));
-  const linhaTotal = total ? `<tr class="total"><td>Total</td>${somas.map((v) => `<td class="n">${d.fmt(v)}</td>`).join('')}${dois ? '<td class="n"></td>' : ''}${d.tipo === 'rosca' && d.unidade !== '%' ? '<td class="n">100,0%</td>' : ''}</tr>` : '';
+  const linhaTotal = total ? `<tr class="total"><td>Total</td>${somas.map((v) => `<td class="n">${d.fmt(v)}</td>`).join('')}${dois ? '<td class="n"></td>' : ''}${d.bandas ? '<td class="n"></td><td></td>' : ''}${d.tipo === 'rosca' && d.unidade !== '%' ? '<td class="n">100,0%</td>' : ''}</tr>` : '';
   const nLinhas = d.rotulos.length + (total ? 1 : 0);
   const tabela = `<table class="tg${nLinhas <= 12 ? ' curta' : ''}"><thead><tr>${cab.map((h, c) => `<th${c ? ' class="n"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${linhas}${linhaTotal}</tbody></table>`;
   return `<div class="bloco-graf">${figura}${tabela}</div>`;
@@ -466,6 +566,8 @@ function logosRodape(t) {
 export function montarDocumento(a, marcaBase = {}) {
   const secoes = Array.isArray(a.secoes) ? a.secoes.slice(0, 30) : [];
   if (!secoes.length) throw new Error('Envie pelo menos uma seção.');
+  const risco = revisarDocumento(a);
+  if (risco.length) throw new Error(mensagemDaTrava(risco, 'seção'));
   const t = { ...(TEMAS_A4[a.tema] ?? TEMAS_A4.marinho) };
   const corEscolhida = [a.cor, marcaBase.cor].find((c) => /^#[0-9a-fA-F]{6}$/.test(c || ''));
   if (corEscolhida) t.acento = corEscolhida;
@@ -525,7 +627,7 @@ table{border-collapse:separate;border-spacing:0;width:100%;margin:5px 0 12px;fon
 th,td{padding:5px 9px;text-align:left;vertical-align:top;border-bottom:1px solid #e6e8ec}th{background:${t.cab};color:${t.cabTx};font-size:7.8pt;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
 th:first-child{border-top-left-radius:7px}th:last-child{border-top-right-radius:7px}tbody tr:last-child td{border-bottom:0}tbody tr:nth-child(even) td{background:${t.zebra}}tr{break-inside:avoid}
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}tr.total td{font-weight:700;background:${t.total};border-top:1.5px solid ${t.forte}}table.curta{break-inside:avoid}
-td.up{color:#1f7a3a;font-weight:600}td.down{color:#b3261e;font-weight:600}td.mid{color:#a86a00;font-weight:600}
+td.up{color:#1f7a3a;font-weight:600}td.down{color:#b3261e;font-weight:600}td.sit{color:${t.sub}}td.sit.fora{color:${t.forte};font-weight:700}td.mid{color:#a86a00;font-weight:600}
 mark{background:#fff1c2;color:#6a4b00;padding:0 4px;border-radius:3px;font-size:.92em}
 .bloco-graf{margin:2px 0 6px}figure.graf{margin:0 0 6px;padding:10px 14px 8px;border:1px solid ${t.linha};border-radius:10px;break-inside:avoid}figure.graf svg{display:block;width:100%;height:auto}
 figure.graf .cap{font-size:8.6pt;font-weight:700;color:${t.forte};margin-bottom:8px}figcaption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 14px;align-items:center;font-size:8pt;color:${t.suave};margin-top:6px}
@@ -549,11 +651,41 @@ ${corpo}
 ${aviso}`;
 }
 
+// Páginas do PDF que o navegador gerou: a árvore de páginas do Chromium sai sem compressão ("/Type /Pages /Count N").
+export function paginasDoPdf(arq) {
+  try {
+    const n = [...readFileSync(arq, 'latin1').matchAll(/\/Type\s*\/Pages\b[^>]*?\/Count\s+(\d+)/g)].map((m) => Number(m[1]));
+    return n.length ? Math.max(...n) : 0;
+  } catch { return 0; }
+}
+
+// Espaçamento justo: a mesma letra, menos ar entre blocos, linhas e células.
+const CSS_JUSTO = 'body{line-height:1.42}.topo{margin-bottom:9px}header{padding-bottom:8px;margin-bottom:9px}h2{margin:10px 0 5px}h3{margin:9px 0 3px}'
+  + 'p,ul,ol{margin-bottom:6px}li{margin-bottom:2px}.resumo{padding:8px 12px;margin-bottom:8px}.destaques{margin-bottom:9px}table{margin:4px 0 9px}'
+  + 'th,td{padding-top:4px;padding-bottom:4px}figure.graf{padding:8px 12px 6px}.aviso{margin-top:8px}';
+
+// Folha que passa da página por pouco (a última página ficaria com o fim da última seção e o aviso): imprime de novo com o
+// espaçamento justo e fica com essa versão só se ela tiver menos páginas. Folha de uma página não é impressa de novo.
+async function justoSeEconomiza(html, pdf) {
+  const n = paginasDoPdf(pdf);
+  if (n < 2) return false;
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'mesa-justo-'));
+  try {
+    const justo = path.join(tmp, 'justo.pdf');
+    await renderizar(html.replace('</style>', () => CSS_JUSTO + '</style>'), justo, 'pdf', [794, 1123]);
+    const m = paginasDoPdf(justo);
+    if (m < 1 || m >= n) return false;
+    copyFileSync(justo, pdf);
+    return true;
+  } catch { return false; } finally { try { rmSync(tmp, { recursive: true, force: true }); } catch { } }
+}
+
 export async function gerarDocumento(a, marcaBase = {}) {
   const html = montarDocumento(a, marcaBase);
   const pdf = path.join(pastaBase(), `${slug(a.titulo)}-${carimbo()}.pdf`);
   await renderizar(html, pdf, 'pdf', [794, 1123]);
-  const r = { tipo: 'pdf', titulo: a.titulo, pasta: path.dirname(pdf), imagens: [], pdf, em: Date.now() };
+  const justo = await justoSeEconomiza(html, pdf);
+  const r = { tipo: 'pdf', titulo: a.titulo, pasta: path.dirname(pdf), imagens: [], pdf, em: Date.now(), ...(justo ? { justo: true } : {}) };
   writeFileSync(ARQUIVO_GERACAO, JSON.stringify(r));
   return r;
 }

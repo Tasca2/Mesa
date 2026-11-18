@@ -68,3 +68,46 @@ test('termos confirmados pelo assessor continuam liberando a trava', () => {
   assert.equal(revisarApresentacao([{ layout: 'frase', titulo: 'Atendimento sem custo de entrada' }]).length, 1);
   assert.deepEqual(revisarApresentacao([{ layout: 'frase', titulo: 'Atendimento sem custo de entrada' }], ['sem custo']), []);
 });
+
+// Correções depois da revisão do passo 4 (18/11): o superlativo com pontuação ou no fim da frase, e a trava nos textos que faltavam.
+const barrados = (titulo, tipo) => revisarApresentacao([{ layout: 'frase', titulo }], [], tipo);
+
+test('reunião: superlativo barrado também antes de pontuação ou no fim do texto', () => {
+  for (const titulo of ['Para a sua família, o melhor.', 'Escolha o melhor', 'Os melhores!', 'O melhor, sempre', 'Uma carteira que é a melhor']) {
+    assert.equal(barrados(titulo).length, 1, `passou: "${titulo}"`);
+  }
+  for (const titulo of ['A melhora da margem veio do preço', 'Para entender melhor o seu objetivo', 'O trimestre foi melhor que o anterior']) {
+    assert.deepEqual(barrados(titulo), [], `barrou sem superlativo: "${titulo}"`);
+  }
+});
+
+test('mercado: "a melhor do ano" e "a melhor da bolsa" também são superlativo; resultado da própria empresa passa', () => {
+  for (const tipo of ['mercado', 'estudo']) {
+    for (const titulo of ['WEGE3 foi a melhor do ano.', 'A melhor da bolsa em 12 meses', 'Entre as melhores do Ibovespa em 2026', 'Para você, o melhor.', 'A melhor relação entre risco e preço']) {
+      assert.equal(barrados(titulo, tipo).length, 1, `${tipo}: passou "${titulo}"`);
+    }
+    for (const titulo of ['A melhora da margem veio do preço', 'O lucro do 3T26 foi melhor que o do 3T25', 'O melhor resultado trimestral da empresa desde 2019']) {
+      assert.deepEqual(barrados(titulo, tipo), [], `${tipo}: barrou "${titulo}"`);
+    }
+  }
+});
+
+test('promessa e superlativo barram também na linha de fonte, na fonte do item e nos rótulos do gráfico', () => {
+  const PAGINAS = [
+    { layout: 'frase', titulo: 'Histórico', fonte: 'Retorno garantido de 1% ao mês' },
+    { layout: 'numeros', titulo: 'Selic em 13,75% desde 17/09/2026', itens: [{ valor: '13,75%', rotulo: 'Meta Selic', fonte: 'Sem risco nenhum' }] },
+    { layout: 'linha', titulo: 'Carteira em 12 meses', rotulos: ['jan', 'Sem risco'], series: [{ nome: 'Carteira', valores: [100, 101] }] },
+    { layout: 'barras', titulo: 'Composição', itens: [{ rotulo: 'Renda fixa', valor: 70 }], fonte: 'O melhor do mercado' },
+  ];
+  for (const tipo of [undefined, 'mercado']) {
+    assert.deepEqual(paginas(revisarApresentacao(PAGINAS, [], tipo)), [1, 2, 3, 4], `tipo ${tipo || 'reuniao'}`);
+  }
+  // A fonte continua fora das regras de regulação e de retorno.
+  assert.deepEqual(revisarApresentacao([{ layout: 'frase', titulo: 'Selic em 13,75% desde 17/09/2026', fonte: 'Banco Central, SGS 432; retorno de 12 meses do CDI' }]), []);
+});
+
+test('rodapé e título da apresentação também passam pela trava de promessa', () => {
+  assert.equal(revisarApresentacao([{ layout: 'frase', titulo: 'Objetivo' }], [], undefined, { rodape: 'Assessor Teste: o melhor do mercado' }).length, 1);
+  assert.equal(revisarApresentacao([{ layout: 'frase', titulo: 'Objetivo' }], [], undefined, { titulo: 'Carteira sem risco' }).length, 1);
+  assert.deepEqual(revisarApresentacao([{ layout: 'frase', titulo: 'Objetivo' }], [], undefined, { rodape: 'Assessor Teste, assessor de investimentos vinculado ao Escritório Teste. Regulado pela CVM.' }), []);
+});

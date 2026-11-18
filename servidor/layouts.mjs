@@ -5,9 +5,9 @@ export const W = 1920;
 export const H = 1080;
 
 const TEMAS = {
-  escuro: { fundo: '#0E0E10', painel: '#17171A', tinta: '#F2EDE4', suave: '#9C9CA3', cor: '#C9A24B', linha: 'rgba(255,255,255,.15)' },
-  claro: { fundo: '#F6F2EA', painel: '#ECE6D9', tinta: '#1A1A1C', suave: '#66666C', cor: '#8A6A2B', linha: 'rgba(0,0,0,.15)' },
-  marinho: { fundo: '#0B1F33', painel: '#12304C', tinta: '#F1F4F7', suave: '#A3B3C4', cor: '#D8B26A', linha: 'rgba(255,255,255,.17)' },
+  escuro: { fundo: '#0E0E10', painel: '#17171A', tinta: '#F2EDE4', suave: '#9C9CA3', cor: '#C9A24B', linha: 'rgba(255,255,255,.15)', neg: '#E07A62' },
+  claro: { fundo: '#F6F2EA', painel: '#ECE6D9', tinta: '#1A1A1C', suave: '#66666C', cor: '#8A6A2B', linha: 'rgba(0,0,0,.15)', neg: '#B0432B' },
+  marinho: { fundo: '#0B1F33', painel: '#12304C', tinta: '#F1F4F7', suave: '#A3B3C4', cor: '#D8B26A', linha: 'rgba(255,255,255,.17)', neg: '#E8836A' },
 };
 const ESTILOS = {
   serifada: { titulo: "Georgia,'Times New Roman',serif", peso: 400, espaco: '-0.012em', pv: true },
@@ -33,23 +33,29 @@ export const casasDe = (v) => {
   if (s.includes('e')) { const [b, e] = s.split('e'); return Math.max(0, (b.split('.')[1] || '').length - Number(e)); }
   return (s.split('.')[1] || '').length;
 };
-// "70%", "R$ 1.234,56", "-0,5 p.p.", "1,2 mi", 12.5 -> { v, unidade, casas }; texto que não é número -> null.
+// "70%", "R$ 1.234,56", "-0,5 p.p.", "1,2 mi", "0,5% a.a.", "110% do CDI", 12.5 -> { v, unidade, casas, base, escala, escritas };
+// texto que não é número -> null. base: "aa", "am" ou "cdi" depois do %; escala: mil, mi ou bi; escritas: casas como escritas.
 export function lerNumero(x) {
-  if (typeof x === 'number') return Number.isFinite(x) ? { v: x, unidade: '', casas: casasDe(x) } : null;
+  if (typeof x === 'number') return Number.isFinite(x) ? { v: x, unidade: '', casas: casasDe(x), base: '', escala: '', escritas: casasDe(x) } : null;
   const s = String(x ?? '').replace(/ /g, ' ').trim();
-  const m = s.match(/^([+\-−–])?\s*(R\$|US\$|€)?\s*([+\-−–])?\s*(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?|\d+\.\d+)\s*(%|p\.\s?p\.|x|mil|mi|milh[aã]o|milh[oõ]es|bi|bilh[aã]o|bilh[oõ]es|pts?)?$/i);
+  const m = s.match(/^([+\-−–])?\s*(R\$|US\$|€)?\s*([+\-−–])?\s*(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?|\d+\.\d+)\s*(%|p\.\s?p\.|x|mil|mi|milh[aã]o|milh[oõ]es|bi|bilh[aã]o|bilh[oõ]es|pts?)?(?:\s*(a\.?\s?a\.?|a\.?\s?m\.?|ao ano|ao m[eê]s|do cdi|cdi))?$/i);
   if (!m) return null;
-  const [, s1, moeda, s2, corpo, suf] = m;
+  const [, s1, moeda, s2, corpo, suf, qual] = m;
   let txt = corpo, casas;
   if (corpo.includes(',')) { casas = corpo.split(',')[1].length; txt = corpo.replace(/\./g, '').replace(',', '.'); }
   else if (/^\d{1,3}(\.\d{3})+$/.test(corpo)) { casas = 0; txt = corpo.replace(/\./g, ''); }
   else casas = (corpo.split('.')[1] || '').length;
   let v = Number(txt);
+  const escritas = casas;
   const sufixo = String(suf || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s/g, '');
+  if (qual && sufixo !== '%') return null;
+  const escala = !MULTIPLICADOR[sufixo] ? '' : sufixo.startsWith('bi') ? 'bi' : sufixo === 'mil' ? 'mil' : 'mi';
   if (MULTIPLICADOR[sufixo]) { v *= MULTIPLICADOR[sufixo]; casas = casasDe(v); }
   if ([s1, s2].some((c) => c && c !== '+')) v = -v;
   const unidade = moeda || (sufixo === '%' ? '%' : sufixo === 'p.p.' ? 'p.p.' : sufixo === 'x' ? 'x' : /^pts?$/.test(sufixo) ? 'pts' : '');
-  return { v, unidade, casas };
+  const q = String(qual || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[\s.]/g, '');
+  const base = !q ? '' : q.includes('cdi') ? 'cdi' : q === 'aa' || q === 'aoano' ? 'aa' : 'am';
+  return { v, unidade, casas, base, escala, escritas };
 }
 export const numeroDe = (x) => lerNumero(x)?.v ?? NaN;
 export function formatador(unidade = '', casas = 0) {
@@ -63,14 +69,16 @@ export function formatador(unidade = '', casas = 0) {
   };
 }
 // Diferença B − A, calculada pelo código. Valores que não são número (ex.: "D+0") usam o texto do item.
+// Percentual vira p.p. (também "% a.a." e "% do CDI", quando A e B têm a mesma base); "mil", "mi" e "bi" ficam na escala escrita.
 function diferenca(a, b, texto) {
   const A = lerNumero(a), B = lerNumero(b);
   if (A && B && (!A.unidade || !B.unidade)) A.unidade = B.unidade = A.unidade || B.unidade;
-  if (!A || !B || A.unidade !== B.unidade) return { txt: String(texto || '—'), num: false };
-  const casas = Math.min(2, Math.max(A.casas, B.casas));
-  const d = B.v - A.v, f = formatador(A.unidade === '%' ? 'p.p.' : A.unidade, casas);
-  if (Math.abs(d) < 0.5 * 10 ** -casas) return { txt: f(0), num: true };
-  return { txt: (d > 0 ? '+' : '') + f(d), num: true };
+  if (!A || !B || A.unidade !== B.unidade || A.base !== B.base) return { txt: String(texto || '—'), num: false };
+  const escala = A.escala && A.escala === B.escala ? A.escala : '';
+  const casas = Math.min(2, escala ? Math.max(A.escritas, B.escritas) : Math.max(A.casas, B.casas));
+  const d = (B.v - A.v) / (escala ? MULTIPLICADOR[escala] : 1), f = formatador(A.unidade === '%' ? 'p.p.' : A.unidade, casas), e = escala ? ` ${escala}` : '';
+  if (Math.abs(d) < 0.5 * 10 ** -casas) return { txt: f(0) + e, num: true };
+  return { txt: (d > 0 ? '+' : '') + f(d) + e, num: true };
 }
 const passoBonito = (bruto) => { const p = 10 ** Math.floor(Math.log10(bruto || 1)), f = bruto / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
 // Tamanho conforme a quantidade de itens: menos itens, letra maior.
@@ -140,7 +148,7 @@ td{font-size:30px;line-height:1.35;padding:28px 24px 28px 0;border-bottom:1px so
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th.n:last-child,td.n:last-child{padding-right:0}
 /* barras */
 .bar{margin-top:24px;display:flex;flex-direction:column;justify-content:space-around;gap:30px}.leg{display:flex;gap:44px;font-size:28px;color:${t.suave};margin-top:36px}.leg i{display:inline-block;width:30px;height:12px;margin-right:14px;vertical-align:middle}
-.bl{display:grid;grid-template-columns:400px 1fr 200px;gap:34px;align-items:center}.bl .r{font-size:30px;line-height:1.25}.bl .t{display:flex;flex-direction:column;gap:8px}.bl .t div{height:24px;background:${t.painel};position:relative}.bl .t b{display:block;height:100%}
+.bl{display:grid;grid-template-columns:400px 1fr 200px;gap:34px;align-items:center}.bl .r{font-size:30px;line-height:1.25}.bl .t{display:flex;flex-direction:column;gap:8px}.bl .t div{height:24px;background:${t.painel};position:relative}.bl .t b{position:absolute;top:0;height:100%}.bl .t i.zero{position:absolute;top:-8px;bottom:-8px;width:2px;margin-left:-1px;background:${t.tinta};opacity:.6}
 .bl .p{font-family:${NUMS};font-size:38px;line-height:1.15;text-align:right;color:${t.tinta}}.bl .p span{display:block;color:${t.suave}}
 /* frase */
 .frase .corpo{justify-content:center;padding-left:56px;border-left:3px solid ${cor}}.frase h2{font-size:84px;line-height:1.16;max-width:1500px}.frase .sub{font-size:34px}
@@ -336,6 +344,9 @@ function serieLinha(s) {
   return { rotulos: rot, series: ser.map((x) => ({ ...x, valores: x.valores.map((v) => (v / x.valores[0]) * 100) })) };
 }
 
+// Rosca em % mostra a parte de cada fatia no total: se a soma não fecha 100 (folga de 1 p.p. de arredondamento), o anel mentiria.
+export const somaRuim = (soma) => `a rosca em % soma ${formatador('%', 1)(soma).replace(',0%', '%')}, e precisa somar 100%: acrescente a fatia que falta (ex.: "Outros") ou mande os valores em R$`;
+const temValor = (v) => v !== undefined && v !== null && String(v).trim() !== '';
 // Gráficos com número que não é número viram erro antes do PDF, com o motivo.
 export function problemasDosSlides(slides) {
   const out = [];
@@ -346,8 +357,24 @@ export function problemasDosSlides(slides) {
       if (its.length < 2) out.push(`${onde}: a rosca precisa de pelo menos 2 itens`);
       for (const x of its) if (!(numeroDe(x.valor) >= 0)) out.push(`${onde}: o valor de "${x.rotulo || x.titulo || '?'}" precisa ser um número positivo (ex.: 70% ou R$ 1.000)`);
       if (its.length >= 2 && its.every((x) => numeroDe(x.valor) === 0)) out.push(`${onde}: todos os valores da rosca são zero`);
+      const soma = its.reduce((a, x) => a + (numeroDe(x.valor) || 0), 0);
+      if (its.length >= 2 && its.every((x) => lerNumero(x.valor)?.unidade === '%') && Math.abs(soma - 100) > 1) out.push(`${onde}: ${somaRuim(soma)}`);
     }
     if (s.layout === 'linha') { try { serieLinha(s); } catch (e) { out.push(`${onde}: ${e.message}`); } }
+    if (s.layout === 'barras') {
+      const its = itensDe(s, 8), duplo = its.some((x) => temValor(x.valor2));
+      if (!its.length) out.push(`${onde}: as barras precisam de pelo menos 1 item`);
+      for (const x of its) {
+        const nome = String(x.rotulo || x.titulo || '').trim();
+        if (!nome) out.push(`${onde}: cada barra precisa de um rótulo (rotulo)`);
+        for (const [campo, v] of [['valor', x.valor], ...(duplo ? [['segundo valor (valor2)', x.valor2]] : [])]) {
+          const l = temValor(v) ? lerNumero(v) : null;
+          if (!temValor(v)) out.push(`${onde}: "${nome || '?'}": falta o ${campo}, que as outras barras têm`);
+          else if (!l) out.push(`${onde}: "${nome || '?'}": o ${campo} precisa ser um número em % (ex.: 12,5% ou -3,2%), não "${v}"`);
+          else if (l.unidade && l.unidade !== '%') out.push(`${onde}: "${nome || '?'}": as barras mostram valores em %, e "${v}" tem outra unidade (para R$ ou múltiplos, use numeros, tabela ou rosca)`);
+        }
+      }
+    }
   });
   return out;
 }
@@ -461,13 +488,20 @@ const LAYOUTS = {
     const duplo = its.some((x) => x.valor2 !== undefined && x.valor2 !== null && x.valor2 !== '');
     const fr = porQtd(k, [4, 40], [6, 34], [8, 30]), fv = porQtd(k, [4, 50], [6, 42], [8, duplo ? 32 : 34]), alt = porQtd(k, [4, duplo ? 40 : 64], [6, duplo ? 30 : 48], [8, duplo ? 22 : 36]);
     const gap = porQtd(k, [4, 44], [6, 30], [8, duplo ? 14 : 22]);
-    const cores = [m.cor, m.suave];
-    const ler = (v) => { const x = numeroDe(v); return Number.isFinite(x) ? Math.max(0, Math.min(100, x)) : 0; };
-    const casas = Math.min(1, Math.max(0, ...its.flatMap((x) => [x.valor, x.valor2]).map((v) => lerNumero(v)?.casas ?? 0)));
+    const cores = [m.cor, m.suave], negs = [m.neg || '#E07A62', mixar(m.neg || '#E07A62', m.fundo, 0.35)];
+    // O número escrito é o enviado (com sinal e as casas dele, até 2). A trilha vai de min(0, valores) a max(100, valores):
+    // negativo sai à esquerda da linha do zero, em outra cor; acima de 100 a escala cresce e a barra nunca sai da trilha.
+    const vals = its.flatMap((x) => [numeroDe(x.valor), ...(duplo ? [numeroDe(x.valor2)] : [])]).filter(Number.isFinite);
+    const lo = Math.min(0, ...vals), hi = Math.max(100, ...vals), pos = (v) => Math.max(0, Math.min(100, ((v - lo) / (hi - lo || 1)) * 100)), zero = pos(0);
+    const casas = Math.min(2, Math.max(0, ...its.flatMap((x) => [x.valor, x.valor2]).map((v) => lerNumero(v)?.casas ?? 0)));
     const pct = formatador('%', casas);
+    const trilha = (v, j) => {
+      const b = Number.isFinite(v) ? `<b class="${v < 0 ? 'neg' : 'pos'}" style="left:${Math.min(pos(v), zero).toFixed(2)}%;width:${Math.abs(pos(v) - zero).toFixed(2)}%;background:${v < 0 ? negs[j] : cores[j]}"></b>` : '';
+      return `<div style="height:${alt}px">${lo < 0 ? `<i class="zero" style="left:${zero.toFixed(2)}%"></i>` : ''}${b}</div>`;
+    };
     const linhas = its.map((x) => {
-      const a = ler(x.valor), b = ler(x.valor2);
-      return `<div class="bl"><div class="r" style="font-size:${fr}px">${lim(x.rotulo)}</div><div class="t"><div style="height:${alt}px"><b style="width:${a}%;background:${cores[0]}"></b></div>${duplo ? `<div style="height:${alt}px"><b style="width:${b}%;background:${cores[1]}"></b></div>` : ''}</div><div class="p" style="font-size:${fv}px">${pct(a)}${duplo ? `<span style="font-size:${Math.max(28, fv - 6)}px">${pct(b)}</span>` : ''}</div></div>`;
+      const a = numeroDe(x.valor), b = numeroDe(x.valor2);
+      return `<div class="bl"><div class="r" style="font-size:${fr}px">${lim(x.rotulo)}</div><div class="t">${trilha(a, 0)}${duplo ? trilha(b, 1) : ''}</div><div class="p" style="font-size:${fv}px">${pct(a)}${duplo ? `<span style="font-size:${Math.max(28, fv - 6)}px">${pct(b)}</span>` : ''}</div></div>`;
     }).join('');
     const leg = duplo && Array.isArray(s.legenda) ? `<div class="leg">${s.legenda.slice(0, 2).map((l, j) => `<span><i style="background:${cores[j]}"></i>${lim(l)}</span>`).join('')}</div>` : '';
     return `<section class="s enche"><div class="c">${etiqueta(s)}${titulo(s, 70)}<div class="corpo"><div class="bar alto" style="gap:${gap}px">${linhas}</div>${leg}</div>${fonteTxt(s)}</div>${rodapePagina(m, i, n)}</section>`;
@@ -581,7 +615,7 @@ export function montarPaginas(slides, marca, deslocamento = 0, total = slides.le
   const t = TEMAS[marca.tema] ?? TEMAS.escuro;
   const est = ESTILOS[marca.estilo] ?? ESTILOS.serifada;
   const cor = /^#[0-9a-fA-F]{6}$/.test(marca.cor || '') ? marca.cor : t.cor;
-  const m = { ...marca, cor, suave: t.suave, fundo: t.fundo, tinta: t.tinta, painel: t.painel, linha: t.linha, pv: !!est.pv, cor2: mixar(cor, '#ffffff', 0.42) };
+  const m = { ...marca, cor, suave: t.suave, fundo: t.fundo, tinta: t.tinta, painel: t.painel, linha: t.linha, neg: t.neg, pv: !!est.pv, cor2: mixar(cor, '#ffffff', 0.42) };
   const html = slides.map((s, i) => {
     const h = (LAYOUTS[s.layout] ?? LAYOUTS.frase)(s, m, i + deslocamento, total);
     if (!s.ponte) return h;

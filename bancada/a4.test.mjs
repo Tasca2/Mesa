@@ -139,3 +139,97 @@ test('os três temas mudam as cores da folha, e a folha sem tema continua azul-m
   assert.notEqual(cor('escuro'), cor('claro'));
   assert.notEqual(cor('escuro'), cor('marinho'));
 });
+
+// Correções depois da revisão do passo 4 (18/11): a folha A4 passa pela trava de promessa, risco zero e superlativo,
+// em todo texto que vai ao cliente; fonte, órgão, FGC e rentabilidade com período continuam passando.
+const TRAVA = /afirmam algo que o assessor pode não ter dito/;
+test('A4: promessa, risco zero e superlativo em qualquer texto que vai ao cliente impedem o PDF', () => {
+  const base = { titulo: 'Comparador de carteira', secoes: [{ titulo: 'Resumo', texto: 'Texto.' }] };
+  const CASOS = [
+    { ...base, titulo: 'A melhor carteira para você' },
+    { ...base, subtitulo: 'Retorno garantido' },
+    { ...base, cliente: 'Cliente sem risco' },
+    { ...base, destaques: [{ rotulo: 'Renda fixa', valor: '70%', nota: 'sem risco' }] },
+    { ...base, secoes: [{ titulo: 'Resumo', texto: 'Linha um.\n- Esta carteira vai render mais' }] },
+    { ...base, secoes: [{ titulo: 'Oportunidade única', texto: 'x' }] },
+    { ...base, secoes: [{ titulo: 'Composição', grafico: { ...COMPOSICAO, titulo: 'A melhor escolha' } }] },
+    { ...base, secoes: [{ titulo: 'Composição', grafico: { ...COMPOSICAO, rotulos: ['Sem risco', ...COMPOSICAO.rotulos.slice(1)] } }] },
+    { ...base, secoes: [{ titulo: 'Composição', grafico: { ...COMPOSICAO, fonte: 'Retorno garantido pelo escritório' } }] },
+    { ...base, secoes: [{ titulo: 'Composição', grafico: { ...COMPOSICAO, series: [{ ...COMPOSICAO.series[0], nome: 'A melhor' }, COMPOSICAO.series[1]] } }] },
+    { ...base, rodape: 'Assessor Teste, o melhor do mercado' },
+  ];
+  for (const a of CASOS) assert.throws(() => montarDocumento(a, MARCA), TRAVA, `passou: ${JSON.stringify(a).slice(0, 160)}`);
+});
+
+test('A4: fonte, órgão, FGC e rentabilidade com período passam; [CONFERIR] e termos confirmados liberam', () => {
+  const ok = { titulo: 'Relatório mensal', tipo: 'relatorio', rodape: 'Assessor Teste, assessor de investimentos vinculado ao Escritório Teste. Regulado pela CVM.',
+    secoes: [{ titulo: 'Resumo', texto: '**A carteira rendeu 1,02% em outubro de 2026, contra 1,15% do CDI (Banco Central, SGS 4391).**\n\n- CDB com garantia do FGC até R$ 250 mil por CPF e instituição\n- Fonte: CVM, dados abertos, 10/11/2026' },
+      { titulo: 'Composição', grafico: COMPOSICAO }] };
+  assert.doesNotThrow(() => montarDocumento(ok, MARCA));
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'T', secoes: [{ texto: 'Resgate sem risco de mercado [CONFERIR: frase do assessor]' }] }, MARCA));
+  assert.throws(() => montarDocumento({ titulo: 'T', secoes: [{ texto: 'Tesouro Selic sem risco de crédito privado' }] }, MARCA), TRAVA);
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'T', termosConfirmados: ['sem risco'], secoes: [{ texto: 'Tesouro Selic sem risco de crédito privado' }] }, MARCA));
+});
+
+test('A4 de estudo e de mercado: rentabilidade ou retorno pedem o período na mesma seção', () => {
+  assert.throws(() => montarDocumento({ titulo: 'Estudo', tipo: 'estudo', secoes: [{ titulo: 'Histórico', texto: 'Rentabilidade de 12,4%.' }] }, MARCA), /retorno sem período/);
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'Estudo', tipo: 'estudo', secoes: [{ titulo: 'Histórico', texto: 'Rentabilidade de 12,4% em 12 meses até out/2026.' }] }, MARCA));
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'Estudo', tipo: 'mercado', secoes: [{ titulo: 'Histórico', texto: 'Retorno de 12,4%.', grafico: { ...COMPOSICAO, fonte: 'CaptaMais, 12 meses até out/2026' } }] }, MARCA), 'o período pode estar na fonte do gráfico da seção');
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'Relatório', tipo: 'relatorio', secoes: [{ texto: 'Rendimento de R$ 2.000 por mês.' }] }, MARCA), 'fora de estudo e mercado, o período não é exigido');
+});
+
+test('A4: rosca em % que não soma 100 não vira PDF; em R$ qualquer soma vale', () => {
+  const rosca = (valores, unidade = '%') => montarDocumento({ titulo: 'T', secoes: [{ titulo: 'Composição', grafico: { tipo: 'rosca', unidade, rotulos: valores.map((_, k) => `Classe ${k + 1}`), series: [{ nome: 'Atual', valores }] } }] }, MARCA);
+  assert.throws(() => rosca([45, 45]), /soma 90%.*100%/);
+  assert.throws(() => rosca([60, 50]), /soma 110%/);
+  assert.doesNotThrow(() => rosca([33.3, 33.3, 33.3]), 'arredondamento de até 1 p.p. passa');
+  assert.doesNotThrow(() => rosca([45, 45], 'R$'));
+});
+
+// Revisão de carteira (plano 7.5): rosca da política × atual e tabela de desvio com as bandas.
+// Números de um cliente de teste (Cliente Teste), não de uma carteira real.
+const REVISAO = {
+  tipo: 'rosca', unidade: '%', categoria: 'Classe',
+  rotulos: ['Renda fixa', 'Ações', 'Fundos imobiliários', 'Exterior'],
+  series: [{ nome: 'Política', valores: [50, 25, 15, 10] }, { nome: 'Atual', valores: [62, 20, 12, 6] }],
+  bandas: [10, 5, 5, 2.5],
+  fonte: 'posição do Cliente Teste em 31/10/2026 e a política de investimento dele',
+};
+const linhasDaTabela = (html) => [...html.slice(html.indexOf('<tbody>')).matchAll(/<tr>(.*?)<\/tr>/g)]
+  .map(([, r]) => [...r.matchAll(/<td[^>]*>([^<]*)<\/td>/g)].map(([, c]) => c));
+
+test('rosca da política × atual: duas roscas, cada número do desenho igual ao da tabela, diferença em p.p.', () => {
+  const html = montarDocumento({ titulo: 'Revisão de carteira', tipo: 'carteira', secoes: [{ titulo: 'Desvio', grafico: { ...REVISAO, bandas: undefined } }] }, MARCA);
+  const svg = html.slice(html.indexOf('<figure'), html.indexOf('</figure>'));
+  assert.equal((svg.match(/class="fatia"/g) || []).length, 8, 'quatro fatias em cada rosca');
+  assert.match(svg, />Política</); assert.match(svg, />Atual</);
+  const g = doGrafico(html), t = daTabela(html);
+  assert.equal(g.size, 8);
+  for (const [k, v] of g) assert.equal(t.get(k), v, `gráfico e tabela diferentes em ${k}`);
+  assert.deepEqual([...html.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]), ['Classe', 'Política', 'Atual', 'Diferença']);
+  assert.deepEqual(linhasDaTabela(html)[0], ['Renda fixa', '50%', '62%', '▲ 12 p.p.']);
+  assert.match(html, /<tr class="total"><td>Total<\/td><td class="n">100%<\/td><td class="n">100%<\/td>/);
+});
+
+test('bandas: a tabela ganha Banda e Situação, feitas pelo código (fora quando o desvio passa da banda)', () => {
+  const html = montarDocumento({ titulo: 'Revisão de carteira', tipo: 'carteira', secoes: [{ titulo: 'Desvio', grafico: REVISAO }] }, MARCA);
+  assert.deepEqual([...html.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]), ['Classe', 'Política', 'Atual', 'Diferença', 'Banda', 'Situação']);
+  assert.deepEqual(linhasDaTabela(html), [
+    ['Renda fixa', '50%', '62%', '▲ 12 p.p.', '±10 p.p.', 'Fora'],
+    ['Ações', '25%', '20%', '▼ 5 p.p.', '±5 p.p.', 'Dentro'],
+    ['Fundos imobiliários', '15%', '12%', '▼ 3 p.p.', '±5 p.p.', 'Dentro'],
+    ['Exterior', '10%', '6%', '▼ 4 p.p.', '±2,5 p.p.', 'Fora'],
+  ]);
+  // barras-duplas também aceitam bandas (alvo e atual em barras)
+  const barras = montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, tipo: 'barras-duplas' } }] }, MARCA);
+  assert.deepEqual(linhasDaTabela(barras)[3], ['Exterior', '10%', '6%', '▼ 4 p.p.', '±2,5 p.p.', 'Fora']);
+});
+
+test('rosca com duas séries só em %, e bandas só com duas séries, uma por rótulo', () => {
+  const emReais = { ...REVISAO, unidade: 'R$', bandas: undefined, series: [{ nome: 'Política', valores: [500, 250, 150, 100] }, { nome: 'Atual', valores: [620, 200, 120, 60] }] };
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: emReais }] }, MARCA), /duas séries.*em %/);
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, bandas: [10, 5] } }] }, MARCA), /uma banda para cada rótulo/);
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, bandas: [10, 5, -1, 2] } }] }, MARCA), /uma banda para cada rótulo/);
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, series: [REVISAO.series[1]] } }] }, MARCA), /bandas só valem com duas séries/);
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, series: [REVISAO.series[0], { nome: 'Atual', valores: [62, 20, 12, 1] }] } }] }, MARCA), /soma 95%/);
+});
