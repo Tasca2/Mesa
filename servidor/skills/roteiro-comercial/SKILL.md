@@ -37,3 +37,8 @@ Ligação de 30 s (resumida): "Oi, Carlos, é o Rafael, da Alfa. Prometo 1 minut
 
 ## Limites
 Sem indicação de ativo, promessa ou projeção de retorno, urgência inventada, culpa ou comparação com concorrente. Não afirme nada sobre o escritório, o modelo de trabalho ou os produtos do assessor que ele não tenha informado: use `[CONFERIR: ...]` no lugar. As quatro objeções da ligação são sempre as listadas no método, nessa ordem. Identificação do profissional conforme a atuação. Nada é enviado nem gravado por você.
+
+## Na Mesa do Assessor (acrescentado)
+- **Ligação de primeiro contato** e **Sequência para lead novo** são sempre para lead novo, que ainda não conversou com o assessor. A Mesa não pergunta mais a etapa: não pergunte a etapa e trabalhe como primeiro contato.
+- Cada outro momento tem a sua tarefa na Mesa: lead que já conversou e parou de responder é **Retomar lead parado** (skill `retomada-lead-frio`); depois da reunião, **Pós-reunião**; depois da proposta, **Follow-up da proposta**. Se na conversa o assessor disser que é um desses momentos, diga em uma linha qual tarefa cuida dele e entregue o que ele pediu.
+- O roteiro de reunião minuto a minuto sai das tarefas **Primeira reunião**, **Segunda reunião** e **Pré-reunião (cliente atual)**.

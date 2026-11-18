@@ -1,6 +1,6 @@
 ---
 name: portfolio-rebalance-review
-description: Revisa a carteira de um cliente frente à política de investimento dele ou à carteira modelo do escritório, mostrando desvios por classe, concentração e liquidez em tabela e resumo. Só análise do desvio: não gera ordem de compra, venda, troca nem cálculo de imposto.
+description: Revisa a carteira de um cliente frente à política de investimento dele, mostrando desvios por classe, concentração e liquidez em tabela e resumo. Só análise do desvio: não gera ordem de compra, venda, troca nem cálculo de imposto.
 ---
 
 # Revisão de carteira (análise de desvio)
@@ -10,9 +10,9 @@ Deixar pronta a conversa de revisão: o desvio medido, o que merece pergunta ao 
 
 ## Entradas
 - Posição atual (ativo, classe, valor, data-base), por arquivo ou colagem. Se o cliente estiver no CaptaMais Consolidador, aceite o relatório dele.
-- **Base de comparação**: política do cliente ou carteira modelo do escritório, com a banda de tolerância. Sem base, entregue só a fotografia (composição e concentração) e avise que não há desvio a medir. Sem banda, pergunte; não invente tolerância.
+- **Base de comparação**: a política de investimento do cliente, com as bandas de tolerância. Sem política, entregue só a fotografia (composição e concentração) e avise que não há desvio a medir. Sem banda, pergunte; não invente tolerância.
 - Perfil do assessor (`mesa_perfil`). Para ativos listados, `analise_ativo` quando o pedido disser que o CaptaMais está conectado. Rode `consultar_cofre` (tema `alocação de ativos finanças comportamentais perfil de risco`); sem cofre, siga o método.
-- Quer comparar com outra carteira (e não com a política)? Isso é a tarefa Comparador de carteira (skill `comparador-de-carteira`); aqui a referência é a política ou o modelo.
+- Quer comparar com outra carteira, inclusive a carteira modelo do escritório? Isso é a tarefa Comparador de carteira (skill `comparador-de-carteira`); aqui a referência é sempre a política do cliente.
 
 Falta algo essencial? Pergunte **uma** coisa e entregue o resto com `[CONFERIR]`.
 

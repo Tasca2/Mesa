@@ -774,7 +774,7 @@
   const AREAS = [
     { id: "rotinas", nome: "Rotinas do dia", desc: "Antes, durante e depois de cada cliente. As rotinas que a mesa conduz com você, passo a passo.", glifo: "orbita",
       grupos: [
-        { nome: "Antes da reunião", tarefas: ["cliente-novo", "primeira-reuniao", "pre-reuniao", "segunda-reuniao", "roteiro-reuniao"] },
+        { nome: "Antes da reunião", tarefas: ["cliente-novo", "primeira-reuniao", "segunda-reuniao", "pre-reuniao"] },
         { nome: "Depois da reunião", tarefas: ["pos-reuniao"] },
         { nome: "Carteira", tarefas: ["carteira", "comparador"] },
         { nome: "Cliente", tarefas: ["diagnostico", "relatorio-mensal", "proposta", "followup"] },
@@ -812,27 +812,22 @@
     "primeira-reuniao": { nome: "Primeira reunião", linha: "Roteiro, sua apresentação, seu escritório e suas soluções.", ref: "skill primeira-reuniao", acao: "Preparar a reunião", perguntas: [
       { id: "duracao", curto: "Duração", titulo: "Quanto tempo dura a reunião?", opcoes: [{ t: "30 minutos" }, { t: "45 minutos" }, { t: "60 minutos" }] },
       { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] }, RESULTADO ] },
-    "segunda-reuniao": { nome: "Segunda reunião", linha: "Devolutiva, proposta de trabalho e pedido de decisão.", ref: "skill segunda-reuniao", acao: "Preparar a reunião", perguntas: [
+    "segunda-reuniao": { nome: "Segunda reunião", linha: "Devolutiva e material da reunião de decisão.", ref: "skill segunda-reuniao", acao: "Preparar a reunião", perguntas: [
       { id: "decide", curto: "Como decide", titulo: "Como essa pessoa costuma decidir?", opcoes: [{ t: "Delega", d: "Quer segurança e simplicidade" }, { t: "Valida", d: "Quer entender a lógica" }, { t: "Analisa", d: "Quer dados e decide sozinha" }, { t: "Não sei ainda" }] }, RESULTADO ] },
     "comparador": { nome: "Comparador de carteira", linha: "Duas carteiras lado a lado, sem dizer qual é melhor.", ref: "skill comparador-de-carteira", acao: "Comparar as carteiras",
       extra: "Só descreve as diferenças: sem compra, venda nem imposto.", perguntas: [
       { id: "comparar", curto: "Comparar", titulo: "O que você quer comparar?", opcoes: [{ t: "Atual × modelo do escritório" }, { t: "Atual × cenário em estudo" }, { t: "Atual × outra instituição" }, { t: "A mesma carteira em duas datas" }] }, RESULTADO ] },
-    "ligacao": { nome: "Roteiro de ligação", linha: "Abertura, valor e fechamento com data e hora.", ref: "skill roteiro-comercial", acao: "Montar o roteiro", perguntas: [
+    "ligacao": { nome: "Ligação de primeiro contato", linha: "Abertura, valor e fechamento com data e hora.", ref: "skill roteiro-comercial", acao: "Montar o roteiro", perguntas: [
       { id: "tempo", curto: "Duração", titulo: "Quanto tempo dura a ligação?", opcoes: [{ t: "30 segundos", d: "Só para marcar a conversa" }, { t: "60 segundos", d: "Com valor em uma frase" }, { t: "120 segundos", d: "Com uma pergunta de descoberta" }] },
-      { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] },
-      { id: "etapa", curto: "Etapa", titulo: "Em que etapa está a conversa?", opcoes: [{ t: "Primeiro contato" }, { t: "Retomada" }, { t: "Depois da reunião" }, { t: "Depois da proposta" }] } ] },
-    "sequencia": { nome: "Sequência de WhatsApp", linha: "5 toques em 10 a 14 dias, prontos para copiar.", ref: "skill roteiro-comercial", acao: "Montar a sequência", perguntas: [
-      { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] },
-      { id: "etapa", curto: "Etapa", titulo: "Em que etapa está a conversa?", opcoes: [{ t: "Primeiro contato" }, { t: "Retomada" }, { t: "Depois da reunião" }, { t: "Depois da proposta" }] } ] },
+      { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] } ] },
+    "sequencia": { nome: "Sequência para lead novo", linha: "5 toques em 10 a 14 dias, prontos para copiar.", ref: "skill roteiro-comercial", acao: "Montar a sequência", perguntas: [
+      { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] } ] },
     "pitch": { nome: "Pitch e e-mail", linha: "Apresentação de 1 minuto e e-mail com 3 assuntos.", ref: "skill roteiro-comercial", acao: "Montar o pitch", perguntas: [
       { id: "formato", curto: "Formato", titulo: "O que você precisa?", opcoes: [{ t: "Pitch de 1 minuto" }, { t: "E-mail com 3 assuntos" }, { t: "Os dois" }] },
       { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] } ] },
-    "roteiro-reuniao": { nome: "Roteiro de reunião", linha: "Minuto a minuto, com as perguntas certas.", ref: "skill roteiro-comercial", acao: "Montar o roteiro", perguntas: [
-      { id: "qual", curto: "Reunião", titulo: "Qual reunião?", opcoes: [{ t: "Primeira (30 min)" }, { t: "Segunda (45 min)" }, { t: "Relacionamento" }] },
-      { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] } ] },
     "relatorio-mensal": { nome: "Relatório mensal ao cliente", linha: "Resumo descritivo do mês, com fonte e data.", ref: "skill relatorio-e-proposta", acao: "Montar o relatório", perguntas: [
       { id: "periodo", curto: "Período", titulo: "Qual período?", opcoes: [{ t: "Mês passado" }, { t: "Trimestre" }, { t: "Ano até agora" }] }, RESULTADO ] },
-    "proposta": { nome: "Proposta de assessoria", linha: "O que fazemos, como trabalhamos e próximo passo.", ref: "skill relatorio-e-proposta", acao: "Montar a proposta", perguntas: [
+    "proposta": { nome: "Proposta de assessoria (documento)", linha: "O documento escrito do serviço, para enviar depois da reunião.", ref: "skill relatorio-e-proposta", acao: "Montar a proposta", perguntas: [
       { id: "tipo", curto: "Para quem", titulo: "Para quem é a proposta?", opcoes: [{ t: "Cliente novo" }, { t: "Cliente atual (ampliar)" }] }, RESULTADO ] },
     "followup": { nome: "Follow-up da proposta", linha: "3 toques para descobrir o que falta decidir.", ref: "skill relatorio-e-proposta", acao: "Montar o follow-up", perguntas: [
       { id: "tempo", curto: "Enviada há", titulo: "Há quanto tempo você enviou a proposta?", opcoes: [{ t: "2 dias" }, { t: "5 dias" }, { t: "10 dias ou mais" }] } ] },
@@ -842,20 +837,19 @@
       { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo do vídeo?", opcoes: [{ t: "Captar novos clientes" }, { t: "Educar iniciantes" }, { t: "Relacionamento com clientes" }, { t: "Bastidores do escritório" }] } ] },
     "cliente-novo": { nome: "Cliente novo", linha: "Ficha de entrada e o que pedir ao cliente.", ref: "rotina prospect-intake", acao: "Abrir a ficha", perguntas: [
       { id: "ponto", curto: "Momento", titulo: "Em que ponto está esse cliente?", opcoes: [{ t: "Antes da primeira conversa", d: "O que perguntar e pedir a ele" }, { t: "Já tenho notas ou documentos", d: "Extratos, IR ou carteira" }] } ] },
-    "pre-reuniao": { nome: "Pré-reunião", linha: "Roteiro da conversa, pontos de atenção e perguntas.", ref: "rotina pre-meeting", acao: "Montar a pré-reunião", perguntas: [
+    "pre-reuniao": { nome: "Pré-reunião (cliente atual)", linha: "Para reunião com quem já é cliente: roteiro, pontos de atenção e perguntas.", ref: "rotina pre-meeting", acao: "Montar a pré-reunião", perguntas: [
       { id: "foco", curto: "Foco", titulo: "Qual é o foco da conversa?", opcoes: [{ t: "Revisão de carteira" }, { t: "Novo aporte" }, { t: "Resgate ou liquidez" }, { t: "Sucessão e patrimônio" }] } ] },
     "pos-reuniao": { nome: "Pós-reunião", linha: "Próximos passos e a mensagem de retorno.", ref: "rotina post-meeting", acao: "Fechar a reunião", perguntas: [
       { id: "saida", curto: "Saída", titulo: "O que precisa sair daqui?", ajuda: "Marque quantos quiser. A transcrição ou as anotações você cola na conversa.", multi: true,
         opcoes: [{ t: "Próximos passos com prazo" }, { t: "Mensagem ao cliente" }, { t: "Registro para o CRM" }] } ] },
     "carteira": { nome: "Revisão de carteira", linha: "Desvios frente à política, sem ordens de compra ou venda.", ref: "rotina portfolio-rebalance-review", acao: "Revisar a carteira",
       extra: "Só a análise do desvio: sem compra, venda nem imposto.", perguntas: [
-      { id: "base", curto: "Comparar com", titulo: "Comparar a carteira com quê?", opcoes: [{ t: "Política do cliente" }, { t: "Carteira modelo do escritório" }] },
       RESULTADO ] },
     "diagnostico": { nome: "Diagnóstico financeiro", linha: "Patrimônio, dívidas, fluxo e reserva.", ref: "skill diagnostico-financeiro", acao: "Fazer o diagnóstico",
       extra: "Não preciso de nome nem CPF do cliente." },
-    "abordagem": { nome: "Primeira abordagem", linha: "Mensagem e perguntas de descoberta.", ref: "skill prospeccao-abordagem", acao: "Preparar a abordagem", perguntas: [
+    "abordagem": { nome: "Primeira mensagem", linha: "Mensagem e perguntas de descoberta.", ref: "skill prospeccao-abordagem", acao: "Preparar a abordagem", perguntas: [
       { id: "canal", curto: "Canal", titulo: "Por onde vai o primeiro contato?", ajuda: "Quem é a pessoa e como vocês se conhecem você escreve na conversa.",
-        opcoes: [{ t: "WhatsApp", d: "Mensagem curta" }, { t: "E-mail", d: "Com assunto" }, { t: "Ligação", d: "Como abrir a conversa" }] } ] },
+        opcoes: [{ t: "WhatsApp", d: "Mensagem curta" }, { t: "E-mail", d: "Com assunto" }] } ] },
     "objecoes": { nome: "Objeção do cliente", linha: "A resposta certa para o \"não\" ou o \"vou pensar\".", ref: "skill objecoes", acao: "Preparar a resposta",
       extra: "A frase exata do cliente você escreve na conversa.", perguntas: [
       { id: "canal", curto: "Canal", titulo: "Onde a objeção apareceu?", opcoes: [{ t: "WhatsApp", d: "Resposta curta" }, { t: "Ligação", d: "Frase para falar" }, { t: "Reunião", d: "Pergunta para aprofundar" }] } ] },
@@ -878,8 +872,6 @@
     "post": { nome: "Criar um post", linha: "Tema, texto e revisão das regras.", ref: "skills pauta-de-conteudo e conteudo-para-cliente", acao: "Criar o post",
       extra: "Depois do texto, faça o parecer de revisão da própria peça.", perguntas: [
       { id: "formato", curto: "Formato", titulo: "Qual formato?", ajuda: "O tema você escreve na conversa.", opcoes: [{ t: "Carrossel" }, { t: "Post único" }, { t: "Roteiro de Reels" }] }, ATUACAO ] },
-    "post-mercado": { nome: "Post do mercado de hoje", linha: "Um indicador do dia vira conteúdo.", ref: "skills macro-brasil e conteudo-para-cliente", acao: "Criar o post", perguntas: [
-      { id: "tema", curto: "Tema", titulo: "Qual assunto do dia?", opcoes: [{ t: "Juros" }, { t: "Inflação" }, { t: "Dólar" }, { t: "Os três juntos" }] }, ATUACAO ] },
     "landing": { nome: "Landing page", linha: "Página de captação no CaptaMais, com o link para a bio.", ref: "skill landing-page-captacao", acao: "Montar a landing page", perguntas: [
       { id: "modelo", curto: "Modelo", titulo: "Qual modelo de página?", ajuda: "O conteúdo é o mesmo; muda o visual. Dá para trocar depois no CaptaMais.", opcoes: [{ t: "Diagnóstico", d: "Escuro e completo, convida para um diagnóstico" }, { t: "Anúncio direto", d: "Claro, formulário no topo, para quem vem do Instagram" }, { t: "Confiança", d: "Escuro, com a sua foto em destaque" }, { t: "Autoridade", d: "Depoimentos e credenciais" }] }, ATUACAO ] },
   };
@@ -920,7 +912,7 @@
       ]
     },
     "ligacao": {
-      "obj": "Ter o roteiro exato da ligação, no tempo escolhido, terminando sempre com data e hora marcadas.",
+      "obj": "Ter o roteiro exato da primeira ligação para um lead novo, no tempo escolhido, terminando sempre com data e hora marcadas.",
       "entrega": [
         "Roteiro da ligação no tempo escolhido (abertura, brevidade, valor, pedido e fechamento com dois horários), em peça separada",
         "Respostas prontas para as 4 objeções mais comuns (semana que vem, quem cuida é o cônjuge, sem mexer até o fim do ano, invisto sozinho), em peça separada",
@@ -928,7 +920,7 @@
       ]
     },
     "sequencia": {
-      "obj": "Ter 5 toques de WhatsApp em 10 a 14 dias, cada um com objetivo, dia e texto prontos.",
+      "obj": "Ter 5 toques de WhatsApp em 10 a 14 dias para um lead novo, cada um com objetivo, dia e texto prontos.",
       "entrega": [
         "Tabela curta: toque, dia, objetivo",
         "Cada toque em uma peça de WhatsApp separada, com até 4 linhas e uma pergunta de resposta fácil",
@@ -992,14 +984,6 @@
         "Custos e prazos de resgate que posso informar"
       ]
     },
-    "roteiro-reuniao": {
-      "obj": "Conduzir a reunião no tempo certo, ouvindo mais do que falando.",
-      "entrega": [
-        "Roteiro minuto a minuto da reunião escolhida, em peça separada",
-        "Perguntas de descoberta nas quatro camadas (presente, aspirações, necessidades e obstáculos), em peça separada",
-        "Como fechar com o próximo passo e a data, e a nota para o CRM, em peça separada"
-      ]
-    },
     "relatorio-mensal": {
       "obj": "Entregar ao cliente um resumo descritivo do período, com fonte e data, sem recomendação nem projeção.",
       "entrega": [
@@ -1021,6 +1005,7 @@
       "obj": "Descobrir o que falta para o cliente decidir, sem pressão nem culpa.",
       "entrega": [
         "Três toques de follow-up (dia 2, dia 5 e dia 10), cada um em peça de WhatsApp separada",
+        "Roteiro de ligação de 60 segundos para usar no lugar do segundo toque, em peça separada",
         "E-mail de fechamento de ciclo, em peça separada",
         "Quando parar e o que registrar no CRM"
       ]
@@ -1053,7 +1038,7 @@
         "Nota para o CRM (ficha em até 12 linhas, com origem do contato e próximo passo), em peça separada",
         "WhatsApp pedindo os documentos e dizendo o que esperar (até 5 linhas), em peça separada",
         "Nota ao analista, em peça separada",
-        "Se ainda não houve a primeira conversa: roteiro da primeira reunião de 30 minutos, em peça separada"
+        "Se ainda não houve a primeira conversa: diga em uma linha que a tarefa Primeira reunião monta o roteiro e a apresentação com esta ficha"
       ],
       "insumos": [
         "Apelido do cliente (sem nome nem CPF)",
@@ -1095,7 +1080,7 @@
       ]
     },
     "carteira": {
-      "obj": "Ver onde a carteira se afasta da referência escolhida, sem ordem de compra, venda nem imposto.",
+      "obj": "Ver onde a carteira se afasta da política de investimento do cliente, com as bandas de tolerância, sem ordem de compra, venda nem imposto.",
       "entrega": [
         "Resumo em 3 linhas: maior desvio, maior concentração e o que vence em 12 meses",
         "Relatório com a tabela classe × alvo × atual × diferença (em pontos percentuais), concentração e liquidez, em peça separada",
@@ -1105,7 +1090,7 @@
       ],
       "insumos": [
         "Carteira atual por classe ou por ativo (valores ou %)",
-        "Política de investimento ou carteira modelo, com as bandas de tolerância",
+        "Política de investimento do cliente, com as bandas de tolerância",
         "Data-base dos números"
       ]
     },
@@ -1126,7 +1111,7 @@
       ]
     },
     "abordagem": {
-      "obj": "Preparar a primeira conversa com um contato novo, sem pressão e sem recomendar produto.",
+      "obj": "Preparar a primeira mensagem para um contato novo, sem pressão e sem recomendar produto.",
       "entrega": [
         "Mensagem de abordagem no canal escolhido",
         "Perguntas de descoberta",
@@ -1367,13 +1352,6 @@
         "O que conferir antes de publicar (foto, depoimentos, números, identificação e aviso, regras do escritório)"
       ],
       "fonte": "Use a skill landing-page-captacao. Modelo: Diagnóstico = diagnostico, Anúncio direto = direto, Confiança = confianca, Autoridade = autoridade. A página fica no domínio captamais.me (captamais.me/landingpage/link); domínio próprio não existe neste fluxo. Crie só o rascunho e nunca diga que publicou."
-    },
-    "post-mercado": {
-      "obj": "Transformar o indicador do dia em conteúdo simples para o cliente.",
-      "entrega": ENTREGA_POST,
-      "insumos": [
-        "Ângulo ou público do post (opcional)"
-      ]
     }
   };
   const ONDE_PESQUISAR = {
@@ -1435,7 +1413,7 @@
       { rotulo: "Algo que já sei dele (opcional)", opcional: true, dica: "Ex.: tem 2 filhos, usa só poupança" },
     ],
     "sequencia": [
-      { rotulo: "Quem é a pessoa e o que já aconteceu", dica: "Ex.: conversamos em 02/11, pediu simulação" },
+      { rotulo: "Quem é a pessoa e o que já aconteceu", dica: "Ex.: dona de clínica, comentou no meu post sobre reserva; ainda não conversamos" },
       { rotulo: "Gancho que posso usar (opcional)", opcional: true, dica: "Ex.: reforma da clínica, aniversário em dezembro" },
     ],
     "pitch": [
@@ -1463,10 +1441,6 @@
       { rotulo: "Carteira A (a atual): ativos ou classes, valores e data-base", longo: true, dica: "Ex.: Renda fixa 55%, Ações 25%, FIIs 10%, Exterior 10% em 14/11/2026" },
       { rotulo: "Carteira B (modelo, cenário ou outra instituição): ativos ou classes, valores e data-base", longo: true, dica: "Ex.: Renda fixa 45%, Ações 30%, FIIs 10%, Exterior 15%" },
       { rotulo: "Custos e prazos de resgate que posso informar (opcional)", opcional: true, dica: "Ex.: taxa de administração de 1% ao ano; resgate em D+30" },
-    ],
-    "roteiro-reuniao": [
-      { rotulo: "Quem é o cliente e o que já sei", longo: true, dica: "Ex.: Ana, médica, 42 anos, indicação; quer se aposentar aos 55" },
-      { rotulo: "Objetivo da reunião", dica: "Ex.: entender o patrimônio e marcar a segunda reunião", padrao: "Entender o cliente e marcar o próximo passo" },
     ],
     "relatorio-mensal": [
       { rotulo: "Posição e movimentos do período (valores, datas, fonte)", longo: true, dica: "Cole o resumo ou os números do extrato" },
@@ -1508,7 +1482,7 @@
     ],
     "carteira": [
       { rotulo: "Carteira atual por classe ou por ativo (valores ou %)", longo: true, dica: "Ex.: Renda fixa 55%, Ações 25%, FIIs 10%, Exterior 10%" },
-      { rotulo: "Política de investimento ou carteira modelo, com as bandas", longo: true, dica: "Ex.: Renda fixa 50% (±10), Ações 25% (±5)…" },
+      { rotulo: "Política de investimento do cliente, com as bandas de tolerância", longo: true, dica: "Ex.: Renda fixa 50% (±10), Ações 25% (±5)…" },
       { rotulo: "Data-base dos números", padrao: "@hoje" },
     ],
     "diagnostico": [
@@ -1588,9 +1562,6 @@
       { rotulo: "Meu WhatsApp (opcional)", opcional: true, dica: "Ex.: 11 99999-0000" },
       { rotulo: "Meu Instagram (opcional)", opcional: true, dica: "Ex.: @meuperfil" },
       { rotulo: "Link desejado da página (opcional)", opcional: true, dica: "Ex.: henri-diagnostico (em branco, eu sugiro)" },
-    ],
-    "post-mercado": [
-      { rotulo: "Ângulo ou público do post", opcoes: ["Educar iniciantes", "Clientes atuais", "Explicar a decisão do dia"], padrao: "Educar iniciantes" },
     ],
   };
   const camposDe = (id) => CAMPOS[id] ?? (PEDIDO[id]?.insumos ?? []).map((rotulo) => ({ rotulo }));
@@ -1704,6 +1675,20 @@
     const r = String(ref ?? "").trim().toLowerCase();
     return Object.keys(T).find((id) => id.toLowerCase() === r || String(T[id].nome).toLowerCase() === r) ?? null;
   };
+  // Tarefas que saíram do menu. Ficam aqui só para o histórico antigo e para quem ainda chamar pelo nome antigo:
+  // a Mesa diz onde está agora o que a tarefa fazia.
+  const SAIRAM_DO_MENU = {
+    "roteiro-reuniao": { nome: "Roteiro de reunião", agora: ["primeira-reuniao", "segunda-reuniao", "pre-reuniao"] },
+    "post-mercado": { nome: "Post do mercado de hoje", agora: ["macro"] },
+  };
+  const saiuDoMenu = (ref) => {
+    const r = String(ref ?? "").trim().toLowerCase();
+    const id = Object.keys(SAIRAM_DO_MENU).find((k) => k === r || SAIRAM_DO_MENU[k].nome.toLowerCase() === r);
+    if (!id) return "";
+    const agora = SAIRAM_DO_MENU[id].agora.filter((x) => T[x]).map((x) => T[x].nome);
+    const onde = agora.length > 1 ? `${agora.slice(0, -1).join(", ")} e ${agora[agora.length - 1]}` : agora[0];
+    return `A tarefa «${SAIRAM_DO_MENU[id].nome}» saiu do menu da Mesa.` + (onde ? ` O que ela fazia está em ${onde}.` : "");
+  };
   function limparAjusteTarefa(aj, id) {
     const base = BASE_PERGUNTAS[id] ?? T[id]?.perguntas ?? [];
     const opcoes = {};
@@ -1738,7 +1723,7 @@
   Object.assign(window.__mesaTarefas, {
     async editar(sp) {
       const id = sp?.tarefa ? achaTarefa(sp.tarefa) : estado.tarefa;
-      if (!id || !T[id]) return { ok: false, motivo: "Não achei essa tarefa. Abra a tarefa ou diga o nome dela." };
+      if (!id || !T[id]) return { ok: false, motivo: saiuDoMenu(sp?.tarefa || estado.tarefa) || "Não achei essa tarefa. Abra a tarefa ou diga o nome dela." };
       aplicarAjusteTarefa(id);
       const base = BASE_PERGUNTAS[id];
       const aj = ajustes.tarefas[id] ?? { opcoes: {}, regras: [] };
@@ -1776,7 +1761,7 @@
   });
 
   window.__mesaContexto = () => ({
-    tela: estado.tela, area: estado.area, tarefa: estado.tarefa ? T[estado.tarefa]?.nome : null,
+    tela: estado.tela, area: estado.area, tarefa: estado.tarefa ? (T[estado.tarefa]?.nome ?? estado.historico?.nome ?? null) : null,
     areas: AREAS.map((a) => `${a.id} (${a.nome})`), skills: SKILLS_CONHECIDAS, minhas: tarefasUsuario.map((t) => `${t.id}: ${t.nome}`),
     todas: Object.values(T).map((t) => t.nome),
     tarefaId: estado.tarefa, areaId: estado.area, areaNome: AREAS.find((a) => a.id === estado.area)?.nome || "",
@@ -1836,7 +1821,7 @@
     const gp = AREAS.flatMap((x) => x.grupos).find((g) => g.pasta && (estado.tela === "lista" ? g.nome === estado.pasta : g.tarefas.includes(estado.tarefa)));
     add(area.nome, estado.tela === "lista" && !gp ? null : () => ir("lista", { pasta: null }));
     if (gp) add(gp.nome, estado.tela === "lista" ? null : () => ir("lista", { pasta: gp.nome }));
-    if (estado.tarefa) add(T[estado.tarefa].nome, null);
+    if (estado.tarefa) add(T[estado.tarefa]?.nome || estado.historico?.nome || "Do histórico", null);
   }
 
   let videoEscolhido = "", escolhendoVideo = false;
@@ -2034,9 +2019,9 @@
     if (conectado && perfil?.atuacao && !perfil?.historico?.length && !editandoPerfil) {
       const ini = el("div", "dica"); ini.style.cssText = "visibility:visible;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 16px";
       ini.append(el("span", "", "Primeira vez? Comece por uma destas:"));
-      [["retomada", "Retomar lead parado"], ["objecoes", "Objeção do cliente"], ["ligacao", "Roteiro de ligação"]].forEach(([id, rot]) => {
+      ["retomada", "objecoes", "ligacao"].forEach((id) => {
         if (!T[id]) return;
-        const b = el("button", "fantasma", rot); b.type = "button";
+        const b = el("button", "fantasma", esc(T[id].nome)); b.type = "button";
         b.onclick = () => ir("guia", { area: AREAS.find((a) => a.grupos.some((g) => g.tarefas.includes(id)))?.id, tarefa: id, passo: 0, respostas: {}, campos: {} });
         ini.append(b);
       });
@@ -2222,6 +2207,7 @@
   }
 
   function telaAcompanhar(v) {
+    if (estado.historico && !T[estado.tarefa]) return telaHistorico(v); // tarefa que saiu do menu: o texto salvo fica na conversa ao lado
     if (estado.historico && typeof window.__mesaStatus === "function") { if (window.__mesaStatus().estado === "pensando") estado.historico = null; else return telaHistorico(v); }
     const t = T[estado.tarefa], ps = perguntasDe(t), a = andamento?.agora ? andamento : null, pronto = !!a?.concluido;
     const emJanela = typeof window.__mesaStatus === "function", sv = emJanela ? window.__mesaStatus().estado : "";
@@ -2450,8 +2436,10 @@
   }
   btnHist.onclick = (ev) => { ev.stopPropagation(); abrirHistorico(); };
   function abrirDoHistorico(r) {
-    if (!r?.tarefa || !T[r.tarefa]) { alert("Essa rotina não existe mais, mas a conversa foi recuperada. Abra uma rotina para continuar."); ir("inicio"); return; }
-    ir("acompanhar", { area: r.area || AREAS.find((a) => a.grupos.some((g) => g.tarefas.includes(r.tarefa)))?.id || estado.area, tarefa: r.tarefa, passo: 0, respostas: {}, campos: {}, historico: { nome: r.nome, em: r.em } });
+    if (!r?.tarefa) { alert("Essa rotina não existe mais, mas a conversa foi recuperada. Abra uma rotina para continuar."); ir("inicio"); return; }
+    // Tarefa que saiu do menu (ou tarefa própria apagada) também abre: a tela do histórico mostra a conversa e diz onde a tarefa foi parar.
+    const area = [r.area, AREAS.find((a) => a.grupos.some((g) => g.tarefas.includes(r.tarefa)))?.id, estado.area].find((x) => AREAS.some((a) => a.id === x)) ?? AREAS[0].id;
+    ir("acompanhar", { area, tarefa: r.tarefa, passo: 0, respostas: {}, campos: {}, historico: { nome: r.nome || SAIRAM_DO_MENU[r.tarefa]?.nome || "", em: r.em } });
     window.__mesaHistorico.fixar();
   }
 
@@ -2501,12 +2489,13 @@
   document.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k" && window.__mesaHistorico) { ev.preventDefault(); abrirBusca(); } });
 
   function telaHistorico(v) {
-    const t = T[estado.tarefa], ps = perguntasDe(t), h = estado.historico;
+    const h = estado.historico, t = T[estado.tarefa] ?? { nome: h.nome || "Do histórico", perguntas: [] }, ps = perguntasDe(t);
     const guia = el("div", "guia"), vidro = el("section", "vidro acomp pronto");
     vidro.append(el("div", "rotulo", `<i></i>Do histórico · ${esc(quando(h.em))}`));
     const meio = el("div", "meio");
     meio.append(el("h2", "", esc(h.nome || t.nome)));
     meio.append(el("p", "detalhe", "O resultado desta rotina está na conversa ao lado. Para ajustar ou continuar de onde parou, escreva na caixa de baixo."));
+    if (!T[estado.tarefa]) meio.append(el("p", "detalhe", esc(saiuDoMenu(estado.tarefa) || "Esta tarefa não está mais no menu da Mesa.")));
     vidro.append(meio);
     const rod = el("div", "rodape"), volta = el("button", "fantasma", "← Início"); volta.onclick = () => ir("inicio"); rod.append(volta); vidro.append(rod);
     guia.append(vidro, dossie(t, ps, true)); v.append(guia);
