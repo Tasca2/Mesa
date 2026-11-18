@@ -117,7 +117,7 @@ const comSkill = (pasta) => readdirSync(pasta, { withFileTypes: true })
 const SKILLS_METODO = comSkill(PASTA_SKILLS);
 const pastaDa = (skill) => path.join(ROTINAS.includes(skill) ? PASTA_ROTINAS : PASTA_SKILLS, skill);
 
-const AREAS = 'Rotinas do dia (cliente novo, pré-reunião, pós-reunião, revisão de carteira, diagnóstico, primeira abordagem, objeções, retomada de lead frio); ' +
+const AREAS = 'Rotinas do dia (antes da reunião: cliente novo, primeira reunião, segunda reunião, pré-reunião (cliente atual); depois da reunião: pós-reunião; carteira: revisão de carteira, comparador de carteira; cliente: diagnóstico financeiro, relatório mensal ao cliente, proposta de assessoria (documento), follow-up da proposta; relacionamento: ritmo e indicação, explicar ao cliente, conversa sobre sucessão; prospecção: primeira mensagem, ligação de primeiro contato, sequência para lead novo, pitch e e-mail, objeção do cliente, retomar lead parado); ' +
   'Mercado hoje (juros, inflação e câmbio, fato relevante, gráfico, ação, setor, fundo imobiliário, renda fixa, estudo e apresentação de ativo); ' +
   'Marketing Profissional (Post para Instagram: criar um post, ideias para postar hoje, calendário de post; editar um Reels; landing page)';
 const COMO_ATUALIZAR = 'Em toda tarefa enviada pela Mesa (mensagem que começa com [Mesa]), chame mesa_perfil para saber quem é o assessor, ' +

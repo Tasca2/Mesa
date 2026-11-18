@@ -1,6 +1,6 @@
 ---
 name: pre-meeting
-description: Prepara a reunião com cliente: contexto, pontos de atenção, roteiro minuto a minuto e perguntas de descoberta (SPIN), a partir da carteira e do histórico que o assessor informar. Use antes de qualquer reunião; não recomenda ativos nem promete retorno.
+description: Prepara a reunião com cliente: contexto, pontos de atenção, roteiro minuto a minuto e perguntas de descoberta (SPIN), a partir da carteira e do histórico que o assessor informar. Use antes de reunião com quem já é cliente; não recomenda ativos nem promete retorno.
 ---
 
 # Pré-reunião
@@ -14,7 +14,7 @@ Chegar à reunião com um roteiro que cabe no tempo, perguntas que descobrem a n
 - Histórico das últimas conversas e o que mudou desde então.
 - Foco da reunião (revisão, aporte, resgate/liquidez, sucessão). Perfil do assessor via `mesa_perfil`; `consultar_cofre` com o tema `reunião SPIN descoberta` se houver.
 
-**Dado que não veio**: não invente. Liste em "Pedir antes da reunião" e use `[CONFERIR]`. Cliente sem nenhum dado = primeira reunião: entregue o roteiro de descoberta e a lista do que pedir.
+**Dado que não veio**: não invente. Liste em "Pedir antes da reunião" e use `[CONFERIR]`. Cliente sem nenhum dado = primeira reunião: diga em uma linha que a tarefa Primeira reunião monta o roteiro e a apresentação, e entregue só a lista do que pedir.
 
 ## Passos
 0. **Objetivo e avanço** (2 linhas, antes de tudo): o que esta reunião precisa resolver e qual é o avanço mínimo aceitável, isto é, o que precisa sair combinado com data (documento enviado, decisão tomada, próxima reunião marcada). Reunião que termina em "vamos nos falando" não avançou. O roteiro inteiro serve a esse avanço.
