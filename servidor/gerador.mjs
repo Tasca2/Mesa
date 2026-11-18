@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync, copyFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -603,11 +603,41 @@ ${corpo}
 ${aviso}`;
 }
 
+// Páginas do PDF que o navegador gerou: a árvore de páginas do Chromium sai sem compressão ("/Type /Pages /Count N").
+export function paginasDoPdf(arq) {
+  try {
+    const n = [...readFileSync(arq, 'latin1').matchAll(/\/Type\s*\/Pages\b[^>]*?\/Count\s+(\d+)/g)].map((m) => Number(m[1]));
+    return n.length ? Math.max(...n) : 0;
+  } catch { return 0; }
+}
+
+// Espaçamento justo: a mesma letra, menos ar entre blocos, linhas e células.
+const CSS_JUSTO = 'body{line-height:1.42}.topo{margin-bottom:9px}header{padding-bottom:8px;margin-bottom:9px}h2{margin:10px 0 5px}h3{margin:9px 0 3px}'
+  + 'p,ul,ol{margin-bottom:6px}li{margin-bottom:2px}.resumo{padding:8px 12px;margin-bottom:8px}.destaques{margin-bottom:9px}table{margin:4px 0 9px}'
+  + 'th,td{padding-top:4px;padding-bottom:4px}figure.graf{padding:8px 12px 6px}.aviso{margin-top:8px}';
+
+// Folha que passa da página por pouco (a última página ficaria com o fim da última seção e o aviso): imprime de novo com o
+// espaçamento justo e fica com essa versão só se ela tiver menos páginas. Folha de uma página não é impressa de novo.
+async function justoSeEconomiza(html, pdf) {
+  const n = paginasDoPdf(pdf);
+  if (n < 2) return false;
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'mesa-justo-'));
+  try {
+    const justo = path.join(tmp, 'justo.pdf');
+    await renderizar(html.replace('</style>', () => CSS_JUSTO + '</style>'), justo, 'pdf', [794, 1123]);
+    const m = paginasDoPdf(justo);
+    if (m < 1 || m >= n) return false;
+    copyFileSync(justo, pdf);
+    return true;
+  } catch { return false; } finally { try { rmSync(tmp, { recursive: true, force: true }); } catch { } }
+}
+
 export async function gerarDocumento(a, marcaBase = {}) {
   const html = montarDocumento(a, marcaBase);
   const pdf = path.join(pastaBase(), `${slug(a.titulo)}-${carimbo()}.pdf`);
   await renderizar(html, pdf, 'pdf', [794, 1123]);
-  const r = { tipo: 'pdf', titulo: a.titulo, pasta: path.dirname(pdf), imagens: [], pdf, em: Date.now() };
+  const justo = await justoSeEconomiza(html, pdf);
+  const r = { tipo: 'pdf', titulo: a.titulo, pasta: path.dirname(pdf), imagens: [], pdf, em: Date.now(), ...(justo ? { justo: true } : {}) };
   writeFileSync(ARQUIVO_GERACAO, JSON.stringify(r));
   return r;
 }
