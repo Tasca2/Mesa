@@ -29,14 +29,14 @@ Se a pessoa já disse a tarefa ao chamar /mesa (por exemplo "/mesa analisar HGLG
 
 Senão, pergunte com `AskUserQuestion` (uma pergunta por vez, no máximo 4 opções, sem listar as opções no texto):
 
-1. **Área**: Rotinas do dia · Mercado hoje · Post para Instagram.
+1. **Área**: Rotinas do dia · Mercado hoje · Produtos · Post para Instagram.
 2. **Grupo**, quando a área tiver mais de 4 tarefas:
    - Rotinas do dia (20 tarefas): pergunte primeiro o momento (Reuniões · Carteira e cliente · Relacionamento · Prospecção) e, quando ele tiver mais de 4 tarefas, o grupo antes da tarefa:
      - Reuniões: Antes da reunião (cliente novo, primeira reunião, segunda reunião, pré-reunião (cliente atual)) · Depois da reunião (pós-reunião, a única do grupo: vá direto a ela).
      - Carteira e cliente: Carteira (revisão de carteira, comparador de carteira) · Cliente (diagnóstico financeiro, relatório mensal ao cliente, proposta de assessoria (documento), follow-up da proposta).
      - Relacionamento: ritmo e indicação, explicar ao cliente, conversa sobre sucessão (pergunte direto a tarefa).
      - Prospecção: Primeiro contato (primeira mensagem, ligação de primeiro contato, sequência para lead novo, pitch e e-mail) · Objeção e retomada (objeção do cliente, retomar lead parado).
-   - Mercado hoje: Panorama (juros/inflação/câmbio, fato relevante, gráfico) · Estudo e ações (estudo de ativo, analisar ação, comparar setor) · Fundos e renda fixa (fundo imobiliário, renda fixa).
+   - Mercado hoje: Panorama (juros/inflação/câmbio, fato relevante, gráfico) · Ativos (estudo de ativo, analisar ação, comparar setor, fundo imobiliário).
    - Post para Instagram: Ideias e referências (estudar perfis de referência, ideias para postar hoje, como foram meus posts) · Criar posts (semana de posts pronta, criar um post).
 3. **Tarefa** dentro do grupo, com o nome e a linha da tabela abaixo como descrição.
 
@@ -73,7 +73,8 @@ Se a pessoa responder "sem preferência" ou algo vago, mostre as tarefas da áre
 | Mercado | Analisar uma ação | Uma empresa pelo método: números, critérios e lacunas | `fundamentalista-metodo` | Resultado |
 | Mercado | Comparar o setor | Empresas lado a lado, na mesma base | `comparativo-setorial` | Resultado |
 | Mercado | Fundo imobiliário | Imóveis, crédito, P/VP e origem dos rendimentos | `analise-fii` | Resultado |
-| Mercado | Renda fixa | Títulos comparados com imposto e liquidez | `comparacao-renda-fixa` | Resultado |
+| Produtos | Raio-X de produto | O que é, como paga, quanto custa e o que pode dar errado, a partir do material | `produto-raio-x` e `leitura-de-lamina` | Produto · Resultado |
+| Produtos | Comparar produtos | Renda fixa, fundos e títulos lado a lado, líquidos de imposto (a antiga Renda fixa) | `comparacao-renda-fixa` | Resultado |
 | Instagram | Estudar perfis de referência | O que funciona nos perfis que você acompanha; vira a ficha "Minhas referências" | `pauta-de-conteudo` | - |
 | Instagram | Ideias para postar hoje | 5 ideias ranqueadas e a primeira já aberta, com gancho, roteiro e legenda | `pauta-de-conteudo` e `macro-brasil` | Objetivo do post |
 | Instagram | Semana de posts pronta | Os posts da semana criados numa pasta, com dia e hora para programar | `pauta-de-conteudo` e `calendario-de-conteudo` | Objetivo da semana · Posts · Programar |
@@ -105,6 +106,7 @@ Pule a pergunta **Atuação** quando o perfil já trouxer a atuação.
 - **Parado há** (retomada) — Há quanto tempo o contato parou? Menos de 30 dias · De 1 a 3 meses · Mais de 3 meses.
 - **Formato do estudo** — O que você vai levar para o cliente? Apresentação em slides (até 8 slides) · Estudo em PDF (para ler e enviar) · Resumo de uma página (para a conversa).
 - **Formato do post** — Qual formato? Carrossel · Post único · Roteiro de Reels.
+- **Produto** (raio-X) — Que produto é? CDB, LCI ou LCA · Crédito privado (CRI, CRA, debênture) · Fundo ou previdência · COE, oferta pública ou outro.
 - **Objetivo do post** — O que você quer com o post de hoje? Educar · Atrair conversas · Mostrar o mercado · Misto.
 - **Objetivo da semana** — Qual o objetivo da semana? Educar · Atrair conversas · Mostrar o mercado · Misto.
 - **Posts** — Quantos posts? 3 · 5 (padrão: de segunda a sexta) · 7.
@@ -124,6 +126,7 @@ Pule a pergunta **Atuação** quando o perfil já trouxer a atuação.
 - Pré-reunião (cliente atual): peça no chat o resumo da carteira e o histórico das últimas conversas; sem eles, entregue o que dá, marque com `[CONFERIR]` o que falta e peça o resto em uma frase.
 - Analisar ação, fundo imobiliário, comparar setor e estudo: busque os dados com `analise_ativo` antes de pedir ao assessor.
 - Post para Instagram: depois do texto aprovado, gere as imagens com `mesa_carrossel` (carrossel de 5 a 8 slides, ou 1 slide para arte única) e informe a pasta e o PDF; no Reels, entregue o roteiro cena a cena e a capa pronta.
+- Raio-X de produto e Comparar produtos: peça a lâmina, o termo ou o e-mail da mesa (texto colado ou arquivo); título público de prazo parecido com `taxas_tesouro`, CDI, Selic e IPCA esperado com `painel_macro`; FGC, imposto e IOF com fonte primária e data. Analise o produto, sem dizer a um cliente que compre.
 - Estudar perfis de referência e Como foram meus posts: peça os prints, as legendas e links ou os números antes de analisar; sem esse material, não analise nem invente perfil ou número. A ficha "Minhas referências" só é gravada com `mesa_perfil` (`salvar.referencias`) depois do ok.
 - Semana de posts pronta: cada carrossel sai com `mesa_carrossel` na pasta da semana ("Semana de DD-MM/N-dia-tema", com a data da segunda-feira).
 - Estudo e apresentação: os números vêm da Análise de Ativo (`analise_ativo`); sem fonte, não entram. Veja "CaptaMais" abaixo.

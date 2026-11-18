@@ -1,8 +1,9 @@
-// Dados públicos da Mesa do Assessor: Banco Central, IBGE e CVM consultados direto, por código, sem leitura de página.
+// Dados públicos da Mesa do Assessor: Banco Central, IBGE, CVM e Tesouro Nacional consultados direto, por código, sem leitura de página.
 // painelMacro: juros, inflação, câmbio, Focus, Copom e agenda, com as variações já calculadas.
 // documentosCvm: fatos relevantes e comunicados das companhias abertas (base aberta da CVM) e o PDF de um deles.
+// taxasTesouro: taxa e preço dos títulos do Tesouro Direto na última data base (arquivo oficial do Tesouro Transparente).
 // Só módulos do Node (fetch, zlib, fs, path). Toda falha vira uma lacuna com o motivo: nenhum número é estimado.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, renameSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { pastaBase } from './gerador.mjs';
@@ -720,4 +721,270 @@ export async function documentosCvm({ empresa, tipos, quantidade, protocolo } = 
   if (!r.empresa) lacunas.push({ item: 'empresa', motivo: r.candidatas.length ? 'mais de uma companhia com esse nome: chame de novo com o CNPJ de uma das candidatas' : `nenhuma companhia aberta com "${String(empresa).slice(0, 60)}" na base da CVM; tente o nome da companhia ou o CNPJ (a analise_ativo devolve o cnpj pelo ticker)` });
   else if (!r.documentos.length) lacunas.push({ item: 'documentos', motivo: 'nenhum documento dessas categorias na base deste ano' });
   return { ...info, empresa: r.empresa, candidatas: r.candidatas, categorias: Array.isArray(tipos) && tipos.length ? tipos : ['Fato Relevante', 'Comunicado ao Mercado'], documentos: r.documentos, lacunas };
+}
+
+// ---------- Tesouro Direto: taxas e preços do dia ----------
+// Arquivo oficial "Preço e taxa dos títulos do Tesouro Direto" do Tesouro Transparente (licença aberta ODbL): o histórico
+// inteiro num CSV de 14,7 MB, com uma data base por dia útil. O JSON do site do Tesouro Direto fica em /o/, que o robots.txt
+// do site fecha para robôs; por isso a ferramenta lê este arquivo. Formato conferido em 18/11/2026: ";" entre colunas,
+// vírgula decimal, datas DD/MM/AAAA, a data mais nova primeiro (a ordem não é documentada, então a leitura não depende dela).
+// Definições das colunas: PDF de metadados do mesmo conjunto (taxa.pdf).
+export const TESOURO_CSV = process.env.MESA_TESOURO_URL ||
+  'https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/PrecoTaxaTesouroDireto.csv';
+const FONTE_TESOURO = 'Tesouro Transparente (Tesouro Nacional), arquivo PrecoTaxaTesouroDireto';
+const MINUTOS_TESOURO = 30;
+const COLUNAS_TESOURO = { tipo: 'Tipo Titulo', vencimento: 'Data Vencimento', dataBase: 'Data Base', taxaCompra: 'Taxa Compra Manha',
+  taxaVenda: 'Taxa Venda Manha', puCompra: 'PU Compra Manha', puVenda: 'PU Venda Manha', puBase: 'PU Base Manha' };
+// Ordem dos tipos na lista e nos títulos de prazo parecido. Renda+ e Educa+ ficam fora dos parecidos: pagam renda mensal.
+const TIPOS_TESOURO = ['Tesouro Prefixado', 'Tesouro Prefixado com Juros Semestrais', 'Tesouro IPCA+', 'Tesouro IPCA+ com Juros Semestrais',
+  'Tesouro Selic', 'Tesouro IGPM+ com Juros Semestrais', 'Tesouro Renda+ Aposentadoria Extra', 'Tesouro Educa+'];
+const PARECIDOS_TESOURO = TIPOS_TESOURO.slice(0, 6);
+const chaveTipo = (s) => sem(s).replace(/ /g, '');
+const dataBrOk = (s) => (/^\d{2}\/\d{2}\/\d{4}$/.test(String(s ?? '').trim()) ? deBr(String(s).trim()) : null);
+const numBr = (s) => {
+  let t = String(s ?? '').trim();
+  if (!t) return null;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  const x = Number(t);
+  return Number.isFinite(x) ? x : null;
+};
+const diasEntre = (a, b) => Math.round((utc(a) - utc(b)) / 86400000);
+const diaEmSP = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(ms));
+// O Renda+ paga 240 parcelas mensais e o Educa+ 60, de janeiro do ano do nome até o vencimento em dezembro
+// (documentos "Tesouro RendA+" e "Tesouro Educa+" do Tesouro Direto, conferidos em 18/11/2026). O ano do nome não é o do vencimento.
+const RENDA_MENSAL = { RENDA: { anos: 20, parcelas: 240 }, EDUCA: { anos: 5, parcelas: 60 } };
+const rendaMensal = (tipo) => (/\bRENDA\b/.test(sem(tipo)) ? RENDA_MENSAL.RENDA : /\bEDUCA\b/.test(sem(tipo)) ? RENDA_MENSAL.EDUCA : null);
+
+export function indexadorDoTipo(tipo) {
+  const s = sem(tipo);
+  if (/PREFIXADO/.test(s)) return 'prefixado';
+  if (/SELIC/.test(s)) return 'selic';
+  if (/\bIGP ?M\b/.test(s)) return 'igpm';
+  if (/IPCA|\bRENDA\b|\bEDUCA\b/.test(s)) return 'ipca';
+  return null;
+}
+export function nomeDoTitulo(tipo, vencimento) {
+  const ano = +String(vencimento).slice(0, 4), r = rendaMensal(tipo);
+  return `${tipo} ${r ? ano - r.anos + 1 : ano}`;
+}
+export function taxaEmTexto(tipo, taxa) {
+  if (taxa == null || !Number.isFinite(taxa)) return null;
+  const n = (x) => x.toFixed(2).replace('.', ',');
+  const i = indexadorDoTipo(tipo);
+  if (i === 'prefixado') return `${n(taxa)}% ao ano (prefixado)`;
+  const nome = { ipca: 'IPCA', selic: 'Selic', igpm: 'IGP-M' }[i];
+  if (!nome) return `${n(taxa)}% ao ano`;
+  return `${nome} ${taxa < 0 ? '-' : '+'} ${n(Math.abs(taxa))}% ao ano`;
+}
+function formaDePagamento(tipo, vencimento) {
+  const r = rendaMensal(tipo);
+  if (r) {
+    const inicio = +vencimento.slice(0, 4) - r.anos + 1;
+    return `Renda mensal: ${r.parcelas} parcelas (${r.anos} anos), de 15/01/${inicio} até o vencimento em ${br(vencimento)}; antes de 15/01/${inicio} o título não paga nada`;
+  }
+  if (/SEMESTRAIS/.test(sem(tipo))) return 'Juros a cada seis meses e o valor de face no vencimento';
+  return 'Tudo no vencimento';
+}
+const completarTitulo = (t) => ({
+  nome: nomeDoTitulo(t.tipo, t.vencimento), tipo: t.tipo, vencimento: t.vencimento, indexador: indexadorDoTipo(t.tipo),
+  taxaCompra: t.taxaCompra, taxaVenda: t.taxaVenda, taxaCompraTexto: taxaEmTexto(t.tipo, t.taxaCompra), taxaVendaTexto: taxaEmTexto(t.tipo, t.taxaVenda),
+  puCompra: t.puCompra, puVenda: t.puVenda, puBase: t.puBase, pagamento: formaDePagamento(t.tipo, t.vencimento),
+  diasCorridosAteOVencimento: t.dataBase ? diasEntre(t.vencimento, t.dataBase) : null, dataBase: t.dataBase,
+});
+const ordemTipo = (tipo) => { const i = TIPOS_TESOURO.findIndex((x) => chaveTipo(x) === chaveTipo(tipo)); return i < 0 ? 99 : i; };
+
+// Lê o CSV e devolve só a data base mais recente. Coluna que mudou de nome vira erro com o nome dela: nada é adivinhado.
+export function lerTesouro(texto) {
+  const linhas = String(texto ?? '').replace(/^﻿/, '').split(/\r?\n/);
+  const cab = (linhas[0] || '').split(';').map(sem);
+  const col = {};
+  for (const [k, nome] of Object.entries(COLUNAS_TESOURO)) {
+    col[k] = cab.indexOf(sem(nome));
+    if (col[k] < 0) throw new Error(`o arquivo do Tesouro mudou de formato: falta a coluna "${nome}"`);
+  }
+  let maior = '', sel = [];
+  for (let n = 1; n < linhas.length; n++) {
+    if (!linhas[n]) continue;
+    const c = linhas[n].split(';'), d = dataBrOk(c[col.dataBase]);
+    if (!d) continue;
+    if (d > maior) { maior = d; sel = [c]; } else if (d === maior) sel.push(c);
+  }
+  if (!sel.length) throw new Error('o arquivo do Tesouro veio sem nenhuma linha de taxa');
+  const titulos = sel
+    .map((c) => ({ tipo: String(c[col.tipo] ?? '').trim(), vencimento: dataBrOk(c[col.vencimento]), dataBase: maior,
+      taxaCompra: numBr(c[col.taxaCompra]), taxaVenda: numBr(c[col.taxaVenda]), puCompra: numBr(c[col.puCompra]), puVenda: numBr(c[col.puVenda]), puBase: numBr(c[col.puBase]) }))
+    .filter((t) => t.tipo && t.vencimento)
+    .map(completarTitulo)
+    .sort((a, b) => ordemTipo(a.tipo) - ordemTipo(b.tipo) || (a.vencimento < b.vencimento ? -1 : a.vencimento > b.vencimento ? 1 : 0));
+  return { dataBase: maior, titulos };
+}
+
+// Nomes do site e nomes antigos. "NTN-B" sozinho é o com juros semestrais; "NTN-B Principal" é o IPCA+ sem cupom.
+const NOMES_ANTIGOS = [
+  [/\bNTN ?B ?PRINCIPAL\b|\bNTNB ?P\b/, 'Tesouro IPCA+'], [/\bNTN ?B\b|\bNTNB\b/, 'Tesouro IPCA+ com Juros Semestrais'],
+  [/\bNTN ?F\b|\bNTNF\b/, 'Tesouro Prefixado com Juros Semestrais'], [/\bNTN ?C\b|\bNTNC\b/, 'Tesouro IGPM+ com Juros Semestrais'],
+  [/\bLTN\b/, 'Tesouro Prefixado'], [/\bLFT\b/, 'Tesouro Selic'],
+];
+function tipoDaConsulta(q) {
+  if (/\bRENDA\b(?! FIXA)/.test(q)) return 'Tesouro Renda+ Aposentadoria Extra';
+  if (/\bEDUCA\b/.test(q)) return 'Tesouro Educa+';
+  for (const [re, tipo] of NOMES_ANTIGOS) if (re.test(q)) return tipo;
+  const js = /SEMESTR|\bJS\b|\bCUPOM\b/.test(q);
+  if (/\bIGP ?M\b/.test(q)) return 'Tesouro IGPM+ com Juros Semestrais';
+  if (/\bIPCA\b/.test(q)) return js ? 'Tesouro IPCA+ com Juros Semestrais' : 'Tesouro IPCA+';
+  if (/\bPRE ?FIXADO\b|\bPRE\b/.test(q)) return js ? 'Tesouro Prefixado com Juros Semestrais' : 'Tesouro Prefixado';
+  if (/\bSELIC\b/.test(q)) return 'Tesouro Selic';
+  return null;
+}
+function lerVencimento(s) {
+  const t = String(s ?? '').trim();
+  let m = t.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return { iso: `${m[3]}-${m[2]}-${m[1]}` };
+  m = t.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return { iso: `${m[1]}-${m[2]}-${m[3]}` };
+  m = t.match(/^(?:19|20)\d{2}$/);
+  return m ? { ano: +m[0] } : null;
+}
+const resumoTitulo = (t) => ({ nome: t.nome, tipo: t.tipo, vencimento: t.vencimento, taxaCompraTexto: t.taxaCompraTexto });
+
+export function acharTitulo(titulos, consulta, { vencimento } = {}) {
+  const bruto = String(consulta ?? ''), q = sem(bruto);
+  const tipo = tipoDaConsulta(q);
+  const doTipo = tipo ? titulos.filter((t) => chaveTipo(t.tipo) === chaveTipo(tipo)) : titulos;
+  const v = lerVencimento(vencimento), naConsulta = lerVencimento(bruto.match(/\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2}/)?.[0]);
+  const data = v?.iso || naConsulta?.iso;
+  const anos = q.match(/\b(?:19|20)\d{2}\b/g), ano = v?.ano || (anos ? +anos[anos.length - 1] : null);
+  const anoDoNome = (t) => +t.nome.slice(-4), anoDoVencimento = (t) => +t.vencimento.slice(0, 4);
+  const nada = (motivo, candidatas = []) => ({ titulo: null, candidatas: candidatas.map(resumoTitulo), motivo });
+  if (data) {
+    const achados = doTipo.filter((t) => t.vencimento === data);
+    if (achados.length === 1) return { titulo: achados[0], candidatas: [] };
+    if (achados.length > 1) return nada('mais de um título vence nessa data: diga o tipo (Prefixado, IPCA+, Selic...)', achados);
+    return nada(`não há ${tipo || 'título'} com vencimento em ${br(data)} no arquivo do dia`, tipo ? doTipo : []);
+  }
+  if (ano && tipo) {
+    const peloNome = doTipo.filter((t) => anoDoNome(t) === ano);
+    if (peloNome.length === 1) return { titulo: peloNome[0], candidatas: [] };
+    if (peloNome.length > 1) return nada('mais de um título desse tipo nesse ano: diga a data de vencimento', peloNome);
+    const peloVencimento = doTipo.filter((t) => anoDoVencimento(t) === ano);
+    if (peloVencimento.length === 1) {
+      const t = peloVencimento[0];
+      return { titulo: t, candidatas: [], nota: `${ano} é o ano do vencimento; o nome do título traz o ano em que começa a renda mensal: ${t.nome}` };
+    }
+    return nada(`não há ${tipo} ${ano} no arquivo do dia; os títulos desse tipo estão em candidatas`, doTipo);
+  }
+  if (ano) {
+    const c = titulos.filter((t) => anoDoNome(t) === ano || anoDoVencimento(t) === ano);
+    if (c.length === 1) return { titulo: c[0], candidatas: [] };
+    return nada(c.length ? 'mais de um título com esse ano: diga o tipo (Prefixado, IPCA+, Selic...)' : `não há título com ${ano} no nome ou no vencimento`, c);
+  }
+  if (tipo && doTipo.length === 1) return { titulo: doTipo[0], candidatas: [] };
+  return nada(tipo ? 'diga o ano ou a data de vencimento do título' : 'diga o tipo e o ano do título, por exemplo "Tesouro IPCA+ 2035"', tipo ? doTipo : []);
+}
+
+// O título de vencimento mais perto do alvo em cada tipo (empate: o que vence antes).
+export function parecidos(titulos, alvo, { indexador, excluir } = {}) {
+  const r = [];
+  for (const tipo of PARECIDOS_TESOURO) {
+    let melhor = null;
+    for (const t of titulos) {
+      if (chaveTipo(t.tipo) !== chaveTipo(tipo) || (indexador && t.indexador !== indexador)) continue;
+      if (excluir && chaveTipo(excluir.tipo) === chaveTipo(t.tipo) && excluir.vencimento === t.vencimento) continue;
+      const d = diasEntre(t.vencimento, alvo);
+      if (!melhor || Math.abs(d) < Math.abs(melhor.d) || (Math.abs(d) === Math.abs(melhor.d) && d < melhor.d)) melhor = { t, d };
+    }
+    if (melhor) {
+      const { t, d } = melhor;
+      r.push({ nome: t.nome, tipo: t.tipo, vencimento: t.vencimento, indexador: t.indexador, taxaCompra: t.taxaCompra, taxaVenda: t.taxaVenda,
+        taxaCompraTexto: t.taxaCompraTexto, pagamento: t.pagamento, diasDoAlvo: d });
+    }
+  }
+  return r;
+}
+
+// Cópia do dia: um arquivo tesouro-AAAA-MM-DD.json na pasta de cache da Mesa, com os títulos da última data base, o ETag e a
+// data de alteração do arquivo. Dentro de 30 minutos a cópia vale sem ir à rede; depois a Mesa pergunta ao servidor se o
+// arquivo mudou (If-None-Match e If-Modified-Since) e só baixa os 14,7 MB de novo se mudou. Gravar a cópia apaga as de outros dias.
+let memoriaTesouro = null;
+export const limparMemoriaTesouro = () => { memoriaTesouro = null; };
+const ARQUIVO_TESOURO = /^tesouro-(\d{4}-\d{2}-\d{2})\.json$/;
+function copiaGuardada(pasta, url) {
+  if (!pasta) return null;
+  let nomes;
+  try { nomes = readdirSync(pasta).filter((n) => ARQUIVO_TESOURO.test(n)).sort().reverse(); } catch { return null; }
+  for (const n of nomes) {
+    try {
+      const c = JSON.parse(readFileSync(path.join(pasta, n), 'utf8'));
+      if (c && c.url === url && typeof c.dataBase === 'string' && Array.isArray(c.titulos) && c.titulos.length && Number.isFinite(c.conferidoEm)) return c;
+    } catch { /* cópia estragada: ignora e baixa de novo */ }
+  }
+  return null;
+}
+function guardarCopia(pasta, copia) {
+  if (!pasta) return;
+  try {
+    mkdirSync(pasta, { recursive: true });
+    const nome = `tesouro-${copia.dia}.json`, tmp = path.join(pasta, `${nome}.${process.pid}.tmp`);
+    writeFileSync(tmp, JSON.stringify(copia));
+    renameSync(tmp, path.join(pasta, nome));
+    for (const n of readdirSync(pasta)) if (ARQUIVO_TESOURO.test(n) && n !== nome) { try { unlinkSync(path.join(pasta, n)); } catch { /* fica para a próxima */ } }
+  } catch { /* sem disco, a cópia fica só na memória */ }
+}
+async function baseTesouro({ pastaCache, buscar = fetch, agora, url, tempo = 90000 }) {
+  let g = memoriaTesouro && memoriaTesouro.url === url && memoriaTesouro.pasta === pastaCache ? memoriaTesouro.copia : copiaGuardada(pastaCache, url);
+  if (g && agora - g.conferidoEm < MINUTOS_TESOURO * 60000) return { copia: g, lacuna: null };
+  const dia = diaEmSP(agora);
+  const cab = { accept: 'text/csv,*/*', 'user-agent': AGENTE };
+  if (g?.etag) cab['if-none-match'] = g.etag;
+  if (g?.ultimaAlteracao) cab['if-modified-since'] = g.ultimaAlteracao;
+  let nova;
+  try {
+    const r = await buscar(url, { headers: cab, signal: AbortSignal.timeout(tempo) });
+    if (r.status === 304 && g) nova = { ...g, dia, conferidoEm: agora, etag: r.headers.get('etag') || g.etag };
+    else if (!r.ok) throw new Error(`o arquivo do Tesouro respondeu HTTP ${r.status}`);
+    else {
+      const { dataBase, titulos } = lerTesouro(await r.text());
+      nova = { url, dia, conferidoEm: agora, etag: r.headers.get('etag'), ultimaAlteracao: r.headers.get('last-modified'), dataBase, titulos };
+    }
+  } catch (e) {
+    if (!g) throw e;
+    return { copia: g, lacuna: { item: 'arquivo de preços e taxas do Tesouro', motivo: `${motivo(e)}; usei a cópia guardada em ${br(diaEmSP(g.conferidoEm))}, com data base ${br(g.dataBase)}` } };
+  }
+  guardarCopia(pastaCache, nova);
+  memoriaTesouro = { url, pasta: pastaCache, copia: nova };
+  return { copia: nova, lacuna: null };
+}
+
+const AVISO_TESOURO = 'O arquivo traz a taxa de mercado de cada título na data base; ele não diz se o título está à venda hoje no Tesouro Direto. ' +
+  'Use como referência do título público de prazo parecido, com a data base, sem dizer que o título está disponível para compra.';
+const LEGENDA_TESOURO = 'taxaCompra: taxa para o investidor comprar o título (no Prefixado é a taxa ao ano; nos outros, o adicional sobre o indexador, ' +
+  'escrito por extenso em taxaCompraTexto). taxaVenda: taxa para o investidor revender o título ao Tesouro antes do vencimento, sempre um pouco maior. ' +
+  'puCompra e puVenda: preço de um título em R$ por essas taxas, com liquidação no dia útil seguinte. puBase: preço pela taxa de venda com liquidação ' +
+  'no mesmo dia, o usado na marcação a mercado. diasCorridosAteOVencimento: contados da data base. diasDoAlvo: vencimento do título parecido menos o ' +
+  'prazo procurado, em dias (negativo: vence antes).';
+
+export async function taxasTesouro({ titulo, vencimento, indexador } = {}, opcoes = {}) {
+  const url = opcoes.url || TESOURO_CSV, agora = opcoes.agora ?? Date.now();
+  const lacunas = [];
+  let base;
+  try {
+    const b = await baseTesouro({ ...opcoes, url, agora });
+    base = b.copia;
+    if (b.lacuna) lacunas.push(b.lacuna);
+  } catch (e) {
+    return { fonte: FONTE_TESOURO, consulta: url, dataBase: null, titulo: null, parecidos: [], lacunas: [{ item: 'arquivo de preços e taxas do Tesouro', motivo: motivo(e) }] };
+  }
+  const titulos = base.titulos.map(completarTitulo);
+  const idx = ['prefixado', 'ipca', 'selic', 'igpm'].includes(indexador) ? indexador : undefined;
+  const info = { fonte: `${FONTE_TESOURO}, data base ${br(base.dataBase)}`, consulta: url, dataBase: base.dataBase,
+    ...(base.ultimaAlteracao ? { arquivoAlteradoEm: base.ultimaAlteracao } : {}), aviso: AVISO_TESOURO, legenda: LEGENDA_TESOURO };
+  const q = String(titulo ?? '').trim();
+  if (q) {
+    const a = acharTitulo(titulos, q, { vencimento });
+    if (!a.titulo) return { ...info, titulo: null, candidatas: a.candidatas, parecidos: [], lacunas: [...lacunas, { item: `título "${q.slice(0, 80)}"`, motivo: a.motivo }] };
+    return { ...info, titulo: a.titulo, ...(a.nota ? { nota: a.nota } : {}), parecidos: parecidos(titulos, a.titulo.vencimento, { indexador: idx, excluir: a.titulo }), lacunas };
+  }
+  const v = lerVencimento(vencimento);
+  if (v) return { ...info, titulo: null, prazoProcurado: v.iso || String(v.ano), parecidos: parecidos(titulos, v.iso || `${v.ano}-07-01`, { indexador: idx }), lacunas };
+  return { ...info, titulo: null, lista: titulos.filter((t) => !idx || t.indexador === idx).map(({ nome, tipo, vencimento: venc, taxaCompraTexto }) => ({ nome, tipo, vencimento: venc, taxaCompraTexto })), lacunas };
 }

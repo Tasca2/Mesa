@@ -11,7 +11,7 @@ import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from '@model
 import { z } from 'zod';
 import { gerarCarrossel, gerarDocumento, gerarApresentacao, pastaBase } from './gerador.mjs';
 import { NOMES_LAYOUT, NOMES_ICONE, NOMES_ILUSTRACAO } from './layouts.mjs';
-import { painelMacro, documentosCvm, RECORTES, REFERENCIAS } from './dados-publicos.mjs';
+import { painelMacro, documentosCvm, taxasTesouro, RECORTES, REFERENCIAS } from './dados-publicos.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const PASTA_SKILLS = process.env.METODO_SKILLS
@@ -119,7 +119,8 @@ const SKILLS_METODO = comSkill(PASTA_SKILLS);
 const pastaDa = (skill) => path.join(ROTINAS.includes(skill) ? PASTA_ROTINAS : PASTA_SKILLS, skill);
 
 const AREAS = 'Rotinas do dia (antes da reunião: cliente novo, primeira reunião, segunda reunião, pré-reunião (cliente atual); depois da reunião: pós-reunião; carteira: revisão de carteira, comparador de carteira; cliente: diagnóstico financeiro, relatório mensal ao cliente, proposta de assessoria (documento), follow-up da proposta; relacionamento: ritmo e indicação, explicar ao cliente, conversa sobre sucessão; prospecção: primeira mensagem, ligação de primeiro contato, sequência para lead novo, pitch e e-mail, objeção do cliente, retomar lead parado); ' +
-  'Mercado hoje (juros, inflação e câmbio, fato relevante, gráfico, ação, setor, fundo imobiliário, renda fixa, estudo e apresentação de ativo); ' +
+  'Mercado hoje (juros, inflação e câmbio, fato relevante, gráfico, ação, setor, fundo imobiliário, estudo e apresentação de ativo); ' +
+  'Produtos (raio-X de produto, comparar produtos, a antiga renda fixa); ' +
   'Marketing Profissional (Post para Instagram: estudar perfis de referência, ideias para postar hoje, semana de posts pronta, criar um post, como foram meus posts; editar um Reels; landing page)';
 const COMO_ATUALIZAR = 'Em toda tarefa enviada pela Mesa (mensagem que começa com [Mesa]), chame mesa_perfil para saber quem é o assessor, ' +
   'chame mesa_andamento antes de cada pedido ao assessor, dizendo em uma frase o que ele precisa responder ou anexar no chat, ' +
@@ -252,11 +253,11 @@ function buildServer() {
       title: 'Abrir a Mesa do Assessor',
       description:
         'Abre a Mesa do Assessor: painel interativo que guia o assessor de investimentos pelas rotinas do dia, pelo ' +
-        'mercado e pelos posts, até a skill certa. Use quando o usuário pedir a mesa ou o painel, ou não souber por onde ' +
+        'mercado, pelos produtos e pelos posts, até a skill certa. Use quando o usuário pedir a mesa ou o painel, ou não souber por onde ' +
         'começar. O parâmetro opcional area abre o painel direto numa área.',
       inputSchema: {
-        area: z.enum(['rotinas', 'mercado', 'instagram']).optional()
-          .describe('Área para abrir direto: rotinas, mercado ou instagram'),
+        area: z.enum(['rotinas', 'mercado', 'produtos', 'instagram']).optional()
+          .describe('Área para abrir direto: rotinas, mercado, produtos ou instagram'),
       },
       annotations: { readOnlyHint: true },
       _meta: { ui: { resourceUri: PAINEL_URI } },
@@ -799,6 +800,34 @@ function buildServer() {
         return { content: [{ type: 'text', text: JSON.stringify(r) }], structuredContent: r };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui consultar a CVM agora: ${e?.message ?? e}. Peça ao assessor o texto, o link ou o PDF do comunicado.` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'taxas_tesouro',
+    {
+      title: 'Taxas e preços do Tesouro Direto (Tesouro Transparente)',
+      description:
+        'Lê o arquivo oficial de preços e taxas do Tesouro Direto (Tesouro Transparente, guardado no dia) e devolve a última data base. ' +
+        'Para um título: taxa de compra e de venda já com o indexador escrito (taxaCompraTexto, por exemplo "IPCA + 7,76% ao ano"), preço (PU), forma de pagamento, dias até o vencimento ' +
+        'e, em parecidos, o título de vencimento mais perto de cada tipo: a referência do "título público de prazo parecido" para comparar CDB, LCI, LCA, debênture ou fundo na mesma base. ' +
+        'Aceita o nome do site ("Tesouro IPCA+ 2035", "Prefixado 2029", "Renda+ 2030", "Educa+ 2027") e os antigos (LTN, LFT, NTN-B, NTN-B Principal, NTN-F). ' +
+        'No Renda+ e no Educa+ o ano do nome é o início da renda mensal, não o vencimento. Sem título e com vencimento: os títulos de prazo parecido com essa data. Sem nada: a lista do dia. ' +
+        'Cite a fonte e a data base que vierem na resposta. O arquivo não diz se o título está à venda hoje: não diga que está disponível para compra.',
+      inputSchema: {
+        titulo: z.string().max(120).optional().describe('Nome do título, ex.: Tesouro IPCA+ 2035, Prefixado 2029, Renda+ 2030, NTN-B 2045'),
+        vencimento: z.string().max(20).optional().describe('Data de vencimento DD/MM/AAAA. Com título, escolhe entre títulos do mesmo tipo; sem título, é o prazo do produto a comparar'),
+        indexador: z.enum(['prefixado', 'ipca', 'selic', 'igpm']).optional().describe('Restringe os títulos parecidos e a lista a um indexador'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ titulo, vencimento, indexador }) => {
+      try {
+        const r = await taxasTesouro({ titulo, vencimento, indexador }, { pastaCache: path.join(PASTA_PERFIL, 'cache') });
+        return { content: [{ type: 'text', text: JSON.stringify(r) }], structuredContent: r };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: `Não consegui ler o arquivo do Tesouro agora: ${e?.message ?? e}. Marque o título público de prazo parecido como sem dado, sem estimar.` }] };
       }
     },
   );

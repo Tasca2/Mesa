@@ -41,7 +41,7 @@ Chame `mesa_perfil` uma vez antes da primeira pergunta. Com `configurado: true`,
 
 ### Área e tarefa
 
-Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta por vez e no máximo 4 opções: área (Rotinas do dia · Mercado hoje · Marketing Profissional), grupo e tarefa.
+Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta por vez e no máximo 4 opções: área (Rotinas do dia · Mercado hoje · Produtos · Marketing Profissional), grupo e tarefa.
 
 | Tarefa | Carregar com `carregar_metodo` |
 |---|---|
@@ -72,7 +72,8 @@ Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta 
 | Analisar uma ação | `fundamentalista-metodo` |
 | Comparar o setor | `comparativo-setorial` |
 | Fundo imobiliário | `analise-fii` |
-| Renda fixa | `comparacao-renda-fixa` |
+| Raio-X de produto | `produto-raio-x` e `leitura-de-lamina` |
+| Comparar produtos (antiga Renda fixa) | `comparacao-renda-fixa` |
 | Estudar perfis de referência · Como foram meus posts | `pauta-de-conteudo` |
 | Ideias para postar hoje | `pauta-de-conteudo` (e `macro-brasil` para o gatilho do dia) |
 | Semana de posts pronta | `calendario-de-conteudo` (e `pauta-de-conteudo` para os temas) |
