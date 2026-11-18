@@ -11,7 +11,7 @@ import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from '@model
 import { z } from 'zod';
 import { gerarCarrossel, gerarDocumento, gerarApresentacao, pastaBase } from './gerador.mjs';
 import { NOMES_LAYOUT, NOMES_ICONE, NOMES_ILUSTRACAO } from './layouts.mjs';
-import { painelMacro, documentosCvm, RECORTES, REFERENCIAS } from './dados-publicos.mjs';
+import { painelMacro, documentosCvm, taxasTesouro, RECORTES, REFERENCIAS } from './dados-publicos.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const PASTA_SKILLS = process.env.METODO_SKILLS
@@ -783,6 +783,34 @@ function buildServer() {
         return { content: [{ type: 'text', text: JSON.stringify(r) }], structuredContent: r };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui consultar a CVM agora: ${e?.message ?? e}. Peça ao assessor o texto, o link ou o PDF do comunicado.` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'taxas_tesouro',
+    {
+      title: 'Taxas e preços do Tesouro Direto (Tesouro Transparente)',
+      description:
+        'Lê o arquivo oficial de preços e taxas do Tesouro Direto (Tesouro Transparente, guardado no dia) e devolve a última data base. ' +
+        'Para um título: taxa de compra e de venda já com o indexador escrito (taxaCompraTexto, por exemplo "IPCA + 7,76% ao ano"), preço (PU), forma de pagamento, dias até o vencimento ' +
+        'e, em parecidos, o título de vencimento mais perto de cada tipo: a referência do "título público de prazo parecido" para comparar CDB, LCI, LCA, debênture ou fundo na mesma base. ' +
+        'Aceita o nome do site ("Tesouro IPCA+ 2035", "Prefixado 2029", "Renda+ 2030", "Educa+ 2027") e os antigos (LTN, LFT, NTN-B, NTN-B Principal, NTN-F). ' +
+        'No Renda+ e no Educa+ o ano do nome é o início da renda mensal, não o vencimento. Sem título e com vencimento: os títulos de prazo parecido com essa data. Sem nada: a lista do dia. ' +
+        'Cite a fonte e a data base que vierem na resposta. O arquivo não diz se o título está à venda hoje: não diga que está disponível para compra.',
+      inputSchema: {
+        titulo: z.string().max(120).optional().describe('Nome do título, ex.: Tesouro IPCA+ 2035, Prefixado 2029, Renda+ 2030, NTN-B 2045'),
+        vencimento: z.string().max(20).optional().describe('Data de vencimento DD/MM/AAAA. Com título, escolhe entre títulos do mesmo tipo; sem título, é o prazo do produto a comparar'),
+        indexador: z.enum(['prefixado', 'ipca', 'selic', 'igpm']).optional().describe('Restringe os títulos parecidos e a lista a um indexador'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ titulo, vencimento, indexador }) => {
+      try {
+        const r = await taxasTesouro({ titulo, vencimento, indexador }, { pastaCache: path.join(PASTA_PERFIL, 'cache') });
+        return { content: [{ type: 'text', text: JSON.stringify(r) }], structuredContent: r };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: `Não consegui ler o arquivo do Tesouro agora: ${e?.message ?? e}. Marque o título público de prazo parecido como sem dado, sem estimar.` }] };
       }
     },
   );
