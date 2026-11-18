@@ -1,4 +1,4 @@
-// Revisão do passo 4 (plano 7.5, "Qual entrega usa o quê"): o Estudo de ativo pede os blocos
+// Revisão do passo 4 (plano 7.5, "Qual entrega usa o quê"): o Estudo de ativo e a Revisão de carteira pedem os blocos
 // novos da folha A4 e dos slides, nas duas telas, e as skills dizem como montar. Rodar: node --test bancada/*.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,6 +37,19 @@ for (const { nome, cat } of TELAS) {
     }
   });
 
+  test(`${nome} · revisão de carteira: o PDF leva só o relatório, com a rosca da política × atual e as bandas`, () => {
+    const l = itens(cat.montar('carteira', { resultado: ['PDF'] }, []).texto);
+    const r = l.find((x) => x.startsWith('Relatório'));
+    assert.match(r, /dentro ou fora da banda/);
+    assert.match(r, /No PDF \(mesa_documento, tipo carteira\), só o relatório: a rosca da política × atual \(gráfico rosca com as duas séries em % e as bandas\) já traz a tabela de desvio/);
+    // as outras entregas da revisão não mudam
+    assert.deepEqual(l.filter((x) => x !== r), [
+      'Resumo em 3 linhas: maior desvio, maior concentração e o que vence em 12 meses',
+      'Roteiro da conversa: leitura simples (3 a 5 frases, sem dizer o que fazer) e 3 perguntas, em peça separada',
+      'WhatsApp convidando o cliente para a revisão (até 4 linhas), em peça separada',
+      'Nota para o CRM (até 6 linhas), em peça separada',
+    ]);
+  });
 }
 
 test('skill estudo-de-ativo: tipo estudo, destaques, linha em base 100 com a série da ferramenta e os layouts novos', () => {
@@ -49,4 +62,13 @@ test('skill estudo-de-ativo: tipo estudo, destaques, linha em base 100 com a sé
   assert.match(mesa, /`capa: true`/);
   assert.match(mesa, /capa, numeros, linha, tabela, lista, comparativo, frase e fechamento/);
   assert.match(mesa, /Sem a série mensal, o histórico vai só na tabela/);
+});
+
+test('rotina portfolio-rebalance-review: em PDF, rosca com Política e Atual em % e bandas; o resto fica no chat', () => {
+  const s = ler('rotinas', 'portfolio-rebalance-review', 'SKILL.md');
+  const pdf = s.split('**Em PDF**')[1]?.split('\n')[0] ?? '';
+  assert.match(pdf, /`mesa_documento`, `tipo: "carteira"`/);
+  assert.match(pdf, /`grafico` `rosca` com duas séries em % \(`Política` e `Atual`, nesta ordem/);
+  assert.match(pdf, /`bandas`/);
+  assert.match(pdf, /Roteiro, WhatsApp, nota de CRM e Conferir ficam no chat, fora do PDF/);
 });

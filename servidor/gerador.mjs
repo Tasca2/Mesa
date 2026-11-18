@@ -379,15 +379,23 @@ function dadosDoGrafico(g, onde) {
   const tipo = g?.tipo;
   if (!['barras', 'barras-duplas', 'rosca', 'linha'].includes(tipo)) throw new Error(`${onde}: tipo de gráfico desconhecido (use barras, barras-duplas, rosca ou linha).`);
   let rotulos = (Array.isArray(g.rotulos) ? g.rotulos : []).map((r) => String(r ?? ''));
-  const max = tipo === 'linha' ? 3 : tipo === 'rosca' ? 1 : 2;
+  const max = tipo === 'linha' ? 3 : 2;
   let series = (Array.isArray(g.series) ? g.series : []).slice(0, max).map((s, k) => ({ nome: String(s?.nome || (k ? `Série ${k + 1}` : 'Valor')), valores: (s?.valores || []).map(numeroDe) }));
   if (!rotulos.length || !series.length) throw new Error(`${onde}: o gráfico precisa de rótulos e de pelo menos uma série.`);
   if (tipo === 'rosca' && rotulos.length > 8) throw new Error(`${onde}: a rosca aceita até 8 fatias.`);
   for (const s of series) {
     if (s.valores.length !== rotulos.length || s.valores.some((v) => !Number.isFinite(v))) throw new Error(`${onde}: a série "${s.nome}" precisa de um valor para cada rótulo (${rotulos.length}), só números.`);
   }
-  if (tipo === 'rosca' && series[0].valores.some((v) => v < 0)) throw new Error(`${onde}: a rosca só aceita valores positivos.`);
+  if (tipo === 'rosca' && series.some((s) => s.valores.some((v) => v < 0))) throw new Error(`${onde}: a rosca só aceita valores positivos.`);
   let unidade = String(g.unidade ?? '').trim(), casas;
+  if (tipo === 'rosca' && series.length === 2 && unidade !== '%') throw new Error(`${onde}: a rosca com duas séries (ex.: política × atual) compara participações: mande as duas séries em %, cada uma somando 100%.`);
+  // Bandas de tolerância (ex.: política × atual): uma por rótulo, na unidade do gráfico (em %, pontos percentuais).
+  let bandas = null;
+  if (g.bandas !== undefined && g.bandas !== null) {
+    if (tipo === 'linha' || series.length !== 2) throw new Error(`${onde}: bandas só valem com duas séries (alvo e atual), em barras-duplas ou rosca.`);
+    bandas = (Array.isArray(g.bandas) ? g.bandas : []).map(numeroDe);
+    if (bandas.length !== rotulos.length || bandas.some((b) => !Number.isFinite(b) || b < 0)) throw new Error(`${onde}: mande uma banda para cada rótulo (${rotulos.length}), em números a partir de zero.`);
+  }
   if (tipo === 'rosca' && unidade === '%') {
     for (const s of series) { const soma = s.valores.reduce((a, v) => a + v, 0); if (Math.abs(soma - 100) > 1) throw new Error(`${onde}: ${somaRuim(soma)}.`); }
   }
@@ -407,7 +415,7 @@ function dadosDoGrafico(g, onde) {
   }
   const fmt = formatador(unidade, casas);
   const unidadeDif = unidade === '%' ? 'p.p.' : unidade;
-  return { tipo, rotulos, series, unidade, fmt, fmtDif: formatador(unidadeDif, casas), base100: tipo === 'linha' && !!(g.retornos || g.base100) };
+  return { tipo, rotulos, series, unidade, fmt, fmtDif: formatador(unidadeDif, casas), unidadeDif, bandas, base100: tipo === 'linha' && !!(g.retornos || g.base100) };
 }
 
 const svgTexto = (x, y, txt, attrs = '') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}"${attrs}>${esc(txt)}</text>`;
@@ -433,6 +441,7 @@ function svgBarras(d, cores) {
 }
 
 function svgRosca(d, cores) {
+  if (d.series.length === 2) return svgRoscaDupla(d, cores);
   const LARG = 680, R = 88, r = 54, cx = 100, vals = d.series[0].valores, total = vals.reduce((a, v) => a + v, 0) || 1;
   const linhaLeg = 25, alto = Math.max(200, d.rotulos.length * linhaLeg + 12);
   const ponto = (ang, raio) => [cx + raio * Math.cos(ang), (alto / 2) + raio * Math.sin(ang)];
@@ -452,6 +461,40 @@ function svgRosca(d, cores) {
     o += `<rect x="236" y="${(y - 10).toFixed(1)}" width="11" height="11" rx="2" fill="${cores[k]}"/>` + svgTexto(256, y, rot, ' class="cat"');
     o += svgTexto(LARG - (d.unidade === '%' ? 4 : 64), y, d.fmt(vals[k]), ` class="gv" data-s="0" data-i="${k}" text-anchor="end"`);
     if (d.unidade !== '%') o += svgTexto(LARG - 4, y, `${((vals[k] / total) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`, ' class="gp" text-anchor="end"');
+  });
+  return `<svg viewBox="0 0 ${LARG} ${alto}" width="100%" role="img">${o}</svg>`;
+}
+
+// Fatias de uma rosca centrada em (cx, cy).
+function fatiasRosca(vals, cores, cx, cy, R, r) {
+  const total = vals.reduce((a, v) => a + v, 0) || 1, ponto = (ang, raio) => [cx + raio * Math.cos(ang), cy + raio * Math.sin(ang)];
+  let o = '', ang = -Math.PI / 2;
+  vals.forEach((v, k) => {
+    const f = v / total;
+    if (f <= 0) return;
+    if (f >= 0.9999) { o += `<circle class="fatia" cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none" stroke="${cores[k]}" stroke-width="${R - r}"/>`; return; }
+    const a2 = ang + f * 2 * Math.PI, g = f > 0.5 ? 1 : 0;
+    const [x1, y1] = ponto(ang, R), [x2, y2] = ponto(a2, R), [x3, y3] = ponto(a2, r), [x4, y4] = ponto(ang, r);
+    o += `<path class="fatia" d="M${x1.toFixed(2)} ${y1.toFixed(2)}A${R} ${R} 0 ${g} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}L${x3.toFixed(2)} ${y3.toFixed(2)}A${r} ${r} 0 ${g} 0 ${x4.toFixed(2)} ${y4.toFixed(2)}Z" fill="${cores[k]}" stroke="#fff" stroke-width="1.5"/>`;
+    ang = a2;
+  });
+  return o;
+}
+
+function svgRoscaDupla(d, cores) {
+  const LARG = 680, R = 62, r = 38, linhaLeg = 25, n = d.rotulos.length;
+  const alto = Math.max(186, n * linhaLeg + 40), cy = (alto - 22) / 2;
+  let o = '';
+  d.series.forEach((s, k) => {
+    const cx = 70 + k * 150;
+    o += fatiasRosca(s.valores, cores, cx, cy, R, r) + svgTexto(cx, cy + R + 18, s.nome, ' class="cat" text-anchor="middle"');
+  });
+  const y0 = (alto - n * linhaLeg) / 2 + 20, colunas = [604, LARG - 4];
+  d.series.forEach((s, k) => { o += svgTexto(colunas[k], y0 - 22, s.nome, ' class="gp" text-anchor="end"'); });
+  d.rotulos.forEach((rot, i) => {
+    const y = y0 + i * linhaLeg;
+    o += `<rect x="300" y="${(y - 10).toFixed(1)}" width="11" height="11" rx="2" fill="${cores[i]}"/>` + svgTexto(320, y, rot, ' class="cat"');
+    d.series.forEach((s, k) => { o += svgTexto(colunas[k], y, d.fmt(s.valores[i]), ` class="gv" data-s="${k}" data-i="${i}" text-anchor="end"`); });
   });
   return `<svg viewBox="0 0 ${LARG} ${alto}" width="100%" role="img">${o}</svg>`;
 }
@@ -494,15 +537,20 @@ function blocoGrafico(g, t, onde) {
   const figura = `<figure class="graf">${g.titulo ? `<div class="cap">${esc(g.titulo)}</div>` : ''}${svg}${legenda}</figure>`;
   if (g.tabela === false) return `<div class="bloco-graf">${figura}</div>`;
   const dois = d.tipo !== 'linha' && d.series.length === 2;
-  const cab = [esc(g.categoria || (d.tipo === 'linha' ? 'Período' : 'Item')), ...d.series.map((s) => esc(s.nome)), ...(dois ? ['Diferença'] : []), ...(d.tipo === 'rosca' && d.unidade !== '%' ? ['Participação'] : [])];
+  const cab = [esc(g.categoria || (d.tipo === 'linha' ? 'Período' : 'Item')), ...d.series.map((s) => esc(s.nome)), ...(dois ? ['Diferença'] : []), ...(d.bandas ? ['Banda', 'Situação'] : []), ...(d.tipo === 'rosca' && d.unidade !== '%' ? ['Participação'] : [])];
+  // Situação: dentro quando o desvio (B − A) cabe na banda; a banda sai com as casas com que veio.
+  const banda = (i) => {
+    const b = d.bandas[i], fora = Math.abs(d.series[1].valores[i] - d.series[0].valores[i]) > b + 1e-9;
+    return `<td class="n">±${formatador(d.unidadeDif, Math.min(2, casasDe(b)))(b)}</td><td class="sit${fora ? ' fora' : ''}">${fora ? 'Fora' : 'Dentro'}</td>`;
+  };
   const total = d.tipo === 'rosca' ? g.total !== false : g.total === true && d.tipo !== 'linha';
   const somaRosca = d.series[0].valores.reduce((a, v) => a + v, 0) || 1;
   const dif = (a, b) => { const v = b - a; return v > 0 ? ['n up', `▲ ${d.fmtDif(v)}`] : v < 0 ? ['n down', `▼ ${d.fmtDif(-v)}`] : ['n', d.fmtDif(0)]; };
   const linhas = d.rotulos.map((r, i) => `<tr><td>${esc(r)}</td>${d.series.map((s, k) => `<td class="n" data-s="${k}" data-i="${i}">${d.fmt(s.valores[i])}</td>`).join('')}` +
-    (dois ? (([c, txt]) => `<td class="${c}">${txt}</td>`)(dif(d.series[0].valores[i], d.series[1].valores[i])) : '') +
+    (dois ? (([c, txt]) => `<td class="${c}">${txt}</td>`)(dif(d.series[0].valores[i], d.series[1].valores[i])) : '') + (d.bandas ? banda(i) : '') +
     (d.tipo === 'rosca' && d.unidade !== '%' ? `<td class="n">${((d.series[0].valores[i] / somaRosca) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</td>` : '') + '</tr>').join('');
   const somas = d.series.map((s) => s.valores.reduce((a, v) => a + v, 0));
-  const linhaTotal = total ? `<tr class="total"><td>Total</td>${somas.map((v) => `<td class="n">${d.fmt(v)}</td>`).join('')}${dois ? '<td class="n"></td>' : ''}${d.tipo === 'rosca' && d.unidade !== '%' ? '<td class="n">100,0%</td>' : ''}</tr>` : '';
+  const linhaTotal = total ? `<tr class="total"><td>Total</td>${somas.map((v) => `<td class="n">${d.fmt(v)}</td>`).join('')}${dois ? '<td class="n"></td>' : ''}${d.bandas ? '<td class="n"></td><td></td>' : ''}${d.tipo === 'rosca' && d.unidade !== '%' ? '<td class="n">100,0%</td>' : ''}</tr>` : '';
   const nLinhas = d.rotulos.length + (total ? 1 : 0);
   const tabela = `<table class="tg${nLinhas <= 12 ? ' curta' : ''}"><thead><tr>${cab.map((h, c) => `<th${c ? ' class="n"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${linhas}${linhaTotal}</tbody></table>`;
   return `<div class="bloco-graf">${figura}${tabela}</div>`;
@@ -579,7 +627,7 @@ table{border-collapse:separate;border-spacing:0;width:100%;margin:5px 0 12px;fon
 th,td{padding:5px 9px;text-align:left;vertical-align:top;border-bottom:1px solid #e6e8ec}th{background:${t.cab};color:${t.cabTx};font-size:7.8pt;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
 th:first-child{border-top-left-radius:7px}th:last-child{border-top-right-radius:7px}tbody tr:last-child td{border-bottom:0}tbody tr:nth-child(even) td{background:${t.zebra}}tr{break-inside:avoid}
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}tr.total td{font-weight:700;background:${t.total};border-top:1.5px solid ${t.forte}}table.curta{break-inside:avoid}
-td.up{color:#1f7a3a;font-weight:600}td.down{color:#b3261e;font-weight:600}td.mid{color:#a86a00;font-weight:600}
+td.up{color:#1f7a3a;font-weight:600}td.down{color:#b3261e;font-weight:600}td.sit{color:${t.sub}}td.sit.fora{color:${t.forte};font-weight:700}td.mid{color:#a86a00;font-weight:600}
 mark{background:#fff1c2;color:#6a4b00;padding:0 4px;border-radius:3px;font-size:.92em}
 .bloco-graf{margin:2px 0 6px}figure.graf{margin:0 0 6px;padding:10px 14px 8px;border:1px solid ${t.linha};border-radius:10px;break-inside:avoid}figure.graf svg{display:block;width:100%;height:auto}
 figure.graf .cap{font-size:8.6pt;font-weight:700;color:${t.forte};margin-bottom:8px}figcaption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 14px;align-items:center;font-size:8pt;color:${t.suave};margin-top:6px}

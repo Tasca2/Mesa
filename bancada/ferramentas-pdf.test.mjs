@@ -66,6 +66,7 @@ test('mesa_documento e mesa_apresentacao aceitam os campos novos e geram o PDF',
     const doc = lista.find((f) => f.name === 'mesa_documento').inputSchema;
     for (const campo of ['cliente', 'dataBase', 'capa', 'destaques', 'tipo', 'tema', 'termosConfirmados']) assert.ok(doc.properties[campo], `mesa_documento sem o campo ${campo}`);
     assert.ok(doc.properties.secoes.items.properties.grafico, 'mesa_documento sem gráfico por seção');
+    assert.ok(doc.properties.secoes.items.properties.grafico.properties?.bandas, 'mesa_documento sem as bandas do gráfico (revisão de carteira)');
     const apr = lista.find((f) => f.name === 'mesa_apresentacao').inputSchema;
     for (const campo of ['cliente', 'tipo']) assert.ok(apr.properties[campo], `mesa_apresentacao sem o campo ${campo}`);
     for (const l of ['rosca', 'linha', 'comparativo']) assert.ok(apr.properties.slides.items.properties.layout.enum.includes(l));

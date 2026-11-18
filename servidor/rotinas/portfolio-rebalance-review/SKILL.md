@@ -35,6 +35,8 @@ Falta algo essencial? Pergunte **uma** coisa e entregue o resto com `[CONFERIR]`
 - `nota-crm` — o que foi medido e o próximo passo, em até 6 linhas.
 **Conferir** — dados, banda e data-base que o assessor valida.
 
+**Em PDF** (Resultado PDF): gere a peça `relatorio` com `mesa_documento`, `tipo: "carteira"`, `cliente` (apelido ou iniciais) e `dataBase`. O desvio vai em `grafico` `rosca` com duas séries em % (`Política` e `Atual`, nesta ordem, cada uma somando 100%), `categoria` "Classe", `bandas` com a tolerância de cada classe em pontos percentuais e `fonte` com a data-base: o código desenha as duas roscas e, embaixo, a tabela com a diferença, a banda e a situação (dentro ou fora), então não repita essa tabela no texto. Sem banda informada, mande o gráfico sem `bandas` e deixe a banda no Conferir. Concentração e liquidez seguem em tabelas curtas no texto. Roteiro, WhatsApp, nota de CRM e Conferir ficam no chat, fora do PDF.
+
 ## Exemplo
 Bom (convite): "Oi, Paula! Fiz a revisão trimestral da sua carteira e tem dois pontos que quero conversar com você: a parte em renda variável e o que vence ano que vem. Consegue 20 minutos na quinta ou na sexta?"
 Ruim: "Sua carteira está desbalanceada, precisamos vender renda variável urgente." (ordem de venda e pressão).

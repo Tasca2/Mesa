@@ -185,3 +185,51 @@ test('A4: rosca em % que não soma 100 não vira PDF; em R$ qualquer soma vale',
   assert.doesNotThrow(() => rosca([33.3, 33.3, 33.3]), 'arredondamento de até 1 p.p. passa');
   assert.doesNotThrow(() => rosca([45, 45], 'R$'));
 });
+
+// Revisão de carteira (plano 7.5): rosca da política × atual e tabela de desvio com as bandas.
+// Números de um cliente de teste (Cliente Teste), não de uma carteira real.
+const REVISAO = {
+  tipo: 'rosca', unidade: '%', categoria: 'Classe',
+  rotulos: ['Renda fixa', 'Ações', 'Fundos imobiliários', 'Exterior'],
+  series: [{ nome: 'Política', valores: [50, 25, 15, 10] }, { nome: 'Atual', valores: [62, 20, 12, 6] }],
+  bandas: [10, 5, 5, 2.5],
+  fonte: 'posição do Cliente Teste em 31/10/2026 e a política de investimento dele',
+};
+const linhasDaTabela = (html) => [...html.slice(html.indexOf('<tbody>')).matchAll(/<tr>(.*?)<\/tr>/g)]
+  .map(([, r]) => [...r.matchAll(/<td[^>]*>([^<]*)<\/td>/g)].map(([, c]) => c));
+
+test('rosca da política × atual: duas roscas, cada número do desenho igual ao da tabela, diferença em p.p.', () => {
+  const html = montarDocumento({ titulo: 'Revisão de carteira', tipo: 'carteira', secoes: [{ titulo: 'Desvio', grafico: { ...REVISAO, bandas: undefined } }] }, MARCA);
+  const svg = html.slice(html.indexOf('<figure'), html.indexOf('</figure>'));
+  assert.equal((svg.match(/class="fatia"/g) || []).length, 8, 'quatro fatias em cada rosca');
+  assert.match(svg, />Política</); assert.match(svg, />Atual</);
+  const g = doGrafico(html), t = daTabela(html);
+  assert.equal(g.size, 8);
+  for (const [k, v] of g) assert.equal(t.get(k), v, `gráfico e tabela diferentes em ${k}`);
+  assert.deepEqual([...html.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]), ['Classe', 'Política', 'Atual', 'Diferença']);
+  assert.deepEqual(linhasDaTabela(html)[0], ['Renda fixa', '50%', '62%', '▲ 12 p.p.']);
+  assert.match(html, /<tr class="total"><td>Total<\/td><td class="n">100%<\/td><td class="n">100%<\/td>/);
+});
+
+test('bandas: a tabela ganha Banda e Situação, feitas pelo código (fora quando o desvio passa da banda)', () => {
+  const html = montarDocumento({ titulo: 'Revisão de carteira', tipo: 'carteira', secoes: [{ titulo: 'Desvio', grafico: REVISAO }] }, MARCA);
+  assert.deepEqual([...html.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]), ['Classe', 'Política', 'Atual', 'Diferença', 'Banda', 'Situação']);
+  assert.deepEqual(linhasDaTabela(html), [
+    ['Renda fixa', '50%', '62%', '▲ 12 p.p.', '±10 p.p.', 'Fora'],
+    ['Ações', '25%', '20%', '▼ 5 p.p.', '±5 p.p.', 'Dentro'],
+    ['Fundos imobiliários', '15%', '12%', '▼ 3 p.p.', '±5 p.p.', 'Dentro'],
+    ['Exterior', '10%', '6%', '▼ 4 p.p.', '±2,5 p.p.', 'Fora'],
+  ]);
+  // barras-duplas também aceitam bandas (alvo e atual em barras)
+  const barras = montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, tipo: 'barras-duplas' } }] }, MARCA);
+  assert.deepEqual(linhasDaTabela(barras)[3], ['Exterior', '10%', '6%', '▼ 4 p.p.', '±2,5 p.p.', 'Fora']);
+});
+
+test('rosca com duas séries só em %, e bandas só com duas séries, uma por rótulo', () => {
+  const emReais = { ...REVISAO, unidade: 'R$', bandas: undefined, series: [{ nome: 'Política', valores: [500, 250, 150, 100] }, { nome: 'Atual', valores: [620, 200, 120, 60] }] };
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: emReais }] }, MARCA), /duas séries.*em %/);
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, bandas: [10, 5] } }] }, MARCA), /uma banda para cada rótulo/);
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, bandas: [10, 5, -1, 2] } }] }, MARCA), /uma banda para cada rótulo/);
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, series: [REVISAO.series[1]] } }] }, MARCA), /bandas só valem com duas séries/);
+  assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, series: [REVISAO.series[0], { nome: 'Atual', valores: [62, 20, 12, 1] }] } }] }, MARCA), /soma 95%/);
+});
