@@ -64,13 +64,27 @@ for (const { nome, cat } of TELAS) {
     assert.equal(cat.montar('macro', MATERIAL, []).linha, 'Painel do dia: juros, inflação, dólar, expectativas e agenda.');
   });
 
-  test(`${nome} · fato relevante: campos de empresa, texto, tese e posição do cliente`, () => {
+  test(`${nome} · fato relevante: campos de empresa, qual comunicado, texto opcional, tese e posição do cliente`, () => {
     assert.deepEqual(campos(cat, 'fato'), [
       ['Empresa (nome ou ticker)', null, null],
-      ['Texto integral do comunicado ou link da página oficial', null, null],
+      ['Qual comunicado', ['O mais recente', 'Quero escolher na lista dos últimos 5', 'Vou colar o texto', 'Vou anexar o PDF'], 'O mais recente'],
+      ['Texto ou link do comunicado', null, null],
       ['Minha tese ou motivo de acompanhar a empresa', null, null],
       ['O cliente tem o papel?', ['Tem, posição relevante', 'Tem, posição pequena', 'Não tem, está olhando', 'Não sei'], null],
     ]);
+    const f = cat.montar('fato', MATERIAL, []).campos;
+    assert.equal(f[2].opcional, true, 'o texto do comunicado é opcional (plano 5.4)');
+    assert.match(f[1].dica, /anexe o arquivo na conversa/, 'a escolha "Vou anexar o PDF" diz onde anexar');
+  });
+
+  test(`${nome} · fato relevante: "Vou anexar o PDF" chega ao pedido, e a fonte trata o PDF anexado como o documento`, () => {
+    const f = cat.montar('fato', MATERIAL, []).campos;
+    const valores = []; valores[0] = 'PETR4'; valores[f.findIndex((x) => x.rotulo === 'Qual comunicado')] = 'Vou anexar o PDF';
+    const t = cat.montar('fato', MATERIAL, valores).texto;
+    assert.ok(t.includes('- Qual comunicado: Vou anexar o PDF'), 'a escolha não chegou ao pedido');
+    assert.ok(t.includes('- Texto ou link do comunicado: (não informado, é opcional)'));
+    assert.ok(t.includes('Se colei o texto ou anexei o PDF, esse é o documento.'), 'a fonte não fala do PDF anexado');
+    assert.ok(cat.montar('fato', MATERIAL, []).texto.includes('- Qual comunicado: O mais recente'), 'sem escolha, vale o mais recente');
   });
 
   test(`${nome} · gráfico: ativo, período, escala e comparação em campos separados`, () => {
@@ -80,8 +94,19 @@ for (const { nome, cat } of TELAS) {
       ['Escala', ['Diário', 'Semanal', 'Mensal'], null],
       ['Comparar com', ['IBOV', 'IFIX', 'CDI', 'Dólar'], null],
       ['Indicadores que quero ver', ['Médias móveis', 'IFR', 'Volume', 'Bandas de Bollinger'], null],
-      ['Imagem do gráfico, série ou descrição', null, null],
+      ['Imagem do gráfico', ['Sem imagem', 'Vou anexar a imagem'], 'Sem imagem'],
     ]);
+    assert.match(cat.montar('grafico', MATERIAL, []).campos.at(-1).dica, /anexe a imagem na conversa/, 'a imagem vem pelo anexo da conversa (plano 5.5)');
+  });
+
+  test(`${nome} · gráfico: com a imagem anexada, a fonte manda ler a imagem primeiro e depois chamar a analise_ativo`, () => {
+    const t = cat.montar('grafico', MATERIAL, []).texto;
+    assert.ok(t.includes('Se anexei a imagem do gráfico, leia a imagem primeiro e diga o que não dá para ler nela. Chame analise_ativo com o ticker'), 'a fonte não fala da imagem anexada');
+    assert.ok(t.includes('- Imagem do gráfico: Sem imagem'));
+  });
+
+  test(`${nome} · material para o cliente: o contexto manda gerar o PDF com mesa_documento, também nas tarefas sem a pergunta Resultado`, () => {
+    for (const id of ['macro', 'fato', 'grafico']) assert.ok(cat.montar(id, MATERIAL, []).contexto.includes('Se o uso for "Material para o cliente", gere também o PDF para o cliente com mesa_documento'), id);
   });
 
   test(`${nome} · estudo: não pergunta o uso, e uma resposta de uso que tenha ficado não troca a entrega`, () => {
@@ -153,7 +178,7 @@ test('a skill de gráfico não cita mais o campo único "Ativo, período e escal
 // tem o seu próprio corte (8.000), que este passo não mexe: fica como pergunta para quem mantém o painel.
 test('um comunicado de 20.000 caracteres colado no campo chega inteiro ao Claude pela janela', () => {
   const { cat, arq } = TELAS[0];
-  const posicao = cat.montar('fato', MATERIAL, []).campos.findIndex((f) => /comunicado/i.test(f.rotulo));
+  const posicao = cat.montar('fato', MATERIAL, []).campos.findIndex((f) => /^Texto/i.test(f.rotulo));
   const valores = []; valores[posicao] = 'x'.repeat(20000);
   const tamanho = cat.montar('fato', MATERIAL, valores).texto.length;
   assert.ok(corteDaTela(arq) >= tamanho, `a janela corta em ${corteDaTela(arq)} e o pedido tem ${tamanho}`);
