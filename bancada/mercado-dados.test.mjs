@@ -48,7 +48,7 @@ for (const { nome, cat } of TELAS) {
 
   test(`${nome} · fato relevante: a fonte usa documentos_cvm, avisa da base semanal e mantém a regra do texto que não abre`, () => {
     const f = fonteDe(pedido(cat, 'fato'));
-    assert.ok(f.startsWith('Se colei o texto, esse é o documento. Se informei só a empresa, chame documentos_cvm'), f.slice(0, 120));
+    assert.ok(f.startsWith('Se colei o texto ou anexei o PDF, esse é o documento. Se informei só a empresa, chame documentos_cvm'), f.slice(0, 120));
     assert.ok(f.includes('as categorias Fato Relevante e Comunicado ao Mercado'));
     assert.ok(f.includes('baixe pelo protocolo o documento escolhido para ler o texto integral'));
     assert.ok(f.includes('A base da CVM é atualizada uma vez por semana: se o comunicado for de hoje e não estiver na lista, diga isso e me peça o texto, o link ou o PDF'));
