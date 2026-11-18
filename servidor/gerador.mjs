@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { montarPaginas, imagemEmbutida, numeroDe, formatador, casasDe, problemasDosSlides, W, H } from './layouts.mjs';
+import { montarPaginas, imagemEmbutida, numeroDe, formatador, casasDe, problemasDosSlides, somaRuim, W, H } from './layouts.mjs';
 
 export const ARQUIVO_GERACAO = path.join(os.tmpdir(), 'mesa-do-assessor-geracao.json');
 
@@ -388,6 +388,9 @@ function dadosDoGrafico(g, onde) {
   }
   if (tipo === 'rosca' && series[0].valores.some((v) => v < 0)) throw new Error(`${onde}: a rosca só aceita valores positivos.`);
   let unidade = String(g.unidade ?? '').trim(), casas;
+  if (tipo === 'rosca' && unidade === '%') {
+    for (const s of series) { const soma = s.valores.reduce((a, v) => a + v, 0); if (Math.abs(soma - 100) > 1) throw new Error(`${onde}: ${somaRuim(soma)}.`); }
+  }
   if (tipo === 'linha' && (g.retornos || g.base100)) {
     if (g.retornos) {
       rotulos = [String(g.inicio || 'Início'), ...rotulos];

@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { carregar } from './catalogo.mjs';
@@ -80,6 +80,25 @@ test('mesa_documento e mesa_apresentacao aceitam os campos novos e geram o PDF',
     const pdf = JSON.parse(r1.result.content[0].text).pdf;
     assert.ok(pdf.startsWith(tmp), 'o PDF saiu fora da pasta temporária');
     assert.ok(readFileSync(pdf).subarray(0, 5).toString() === '%PDF-');
+
+    // O rodapé de compliance e "N de M" moram nas margens da página (@page). Conferido no texto do PDF que o navegador gerou
+    // (pdftotext, do Poppler): toda página leva a frase e o número.
+    const paginasDoPdf = (arq) => execFileSync('pdftotext', ['-enc', 'UTF-8', arq, '-'], { encoding: 'utf8' }).split('\f').filter((p) => p.trim());
+    const pags = paginasDoPdf(pdf);
+    assert.ok(pags.length >= 1);
+    pags.forEach((p, k) => {
+      assert.match(p, /Material informativo e educacional\. Não é recomendação de compra, venda ou alocação de ativos, nem promessa de retorno\./, `página ${k + 1} sem o rodapé de compliance`);
+      assert.match(p, new RegExp(`\\b${k + 1} de ${pags.length}\\b`), `página ${k + 1} sem "${k + 1} de ${pags.length}"`);
+    });
+
+    // Capa da folha A4 com o cargo do perfil (atuacao), como na capa dos slides.
+    const salvo = await s.chamar('tools/call', { name: 'mesa_perfil', arguments: { salvar: { nome: 'Assessor Teste', atuacao: 'Assessor de investimento', escritorio: 'Escritório Teste' } } });
+    assert.ok(!salvo.result?.isError, JSON.stringify(salvo).slice(0, 300));
+    const r3 = await s.chamar('tools/call', { name: 'mesa_documento', arguments: { titulo: 'Proposta de assessoria', capa: true, tipo: 'proposta', cliente: 'Cliente Teste', secoes: [{ titulo: 'Resumo', texto: '**Texto.**' }] } });
+    assert.ok(!r3.result.isError, r3.result.content?.[0]?.text);
+    const capa = paginasDoPdf(JSON.parse(r3.result.content[0].text).pdf)[0];
+    assert.match(capa, /Assessor Teste/);
+    assert.match(capa, /Assessor de investimento/, 'a capa não mostra o cargo do perfil');
 
     const antigo = await s.chamar('tools/call', { name: 'mesa_documento', arguments: { titulo: 'Relatório', secoes: [{ titulo: 'Resumo', texto: '**Frase.**\n\n- item' }] } });
     assert.ok(!antigo.result.isError, 'a chamada antiga, sem campos novos, falhou');

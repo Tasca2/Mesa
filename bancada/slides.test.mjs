@@ -133,3 +133,22 @@ test('barras: valor que não é número, rótulo vazio, unidade que não é % e 
   assert.match(p([{ rotulo: 'a', valor: 10, valor2: 20 }, { rotulo: 'b', valor: 30 }]).join(' '), /"b".*segundo valor/);
   assert.match(p([]).join(' '), /pelo menos 1 item/);
 });
+
+test('rosca em % que não soma 100 vira erro antes do PDF', () => {
+  const r = (vs) => problemasDosSlides([{ layout: 'rosca', titulo: 'T', itens: vs.map((valor, k) => ({ rotulo: `Classe ${k + 1}`, valor })) }]).join(' ');
+  assert.match(r(['45%', '45%']), /soma 90%/);
+  assert.equal(r(['70%', '10%', '15%', '5%']), '');
+  assert.equal(r(['R$ 450.000', 'R$ 450.000']), '', 'em R$ a fatia é a parte do total');
+});
+
+test('comparativo: diferença em p.p. para "% a.a." e "% do CDI", e na mesma escala para "mi"', () => {
+  const h = pagina({ layout: 'comparativo', titulo: 'Custos e tamanho', legenda: ['Atual', 'Proposta'], itens: [
+    { rotulo: 'Taxa', valor: '0,5% a.a.', valor2: '1% a.a.' }, { rotulo: 'CDB', valor: '100% do CDI', valor2: '110% do CDI' },
+    { rotulo: 'Patrimônio', valor: 'R$ 1,2 mi', valor2: 'R$ 1,5 mi' }, { rotulo: 'Volume', valor: '1,2 mi', valor2: '1,5 mi' },
+    { rotulo: 'Misto', valor: '1% a.a.', valor2: '100% do CDI', texto: 'bases diferentes' }] });
+  assert.match(h, /class="dif[^"]*">\+0,5 p\.p\.</);
+  assert.match(h, /class="dif[^"]*">\+10 p\.p\.</);
+  assert.match(h, /class="dif[^"]*">\+R\$ 0,3 mi</);
+  assert.match(h, /class="dif[^"]*">\+0,3 mi</);
+  assert.match(h, /class="dif[^"]*">bases diferentes</);
+});

@@ -177,3 +177,11 @@ test('A4 de estudo e de mercado: rentabilidade ou retorno pedem o período na me
   assert.doesNotThrow(() => montarDocumento({ titulo: 'Estudo', tipo: 'mercado', secoes: [{ titulo: 'Histórico', texto: 'Retorno de 12,4%.', grafico: { ...COMPOSICAO, fonte: 'CaptaMais, 12 meses até out/2026' } }] }, MARCA), 'o período pode estar na fonte do gráfico da seção');
   assert.doesNotThrow(() => montarDocumento({ titulo: 'Relatório', tipo: 'relatorio', secoes: [{ texto: 'Rendimento de R$ 2.000 por mês.' }] }, MARCA), 'fora de estudo e mercado, o período não é exigido');
 });
+
+test('A4: rosca em % que não soma 100 não vira PDF; em R$ qualquer soma vale', () => {
+  const rosca = (valores, unidade = '%') => montarDocumento({ titulo: 'T', secoes: [{ titulo: 'Composição', grafico: { tipo: 'rosca', unidade, rotulos: valores.map((_, k) => `Classe ${k + 1}`), series: [{ nome: 'Atual', valores }] } }] }, MARCA);
+  assert.throws(() => rosca([45, 45]), /soma 90%.*100%/);
+  assert.throws(() => rosca([60, 50]), /soma 110%/);
+  assert.doesNotThrow(() => rosca([33.3, 33.3, 33.3]), 'arredondamento de até 1 p.p. passa');
+  assert.doesNotThrow(() => rosca([45, 45], 'R$'));
+});

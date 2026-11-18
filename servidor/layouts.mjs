@@ -33,23 +33,29 @@ export const casasDe = (v) => {
   if (s.includes('e')) { const [b, e] = s.split('e'); return Math.max(0, (b.split('.')[1] || '').length - Number(e)); }
   return (s.split('.')[1] || '').length;
 };
-// "70%", "R$ 1.234,56", "-0,5 p.p.", "1,2 mi", 12.5 -> { v, unidade, casas }; texto que não é número -> null.
+// "70%", "R$ 1.234,56", "-0,5 p.p.", "1,2 mi", "0,5% a.a.", "110% do CDI", 12.5 -> { v, unidade, casas, base, escala, escritas };
+// texto que não é número -> null. base: "aa", "am" ou "cdi" depois do %; escala: mil, mi ou bi; escritas: casas como escritas.
 export function lerNumero(x) {
-  if (typeof x === 'number') return Number.isFinite(x) ? { v: x, unidade: '', casas: casasDe(x) } : null;
+  if (typeof x === 'number') return Number.isFinite(x) ? { v: x, unidade: '', casas: casasDe(x), base: '', escala: '', escritas: casasDe(x) } : null;
   const s = String(x ?? '').replace(/ /g, ' ').trim();
-  const m = s.match(/^([+\-−–])?\s*(R\$|US\$|€)?\s*([+\-−–])?\s*(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?|\d+\.\d+)\s*(%|p\.\s?p\.|x|mil|mi|milh[aã]o|milh[oõ]es|bi|bilh[aã]o|bilh[oõ]es|pts?)?$/i);
+  const m = s.match(/^([+\-−–])?\s*(R\$|US\$|€)?\s*([+\-−–])?\s*(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?|\d+\.\d+)\s*(%|p\.\s?p\.|x|mil|mi|milh[aã]o|milh[oõ]es|bi|bilh[aã]o|bilh[oõ]es|pts?)?(?:\s*(a\.?\s?a\.?|a\.?\s?m\.?|ao ano|ao m[eê]s|do cdi|cdi))?$/i);
   if (!m) return null;
-  const [, s1, moeda, s2, corpo, suf] = m;
+  const [, s1, moeda, s2, corpo, suf, qual] = m;
   let txt = corpo, casas;
   if (corpo.includes(',')) { casas = corpo.split(',')[1].length; txt = corpo.replace(/\./g, '').replace(',', '.'); }
   else if (/^\d{1,3}(\.\d{3})+$/.test(corpo)) { casas = 0; txt = corpo.replace(/\./g, ''); }
   else casas = (corpo.split('.')[1] || '').length;
   let v = Number(txt);
+  const escritas = casas;
   const sufixo = String(suf || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s/g, '');
+  if (qual && sufixo !== '%') return null;
+  const escala = !MULTIPLICADOR[sufixo] ? '' : sufixo.startsWith('bi') ? 'bi' : sufixo === 'mil' ? 'mil' : 'mi';
   if (MULTIPLICADOR[sufixo]) { v *= MULTIPLICADOR[sufixo]; casas = casasDe(v); }
   if ([s1, s2].some((c) => c && c !== '+')) v = -v;
   const unidade = moeda || (sufixo === '%' ? '%' : sufixo === 'p.p.' ? 'p.p.' : sufixo === 'x' ? 'x' : /^pts?$/.test(sufixo) ? 'pts' : '');
-  return { v, unidade, casas };
+  const q = String(qual || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[\s.]/g, '');
+  const base = !q ? '' : q.includes('cdi') ? 'cdi' : q === 'aa' || q === 'aoano' ? 'aa' : 'am';
+  return { v, unidade, casas, base, escala, escritas };
 }
 export const numeroDe = (x) => lerNumero(x)?.v ?? NaN;
 export function formatador(unidade = '', casas = 0) {
@@ -63,14 +69,16 @@ export function formatador(unidade = '', casas = 0) {
   };
 }
 // Diferença B − A, calculada pelo código. Valores que não são número (ex.: "D+0") usam o texto do item.
+// Percentual vira p.p. (também "% a.a." e "% do CDI", quando A e B têm a mesma base); "mil", "mi" e "bi" ficam na escala escrita.
 function diferenca(a, b, texto) {
   const A = lerNumero(a), B = lerNumero(b);
   if (A && B && (!A.unidade || !B.unidade)) A.unidade = B.unidade = A.unidade || B.unidade;
-  if (!A || !B || A.unidade !== B.unidade) return { txt: String(texto || '—'), num: false };
-  const casas = Math.min(2, Math.max(A.casas, B.casas));
-  const d = B.v - A.v, f = formatador(A.unidade === '%' ? 'p.p.' : A.unidade, casas);
-  if (Math.abs(d) < 0.5 * 10 ** -casas) return { txt: f(0), num: true };
-  return { txt: (d > 0 ? '+' : '') + f(d), num: true };
+  if (!A || !B || A.unidade !== B.unidade || A.base !== B.base) return { txt: String(texto || '—'), num: false };
+  const escala = A.escala && A.escala === B.escala ? A.escala : '';
+  const casas = Math.min(2, escala ? Math.max(A.escritas, B.escritas) : Math.max(A.casas, B.casas));
+  const d = (B.v - A.v) / (escala ? MULTIPLICADOR[escala] : 1), f = formatador(A.unidade === '%' ? 'p.p.' : A.unidade, casas), e = escala ? ` ${escala}` : '';
+  if (Math.abs(d) < 0.5 * 10 ** -casas) return { txt: f(0) + e, num: true };
+  return { txt: (d > 0 ? '+' : '') + f(d) + e, num: true };
 }
 const passoBonito = (bruto) => { const p = 10 ** Math.floor(Math.log10(bruto || 1)), f = bruto / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
 // Tamanho conforme a quantidade de itens: menos itens, letra maior.
@@ -336,6 +344,8 @@ function serieLinha(s) {
   return { rotulos: rot, series: ser.map((x) => ({ ...x, valores: x.valores.map((v) => (v / x.valores[0]) * 100) })) };
 }
 
+// Rosca em % mostra a parte de cada fatia no total: se a soma não fecha 100 (folga de 1 p.p. de arredondamento), o anel mentiria.
+export const somaRuim = (soma) => `a rosca em % soma ${formatador('%', 1)(soma).replace(',0%', '%')}, e precisa somar 100%: acrescente a fatia que falta (ex.: "Outros") ou mande os valores em R$`;
 const temValor = (v) => v !== undefined && v !== null && String(v).trim() !== '';
 // Gráficos com número que não é número viram erro antes do PDF, com o motivo.
 export function problemasDosSlides(slides) {
@@ -347,6 +357,8 @@ export function problemasDosSlides(slides) {
       if (its.length < 2) out.push(`${onde}: a rosca precisa de pelo menos 2 itens`);
       for (const x of its) if (!(numeroDe(x.valor) >= 0)) out.push(`${onde}: o valor de "${x.rotulo || x.titulo || '?'}" precisa ser um número positivo (ex.: 70% ou R$ 1.000)`);
       if (its.length >= 2 && its.every((x) => numeroDe(x.valor) === 0)) out.push(`${onde}: todos os valores da rosca são zero`);
+      const soma = its.reduce((a, x) => a + (numeroDe(x.valor) || 0), 0);
+      if (its.length >= 2 && its.every((x) => lerNumero(x.valor)?.unidade === '%') && Math.abs(soma - 100) > 1) out.push(`${onde}: ${somaRuim(soma)}`);
     }
     if (s.layout === 'linha') { try { serieLinha(s); } catch (e) { out.push(`${onde}: ${e.message}`); } }
     if (s.layout === 'barras') {

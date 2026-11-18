@@ -641,7 +641,7 @@ function buildServer() {
     async (args) => {
       try {
         const p = lerPerfil();
-        const r = await gerarDocumento(args, { ...(p.marca || {}), nome: p.nome, escritorio: p.escritorio });
+        const r = await gerarDocumento(args, { ...(p.marca || {}), nome: p.nome, escritorio: p.escritorio, cargo: p.atuacao });
         return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pdf: r.pdf }) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui gerar o PDF: ${e?.message ?? e}. Entregue o texto no chat.` }] };
