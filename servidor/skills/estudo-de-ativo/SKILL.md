@@ -47,7 +47,7 @@ Em todos: ao final, uma mensagem curta de envio ao cliente (`whatsapp`, sem `**`
 
 1. O material nasce da análise: chame `analise_ativo` com todos os blocos antes de montar página. Em ação e fundo imobiliário, com `pesquisa=true`.
 2. Fatos do período: `documentos_cvm`. Juros e inflação do período: `painel_macro`. Número sem fonte não entra no material.
-3. Resumo de uma página e Estudo em PDF usam `mesa_documento`, com as tabelas no texto de cada seção. Apresentação usa `mesa_apresentacao`, com os layouts capa, numeros, tabela, barras, lista, frase e fechamento.
-4. Sem gráfico inventado: o PDF ainda não desenha gráfico de linha. Não descreva gráfico que não foi gerado; a evolução vai em tabela ou no layout barras.
+3. O arquivo leva `tipo: "estudo"`. Resumo de uma página: `mesa_documento` com os quatro números em `destaques` (rótulo, valor e a referência na nota), o histórico em `grafico` `linha` com `retornos: true` (ativo e índice, os retornos mensais que a ferramenta devolveu, `inicio` = o mês anterior ao primeiro retorno, `fonte` com a data e `tabela: false`, porque a tabela do histórico vem logo abaixo, no texto da seção) e os fortes e pontos de atenção. Estudo em PDF: o mesmo, com `capa: true` e as seções na ordem do pedido. Apresentação: `mesa_apresentacao` com os layouts capa, numeros, linha, tabela, lista, comparativo, frase e fechamento.
+4. Sem gráfico inventado: a linha só sai com a série mensal da ferramenta (até 24 meses), com fonte e data. Sem a série mensal, o histórico vai só na tabela e o material não fala de gráfico.
 5. Um título-conclusão por página, com o número que sustenta.
 6. Mais de um ativo: mesma data-base para todos, ou diga qual ficou diferente.
