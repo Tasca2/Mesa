@@ -229,6 +229,14 @@
     return r.json();
   };
   let ctxPendente = "";
+  // Aviso de corte na conversa: o motor devolve "aviso" quando parte do envio ficou de fora (ou "erro" 413 quando a
+  // mensagem sozinha passa do limite). Fica à vista até o próximo envio.
+  function avisoCorte(t) {
+    const cx = raiz && raiz.querySelector("#cvCaixa"); if (!cx) return;
+    let av = raiz.querySelector("#cvCorteAviso");
+    if (!av) { if (!t) return; av = document.createElement("div"); av.id = "cvCorteAviso"; av.className = "estado-cv on"; av.style.color = "#F0A49A"; av.setAttribute("role", "status"); av.setAttribute("aria-live", "polite"); cx.before(av); }
+    av.textContent = t || ""; av.style.display = t ? "" : "none";
+  }
   class App {
     constructor() { this._c = { displayMode: "inline", availableDisplayModes: ["inline"] }; }
     async connect() { await api("/api/ping"); setInterval(() => api("/api/ping").catch(() => {}), 10000); montarConversa(); atualizar(); }
@@ -240,8 +248,9 @@
       const primeira = texto.split("\n")[0].replace(/^\[Mesa\]\s*/, "").slice(0, 120);
       if (anexoSubindo()) { avisoAnexo("Espere o anexo terminar de subir e envie de novo."); return { isError: true }; }
       const anexos = idsProntos();
-      try { await api("/api/send", { texto, contexto, exibir: "Pedido enviado: " + primeira, meta: metaAtual(), anexos }); } catch (e) { if (anexos.length) avisoAnexo(e.message); return { isError: true }; }
-      tirarEnviados(anexos); acompanhar(); return {};
+      let r;
+      try { r = await api("/api/send", { texto, contexto, exibir: "Pedido enviado: " + primeira, meta: metaAtual(), anexos }); } catch (e) { if (e && e.status === 413) avisoCorte(e.message); else if (anexos.length) avisoAnexo(e.message); return { isError: true }; }
+      avisoCorte(r && r.aviso ? r.aviso : ""); tirarEnviados(anexos); acompanhar(); return {};
     }
     async melhorarPrompt(texto, pedido) {
       const r = await api("/api/melhorar", { texto, pedido });
@@ -609,10 +618,12 @@
       if (!t || rodando) return false;
       if (anexoSubindo()) { avisoAnexo("Espere o anexo terminar de subir e envie de novo."); return false; }
       const pedido = window.__mesaPedido && window.__mesaPedido.get ? window.__mesaPedido.get() : "";
-      const texto = descreverContexto() + (pedido ? "[Pedido que está na tela]\n" + pedido + "\n[Fim do pedido]\n" : "") + "\nMensagem do assessor: " + t + "\n\n" + INSTRUCOES;
+      // O fim (a mensagem do assessor e as instruções) vai protegido: acima do limite, o motor corta o miolo e devolve o aviso.
+      const fim = "\nMensagem do assessor: " + t + "\n\n" + INSTRUCOES;
+      const texto = descreverContexto() + (pedido ? "[Pedido que está na tela]\n" + pedido + "\n[Fim do pedido]\n" : "") + fim;
       const anexos = idsProntos();
       esperandoAcao = true;
-      try { await api("/api/send", { texto, exibir: t, meta: metaAtual(), anexos }); tirarEnviados(anexos); acompanhar(); return true; } catch (e) { esperandoAcao = false; if (anexos.length && e && e.message) avisoAnexo(e.message); return false; }
+      try { const r = await api("/api/send", { texto, fimProtegido: fim.length, exibir: t, meta: metaAtual(), anexos }); avisoCorte(r && r.aviso ? r.aviso : ""); tirarEnviados(anexos); acompanhar(); return true; } catch (e) { esperandoAcao = false; if (e && e.status === 413) avisoCorte(e.message); else if (anexos.length && e && e.message) avisoAnexo(e.message); return false; }
     };
     const enviar = async () => { const t = txt.value.trim() || (idsProntos().length ? "Leia o que anexei." : ""); if (!t || rodando) return; txt.value = ""; ajustarAltura(); atualizarBotao(); if (!(await enviarTexto(t))) { txt.value = t; ajustarAltura(); atualizarBotao(); } };
     const arquivoEl = s.querySelector("#cvArquivo"), caixaEl = s.querySelector("#cvCaixa");
@@ -2283,7 +2294,7 @@
       apagar.onclick = async () => {
         try {
           const r = await app.callServerTool({ name: "mesa_perfil", arguments: { modelo: { tarefa: estado.tarefa, texto: null } } });
-          perfil = r?.structuredContent?.perfil ?? perfil; pr.modelo = false; pr.editado = false; pr.texto = pr.base; area.value = pr.base; apagar.hidden = true; aviso.hidden = true; refazer.hidden = true;
+          perfil = r?.structuredContent?.perfil ?? perfil; pr.modelo = false; pr.editado = false; pr.texto = pr.base; area.value = pr.base; apagar.hidden = true; aviso.hidden = true; refazer.hidden = true; medir();
           const st = $(".estado"); st.className = "estado"; st.textContent = "Modelo apagado. Voltou ao texto padrão.";
         } catch {   }
       };
@@ -2725,9 +2736,11 @@
   // Corte do pedido ao enviar. O que passa do corte chega ao Claude sem o fim do pedido, onde ficam as regras: a tela
   // avisa enquanto o assessor monta o pedido e, ao enviar, pede um segundo clique antes de mandar cortado.
   const CORTE_PEDIDO = 40000;
+  // Pedido de edição de vídeo: até 8.000 caracteres (o limite que já existia), com a linha do vídeo sempre inteira.
+  const CORTE_VIDEO = 8000;
   let medirPedido = null, corteAvisado = "";
   const milhar = (n) => n.toLocaleString("pt-BR");
-  const avisoDeCorte = (n) => `O pedido tem ${milhar(n)} caracteres e a janela envia até ${milhar(CORTE_PEDIDO)}: os últimos ${milhar(n - CORTE_PEDIDO)} ficariam de fora, entre eles as regras do fim do pedido. Encurte o texto colado nos campos ou mande o restante depois, na conversa.`;
+  const avisoDeCorte = (n, limite = CORTE_PEDIDO) => `O pedido tem ${milhar(n)} caracteres e a janela envia até ${milhar(limite)}: os últimos ${milhar(n - limite)} ficariam de fora, entre eles as regras do fim do pedido. Encurte o texto colado nos campos ou mande o restante depois, na conversa.`;
   function agendarRascunho() {
     medirPedido?.();
     if (!conectado) return;
@@ -2804,8 +2817,11 @@
     setTimeout(() => { btn.textContent = rotulo; }, 2200);
   }
 
+  // A caixa de continuar a conversa envia até LIMITE_CAIXA caracteres. Acima disso não corta: avisa e não envia.
+  const LIMITE_CAIXA = 4000;
   async function enviarMensagem(texto, st) {
-    texto = texto.trim().slice(0, 4000); if (!texto) return false;
+    texto = texto.trim(); if (!texto) return false;
+    if (texto.length > LIMITE_CAIXA) { st.className = "estado erro"; st.textContent = `A mensagem tem ${milhar(texto.length)} caracteres e a caixa envia até ${milhar(LIMITE_CAIXA)}. Encurte ou mande em duas partes.`; return false; }
     if (!conectado) { st.className = "estado erro"; st.textContent = "O painel não se conectou ao Claude. Peça a Mesa de novo numa conversa nova."; return false; }
     try {
       const r = await app.sendMessage({ role: "user", content: [{ type: "text", text: texto }] });
@@ -2896,7 +2912,10 @@
     if (typeof window.__mesaStatus === "function" && window.__mesaStatus().estado === "pensando") { alert("O Claude ainda está trabalhando no pedido anterior. Espere terminar ou clique em parar na caixa de baixo."); return; }
     const t = T["editar-reels"], a = AREAS.find((x) => x.id === estado.area) || AREAS.find((x) => x.id === "instagram");
     const quem = [perfil?.nome, perfil?.atuacao, perfil?.escritorio].filter(Boolean).join(" · ");
-    const texto = (pedidoEdicaoVideo(t, [], a, quem) + "\n\nVídeo anexado: " + caminho + ". Pode começar.").slice(0, 8000);
+    // A linha do vídeo vai sempre inteira; se o pedido passar de CORTE_VIDEO, o fim dele sai e o aviso diz quanto.
+    const linha = "\n\nVídeo anexado: " + caminho + ". Pode começar.", corpo = pedidoEdicaoVideo(t, [], a, quem);
+    if (corpo.length + linha.length > CORTE_VIDEO) alert(avisoDeCorte(corpo.length + linha.length, CORTE_VIDEO) + " O envio segue assim, com a linha do vídeo inteira.");
+    const texto = corpo.slice(0, CORTE_VIDEO - linha.length) + linha;
     enviando = true;
     try {
       app.callServerTool({ name: "mesa_registrar", arguments: { evento: "tarefa_enviada", tarefa: t.nome, area: a.nome, respostas: [] } }).catch(() => {});
@@ -2924,7 +2943,10 @@
       const caminho = videoEscolhido && videoEscolhido !== "-" ? videoEscolhido : await perguntarVideo();
       enviando = false;
       if (!caminho) { st.className = "estado"; st.textContent = "Envio cancelado: escolha o vídeo para editar."; return; }
-      texto = (texto + "\n\nVídeo anexado: " + caminho + ". Pode começar.").slice(0, 8000);
+      // O pedido de vídeo vai até CORTE_VIDEO com a linha do vídeo sempre inteira; acima disso, avisa e pede o segundo clique.
+      const linha = "\n\nVídeo anexado: " + caminho + ". Pode começar.", cabe = CORTE_VIDEO - linha.length;
+      if (inteiro.length > cabe && corteAvisado !== inteiro + linha) { corteAvisado = inteiro + linha; videoEscolhido = caminho; st.className = "estado erro"; st.textContent = avisoDeCorte(inteiro.length, cabe) + " Para enviar assim mesmo, cortado, clique de novo."; return; }
+      texto = inteiro.slice(0, cabe) + linha;
     }
     enviando = true; st.className = "estado"; st.textContent = "Enviando…";
     try {

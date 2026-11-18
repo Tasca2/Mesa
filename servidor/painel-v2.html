@@ -1521,7 +1521,7 @@
       apagar.onclick = async () => {
         try {
           const r = await app.callServerTool({ name: "mesa_perfil", arguments: { modelo: { tarefa: estado.tarefa, texto: null } } });
-          perfil = r?.structuredContent?.perfil ?? perfil; pr.modelo = false; pr.editado = false; pr.texto = pr.base; area.value = pr.base; apagar.hidden = true; aviso.hidden = true; refazer.hidden = true;
+          perfil = r?.structuredContent?.perfil ?? perfil; pr.modelo = false; pr.editado = false; pr.texto = pr.base; area.value = pr.base; apagar.hidden = true; aviso.hidden = true; refazer.hidden = true; medir();
           const st = $(".estado"); st.className = "estado"; st.textContent = "Modelo apagado. Voltou ao texto padrão.";
         } catch {   }
       };
@@ -2020,8 +2020,11 @@
     setTimeout(() => { btn.textContent = rotulo; }, 2200);
   }
 
+  // A caixa de continuar a conversa envia até LIMITE_CAIXA caracteres. Acima disso não corta: avisa e não envia.
+  const LIMITE_CAIXA = 4000;
   async function enviarMensagem(texto, st) {
-    texto = texto.trim().slice(0, 4000); if (!texto) return false;
+    texto = texto.trim(); if (!texto) return false;
+    if (texto.length > LIMITE_CAIXA) { st.className = "estado erro"; st.textContent = `A mensagem tem ${milhar(texto.length)} caracteres e a caixa envia até ${milhar(LIMITE_CAIXA)}. Encurte ou mande em duas partes.`; return false; }
     if (!conectado) { st.className = "estado erro"; st.textContent = "O painel não se conectou ao Claude. Peça a Mesa de novo numa conversa nova."; return false; }
     try {
       const r = await app.sendMessage({ role: "user", content: [{ type: "text", text: texto }] });

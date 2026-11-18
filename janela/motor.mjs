@@ -11,6 +11,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { acharClaude, precisaShell, ARQUIVO_MOTOR, FERRAMENTAS_WEB, PASTA_DADOS } from './comum.mjs';
 import { openSync, readSync, closeSync } from 'node:fs';
 import { MAX_ANEXOS, PASTA_ANEXOS, PASTA_FONTES, TERMINAL, tipoDoAnexo, assinaturaConfere, erroDeTamanho, dentroDe, destinoDoAnexo, argsDeFerramentas, blocoDeAnexos } from './anexos.mjs';
+import { cortarMensagem, cortarFim, paraExibir } from './corte.mjs';
+// Limites do /api/send (os mesmos de antes; agora nenhum é calado: veja corte.mjs). A mensagem vai até 40.000 caracteres;
+// as instruções da tarefa (contexto) e o texto que aparece na conversa, até 4.000.
+const LIMITE_MENSAGEM = 40000, LIMITE_CONTEXTO = 4000, LIMITE_EXIBIR = 4000;
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const SERVIDOR = path.resolve(AQUI, '..', 'servidor');
@@ -581,13 +585,17 @@ const servidor = http.createServer(async (req, res) => {
       }
       case '/api/send': {
         if (estado.rodando) return json(res, 409, { erro: 'O Claude ainda está respondendo.' });
-        const texto = String(corpo.texto || '').trim().slice(0, 40000);
-        if (!texto) return json(res, 400, { erro: 'vazio' });
+        // Acima do limite sai o miolo, nunca o fim protegido (a mensagem do assessor e as instruções); o que sair volta em "aviso".
+        const msg = cortarMensagem(String(corpo.texto || '').trim(), LIMITE_MENSAGEM, corpo.fimProtegido);
+        if (msg.erro) return json(res, 413, { erro: msg.erro });
+        if (!msg.texto) return json(res, 400, { erro: 'vazio' });
         const anexos = separarAnexos(corpo.anexos);
         if (!anexos) return json(res, 400, { erro: 'Um anexo não está mais disponível. Anexe o arquivo de novo.' });
         if (corpo.meta) estado.meta = limpaMeta(corpo.meta);
-        rodarClaude(texto, String(corpo.contexto || '').slice(0, 4000), corpo.exibir ? String(corpo.exibir).slice(0, 4000) : '', anexos);
-        return json(res, 200, { ok: true });
+        const ctx = cortarFim(String(corpo.contexto || ''), LIMITE_CONTEXTO, 'As instruções da tarefa que vão junto com o pedido');
+        rodarClaude(msg.texto, ctx.texto, corpo.exibir ? paraExibir(String(corpo.exibir), LIMITE_EXIBIR) : '', anexos);
+        const avisos = [msg.aviso, ctx.aviso].filter(Boolean);
+        return json(res, 200, { ok: true, cortado: avisos.length > 0, ...(avisos.length ? { aviso: avisos.join(' ') } : {}) });
       }
       case '/api/anexo/remover': {
         const a = anexosPendentes.find((x) => x.id === String(corpo.id || ''));
