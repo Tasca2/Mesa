@@ -35,12 +35,13 @@ Trocar "o que eu posto esta semana?" por uma pasta com os posts criados, uma tab
      - O tema tem de 1 a 3 palavras, sem acento.
    - Exemplo: "Semana de 23-11/1-seg-previdencia". Todos os posts da semana vão para a mesma "Semana de …".
    - O rodapé leva a identificação do profissional e o aviso "conteúdo educativo, não é recomendação".
+   - Todo slide com número de mercado leva o campo `fonte` (órgão e data), inclusive a capa. A fonte sai no pé da imagem.
    - Se a trava de palavras barrar, reescreva o slide. `termosConfirmados` só vale quando o assessor afirmou o termo.
    - Se a resposta trouxer "avisos" (por exemplo, perfil sem foto), conte ao assessor.
 4. **Reels.**
    - Gancho dos 3 primeiros segundos.
    - Roteiro de 30 a 45 segundos em tabela: cena, tempo, fala e texto na tela.
-   - Capa feita com `mesa_carrossel`: 1 slide do tipo capa, na pasta do post.
+   - Capa feita com `mesa_carrossel`: 1 slide do tipo capa, na pasta do post. Se a capa tiver número de mercado, preencha `fonte` com órgão e data.
    - O vídeo é gravado pelo assessor ou editado na tarefa "Editar um vídeo (Reels)". Segundo a Central de Ajuda da Meta, o Meta Business Suite não cria Reels a partir de fotos quando o post é para o Instagram.
 5. **Post único.** Gere 1 slide com `mesa_carrossel`, na pasta do post.
 6. **Legendas.** Escreva uma peça para cada post:
