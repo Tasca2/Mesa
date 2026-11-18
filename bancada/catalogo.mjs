@@ -88,7 +88,9 @@ export function corteDaTela(arquivo) {
 
 // Tamanho em que o motor da janela corta o pedido ao receber.
 export function corteDoMotor(arquivoMotor) {
-  const m = readFileSync(arquivoMotor, 'utf8').match(/case '\/api\/send':[\s\S]{0,400}?corpo\.texto \|\| ''\)\.trim\(\)\.slice\(0, (\d+)\)/);
+  const s = readFileSync(arquivoMotor, 'utf8');
+  // Desde a revisão do passo 2 o limite é uma constante; nas versões anteriores, o número escrito no corte do /api/send.
+  const m = s.match(/const LIMITE_MENSAGEM = (\d+)/) || s.match(/case '\/api\/send':[\s\S]{0,400}?corpo\.texto \|\| ''\)\.trim\(\)\.slice\(0, (\d+)\)/);
   if (!m) throw new Error(`Não achei o corte do pedido em ${arquivoMotor}`);
   return Number(m[1]);
 }

@@ -44,7 +44,12 @@ async function sgs(codigo, hoje, precisaDe) {
   }
   return mapa;
 }
-const ultimaData = (i) => i.mesEmAndamento?.data ?? (i.servicoPtax?.nota ? null : i.data);
+const ultimaData = (i) => i.mesEmAndamento?.data ?? (i.servicoPtax?.diasForaDaSerie1?.length ? null : i.data);
+// Dias que só o serviço PTAX já tinha: o valor de cada um, consultado aqui dia a dia (outro endereço: cotação do dia).
+const urlPtaxDia = (d) => `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='${mda(d)}'&$format=json`;
+const extraPtax = async (i) => new Map(await Promise.all((i.servicoPtax?.diasForaDaSerie1 || []).map(async (d) => [d, (await json([urlPtaxDia(d)])).value.at(-1).cotacaoVenda])));
+// Tolerância de 0,01 p.p. contra o número oficial publicado (que vem com 2 casas).
+const pertoDoOficial = (obtido, oficial, rotulo) => assert.ok(Math.abs(obtido - oficial) <= 0.01 + 1e-9, `${rotulo}: ${obtido} contra ${oficial} do número oficial`);
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/';
 const olinda = (recurso, filtro, extra = '') => json([`${OLINDA}${recurso}?$filter=${encodeURIComponent(filtro)}&$format=json${extra}`]).then((j) => j.value);
 const COPOM = 'https://www.bcb.gov.br/api/servico/sitebcb/copom/';
@@ -54,18 +59,29 @@ const pertoDe = (obtido, exato, rotulo) => assert.ok(Math.abs(obtido - exato) <=
 // Periodicidade de cada série, pelo cadastro do SGS: mensais e anual; as outras são diárias.
 const MENSAIS = ['cdiMes', 'ipcaMes', 'ipca12m', 'igpmMes', 'desemprego'], ANUAIS = ['metaInflacao'];
 // O dado da data citada e a data que a regra manda: anterior, último até o fim do mês anterior, até o fim do ano anterior.
-function confereIndicador(i, serie, hoje, comparar) {
+function confereIndicador(i, serie, hoje, comparar, ptaxFora = new Map()) {
   let datas = [...serie.keys()].filter((d) => d <= hoje).sort();
   const mensal = MENSAIS.includes(i.id), anual = ANUAIS.includes(i.id);
-  if (mensal && datas.at(-1).slice(0, 7) === hoje.slice(0, 7)) assert.ok(i.mesEmAndamento, `${i.id}: o mês corrente, ainda aberto, não ficou à parte`);
-  if (i.servicoPtax?.nota) datas = [...datas, i.data]; // dia que só o serviço PTAX já tinha (conferido à parte)
+  // Só a série 4391 (CDI do mês) publica o mês antes de ele fechar. Nas outras mensais, o dado do mês corrente já é o mês
+  // fechado (o IGP-M sai no fim do próprio mês) e tem de ser o último dado, não "mês em andamento".
+  if (mensal && datas.at(-1).slice(0, 7) === hoje.slice(0, 7)) {
+    if (i.serie === 4391) assert.ok(i.mesEmAndamento, `${i.id}: o mês corrente, ainda aberto, não ficou à parte`);
+    else assert.equal(i.mesEmAndamento, undefined, `${i.id}: o mês ${datas.at(-1).slice(0, 7)} já fechou e saiu como mês em andamento`);
+  }
+  const fora = i.servicoPtax?.diasForaDaSerie1 || [];
+  for (const d of fora) {
+    assert.ok(ptaxFora.has(d), `${i.id}: sem a cotação do serviço PTAX de ${d}`);
+    assert.ok(!serie.has(d) && d > datas.at(-1), `${i.id}: ${d} já está na série 1 ou não é mais novo que ela`);
+    serie = new Map([...serie, [d, { valor: ptaxFora.get(d), fim: null }]]);
+    datas = [...datas, d];
+  }
   if (i.mesEmAndamento) {
     assert.equal(i.mesEmAndamento.data, datas.at(-1), `${i.id}: mês em andamento`);
     assert.equal(i.mesEmAndamento.valor, serie.get(datas.at(-1)).valor, `${i.id}: valor do mês em andamento`);
     datas = datas.slice(0, -1);
   }
   assert.equal(i.data, datas.at(-1), `${i.id}: a data não é a do último dado`);
-  if (!i.servicoPtax?.nota) assert.equal(i.valor, serie.get(i.data).valor, `${i.id}: valor de ${i.data}`);
+  assert.equal(i.valor, serie.get(i.data).valor, `${i.id}: valor de ${i.data}`);
   if (i.periodoAte) assert.equal(i.periodoAte, serie.get(i.data).fim, `${i.id}: fim do período`);
   const ultimoAte = (lim) => datas.filter((d) => d <= lim).at(-1);
   const fimMesAnt = new Date(Date.UTC(+i.data.slice(0, 4), +i.data.slice(5, 7) - 1, 0)).toISOString().slice(0, 10);
@@ -85,6 +101,7 @@ function confereIndicador(i, serie, hoje, comparar) {
     mes: anual ? null : mensal ? anterior : ultimoAte(fimMesAnt),
     ano: anual ? anterior : ultimoAte(fimAnoAnt),
   };
+  if (esperado.dia) assert.equal(i.variacoes.dia.rotulo, `de ${br(esperado.dia)} a ${br(i.data)}`, `${i.id}: o rótulo da variação no dia`);
   for (const [k, data] of Object.entries(esperado)) {
     const v = i.variacoes[k];
     if (!data) { assert.equal(v, null, `${i.id}: variação ${k} deveria vir vazia`); continue; }
@@ -96,13 +113,26 @@ function confereIndicador(i, serie, hoje, comparar) {
   assert.equal(i.referencia.comparadoCom.data, ref, `${i.id}: a referência ${comparar} compara com a data errada`);
   assert.equal(i.referencia.comparadoCom.valor, serie.get(ref).valor, `${i.id}: valor da referência`);
   pertoDe(i.referencia.variacao, conta(serie.get(ref).valor), `${i.id}: variação contra ${comparar}`);
-  const composto = (ds) => (ds.reduce((f, d) => f * (1 + serie.get(d).valor / 100), 1) - 1) * 100;
-  if (i.acumulado12Meses) pertoDe(i.acumulado12Meses.valor, composto(datas.slice(-12)), `${i.id}: 12 meses`);
-  if (i.acumuladoNoAno && i.id !== 'ipcaMes') {
-    const doAno = datas.filter((d) => d.slice(0, 4) === i.data.slice(0, 4));
-    assert.equal(i.acumuladoNoAno.meses, doAno.length, `${i.id}: meses no ano`);
-    pertoDe(i.acumuladoNoAno.valor, composto(doAno), `${i.id}: acumulado no ano`);
+  // Acumulados do CDI e do IGP-M: pela conta oficial (não a composição aproximada); o valor é conferido contra o número
+  // oficial publicado no teste do painel completo (Calculadora do Cidadão do Banco Central e release da FGV).
+  if (i.id === 'cdiMes' || i.id === 'igpmMes') {
+    for (const k of ['acumulado12Meses', 'acumuladoNoAno']) assert.ok(i[k] && !i[k].aproximado, `${i.id}: ${k} não veio pela conta oficial: ${JSON.stringify(i[k])}`);
+    assert.equal(i.acumulado12Meses.ate, i.data.slice(0, 7));
+    assert.equal(i.acumuladoNoAno.meses, datas.filter((d) => d.slice(0, 4) === i.data.slice(0, 4)).length, `${i.id}: meses no ano`);
   }
+}
+const MESES_PT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+// Calculadora do Cidadão do Banco Central, correção pelo CDI a 100%: do 1º dia do mês "de" até a véspera do 1º dia do mês
+// seguinte a "ate" (a calculadora conta da data inicial até o dia anterior à final; data sem expediente vai para o dia útil seguinte).
+async function cdiDaCalculadora(de, ate) {
+  const [a, m] = ate.split('-').map(Number);
+  const fim = new Date(Date.UTC(a, m, 1)).toISOString().slice(0, 10);
+  const url = `https://www3.bcb.gov.br/CALCIDADAO/publico/corrigirPeloCDI.do?method=corrigirPeloCDI&dataInicial=${br(de + '-01')}&dataFinal=${br(fim)}&valorCorrecao=1000,00&percentualCorrecao=100,00`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
+  const t = semHtml(new TextDecoder('latin1').decode(await r.arrayBuffer()));
+  const x = t.match(/Valor percentual correspondente\s+([\d.]*\d,\d+)\s*%/);
+  assert.ok(x, `a Calculadora do Cidadão não trouxe o percentual (${url}): ${t.slice(0, 300)}`);
+  return Number(x[1].replace(/\./g, '').replace(',', '.'));
 }
 
 let painel = null;
@@ -113,13 +143,33 @@ test('painel completo: cada número bate com a consulta direta ao Banco Central 
   assert.equal(painel.comparar, 'Mês passado');
   assert.deepEqual(painel.indicadores.map((i) => i.id), D.RECORTES['Painel completo'], `faltou indicador; lacunas: ${JSON.stringify(painel.lacunas)}`);
   const porId = Object.fromEntries(painel.indicadores.map((i) => [i.id, i]));
-  for (const i of painel.indicadores) confereIndicador(i, await sgs(i.serie, hoje, ultimaData(i)), hoje, 'Mês passado');
+  for (const i of painel.indicadores) confereIndicador(i, await sgs(i.serie, hoje, ultimaData(i)), hoje, 'Mês passado', await extraPtax(i));
 
   // dólar: o mesmo valor no serviço PTAX do dia (outro endereço: cotação do dia, boletim de fechamento)
   const d = porId.dolar;
-  const ptax = await json([`https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='${mda(d.servicoPtax.data)}'&$format=json`]);
+  const ptax = await json([urlPtaxDia(d.servicoPtax.data)]);
   assert.equal(ptax.value.at(-1).cotacaoVenda, d.servicoPtax.cotacaoVenda);
   if (d.servicoPtax.data === d.data) assert.equal(d.valor, d.servicoPtax.cotacaoVenda);
+  assert.equal(d.servicoPtax.bate, true, `série 1 e serviço PTAX diferem: ${JSON.stringify(painel.lacunas)}`);
+  assert.match(d.oQueE, /PTAX de fechamento, de venda/);
+
+  // CDI acumulado (pelos dias da série 12) contra a Calculadora do Cidadão do Banco Central no mesmo período
+  const cdi = porId.cdiMes;
+  for (const k of ['acumulado12Meses', 'acumuladoNoAno']) pertoDoOficial(cdi[k].valor, await cdiDaCalculadora(cdi[k].de, cdi[k].ate), `CDI ${k} (${cdi[k].de} a ${cdi[k].ate})`);
+
+  // IGP-M: o release mais recente da FGV (portal do IBRE, última divulgação do IGP-M) é do mesmo mês do painel, com o
+  // mesmo valor do mês, e os acumulados do painel batem com os da FGV
+  const ig = porId.igpmMes;
+  const fgv = semHtml(await (await fetch('https://portalibre.fgv.br/ultima-divulgacao/65', { signal: AbortSignal.timeout(60000) })).text());
+  const mesFgv = fgv.match(/\(IGP-M\)\s*(subiu|caiu|recuou|avançou|variou)\s+(-?[\d,]+)%\s+em\s+([a-zç]+)/i);
+  const acum = fgv.match(/acumula (alta|queda) de ([\d,]+)% no ano e (?:(alta|queda) )?de ([\d,]+)% em 12 meses/);
+  const dataFgv = fgv.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  assert.ok(mesFgv && acum && dataFgv, `o release da FGV mudou de formato: ${fgv.slice(0, 400)}`);
+  const n = (s) => Number(s.replace(',', '.'));
+  assert.equal(`${dataFgv[3]}-${String(MESES_PT.indexOf(mesFgv[3].toLowerCase()) + 1).padStart(2, '0')}`, ig.data.slice(0, 7), 'o IGP-M do painel não é o do release mais recente da FGV');
+  assert.equal(ig.valor, (/caiu|recuou/i.test(mesFgv[1]) ? -1 : 1) * n(mesFgv[2]), 'IGP-M do mês: Banco Central e FGV');
+  pertoDoOficial(ig.acumuladoNoAno.valor, (acum[1] === 'queda' ? -1 : 1) * n(acum[2]), 'IGP-M no ano');
+  pertoDoOficial(ig.acumulado12Meses.valor, ((acum[3] || acum[1]) === 'queda' ? -1 : 1) * n(acum[4]), 'IGP-M em 12 meses');
 
   // IPCA: o mês, o acumulado no ano e os 12 meses no IBGE, consultando o período pelo número
   const ip = porId.ipcaMes, per = ip.data.slice(0, 7).replace('-', '');
@@ -218,7 +268,7 @@ for (const [recorte, comparar, ids] of [['Dólar e câmbio', 'Semana passada', [
     const p = await D.painelMacro({ recorte, comparar });
     assert.equal(p.recorte, recorte);
     assert.deepEqual(p.indicadores.map((i) => i.id), ids, `lacunas: ${JSON.stringify(p.lacunas)}`);
-    for (const i of p.indicadores) confereIndicador(i, await sgs(i.serie, p.hoje, ultimaData(i)), p.hoje, comparar);
+    for (const i of p.indicadores) confereIndicador(i, await sgs(i.serie, p.hoje, ultimaData(i)), p.hoje, comparar, await extraPtax(i));
     assert.equal(p.juroReal === null, recorte === 'Dólar e câmbio');
     assert.equal(p.copom === null, recorte !== 'Juros e Copom');
   });
