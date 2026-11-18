@@ -1755,7 +1755,7 @@
     },
   };
 
-  let ajustes = { tarefas: {}, skills: {} };
+  let ajustes = { tarefas: {}, skills: {}, modelosMantidos: {} }, regrasGuardadas = {};
   const BASE_PERGUNTAS = {};
   const regrasLimpas = (x) => lista(x, 12, 200);
   const PERGUNTAS_FIXAS = ["resultado", "atuacao", "uso"];
@@ -1773,9 +1773,24 @@
     }
     t.perguntas = base;
   }
+  // Tarefas que mudaram de nome, objetivo ou entrega no passo 3, com o texto que tinham na 1.13. Servem para achar a
+  // tarefa pelo nome antigo e para reconhecer, em modelo salvo e rascunho, o texto da versão anterior: a tela avisa e
+  // só troca quando o assessor pede. nome: título antigo; obj: objetivo antigo; itens: [antes, agora]; novos: [depois de, item novo].
+  const TEXTO_ANTIGO = {
+    "cliente-novo": { itens: [["Se ainda não houve a primeira conversa: roteiro da primeira reunião de 30 minutos, em peça separada", "Se ainda não houve a primeira conversa: diga em uma linha que a tarefa Primeira reunião monta o roteiro e a apresentação com esta ficha"]] },
+    carteira: { obj: "Ver onde a carteira se afasta da referência escolhida, sem ordem de compra, venda nem imposto." },
+    abordagem: { nome: "Primeira abordagem", obj: "Preparar a primeira conversa com um contato novo, sem pressão e sem recomendar produto." },
+    ligacao: { nome: "Roteiro de ligação", obj: "Ter o roteiro exato da ligação, no tempo escolhido, terminando sempre com data e hora marcadas." },
+    sequencia: { nome: "Sequência de WhatsApp", obj: "Ter 5 toques de WhatsApp em 10 a 14 dias, cada um com objetivo, dia e texto prontos." },
+    followup: { novos: [["Três toques de follow-up (dia 2, dia 5 e dia 10), cada um em peça de WhatsApp separada", "Roteiro de ligação de 60 segundos para usar no lugar do segundo toque, em peça separada"]] },
+    proposta: { nome: "Proposta de assessoria" },
+    "pre-reuniao": { nome: "Pré-reunião" },
+  };
+  const NOMES_ANTIGOS = Object.fromEntries(Object.entries(TEXTO_ANTIGO).filter(([, a]) => a.nome).map(([id, a]) => [a.nome, id]));
   const achaTarefa = (ref) => {
     const r = String(ref ?? "").trim().toLowerCase();
-    return Object.keys(T).find((id) => id.toLowerCase() === r || String(T[id].nome).toLowerCase() === r) ?? null;
+    return Object.keys(T).find((id) => id.toLowerCase() === r || String(T[id].nome).toLowerCase() === r)
+      ?? Object.entries(NOMES_ANTIGOS).find(([nome, id]) => nome.toLowerCase() === r && T[id])?.[1] ?? null;
   };
   // Tarefas que saíram do menu. Ficam aqui só para o histórico antigo e para quem ainda chamar pelo nome antigo:
   // a Mesa diz onde está agora o que a tarefa fazia.
@@ -1783,14 +1798,52 @@
     "roteiro-reuniao": { nome: "Roteiro de reunião", agora: ["primeira-reuniao", "segunda-reuniao", "pre-reuniao"] },
     "post-mercado": { nome: "Post do mercado de hoje", agora: ["macro"] },
   };
-  const saiuDoMenu = (ref) => {
+  const idQueSaiu = (ref) => {
     const r = String(ref ?? "").trim().toLowerCase();
-    const id = Object.keys(SAIRAM_DO_MENU).find((k) => k === r || SAIRAM_DO_MENU[k].nome.toLowerCase() === r);
+    return Object.keys(SAIRAM_DO_MENU).find((k) => k === r || SAIRAM_DO_MENU[k].nome.toLowerCase() === r) ?? null;
+  };
+  const saiuDoMenu = (ref) => {
+    const id = idQueSaiu(ref);
     if (!id) return "";
     const agora = SAIRAM_DO_MENU[id].agora.filter((x) => T[x]).map((x) => T[x].nome);
     const onde = agora.length > 1 ? `${agora.slice(0, -1).join(", ")} e ${agora[agora.length - 1]}` : agora[0];
     return `A tarefa «${SAIRAM_DO_MENU[id].nome}» saiu do menu da Mesa.` + (onde ? ` O que ela fazia está em ${onde}.` : "");
   };
+  // Trechos da versão anterior num texto desta tarefa (modelo salvo ou rascunho), e o texto com eles trocados pelos de
+  // hoje (título e objetivo vêm do pedido montado agora).
+  const escRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const linhaRe = (l) => new RegExp(`^${escRe(l)}$`, "m");
+  const tituloAntigoRe = (nome) => new RegExp(`^\\[Mesa\\] [^\\n]* › ${escRe(nome)}$`, "m");
+  function trechosAntigos(texto, id) {
+    const a = TEXTO_ANTIGO[id], x = String(texto ?? ""), r = [];
+    if (!a) return r;
+    if (a.nome && tituloAntigoRe(a.nome).test(x)) r.push("nome");
+    if (a.obj && linhaRe("Objetivo: " + a.obj).test(x)) r.push("obj");
+    if ((a.itens ?? []).some(([antes]) => linhaRe("- " + antes).test(x)) || (a.novos ?? []).some(([apos, novo]) => linhaRe("- " + apos).test(x) && !linhaRe("- " + novo).test(x))) r.push("itens");
+    return r;
+  }
+  function trocarTrechos(texto, id, base) {
+    const a = TEXTO_ANTIGO[id]; let x = String(texto ?? "");
+    if (!a) return x;
+    const titulo = base.match(/^\[Mesa\] .*$/m)?.[0], obj = base.match(/^Objetivo: .*$/m)?.[0];
+    if (a.nome && titulo) x = x.replace(tituloAntigoRe(a.nome), () => titulo);
+    if (a.obj && obj) x = x.replace(linhaRe("Objetivo: " + a.obj), () => obj);
+    for (const [antes, agora] of a.itens ?? []) x = x.replace(linhaRe("- " + antes), () => "- " + agora);
+    for (const [apos, novo] of a.novos ?? []) if (!linhaRe("- " + novo).test(x)) x = x.replace(linhaRe("- " + apos), (l) => l + "\n- " + novo);
+    return x;
+  }
+  const MUDOU_NA_VERSAO = { nome: "o nome da tarefa", obj: "o objetivo", itens: "a lista do que receber", opcao: "uma opção de resposta" };
+  const oQueMudou = (tipos) => { const l = tipos.map((x) => MUDOU_NA_VERSAO[x]); return l.length > 1 ? `${l.slice(0, -1).join(", ")} e ${l[l.length - 1]}` : l[0] ?? ""; };
+  // Marca curta de um texto, para lembrar qual modelo salvo o assessor decidiu manter como está.
+  const assinatura = (s) => { let h = 5381; for (const c of String(s)) h = (Math.imul(h, 33) ^ c.codePointAt(0)) >>> 0; return String(s).length.toString(36) + "-" + h.toString(36); };
+  // Bloco "Minhas regras pessoais" do pedido de agora no lugar do bloco do texto: põe, troca ou tira.
+  const REGRAS_PESSOAIS_RE = /Minhas regras pessoais \(valem[^\n]*\n(?:- [^\n]*(?:\n|$))*/;
+  function trocarRegras(texto, base) {
+    const novo = base.match(REGRAS_PESSOAIS_RE)?.[0];
+    if (REGRAS_PESSOAIS_RE.test(texto)) return novo ? texto.replace(REGRAS_PESSOAIS_RE, () => novo) : texto.replace(new RegExp(REGRAS_PESSOAIS_RE.source + "\\n?"), "");
+    const k = novo ? texto.indexOf(REGRAS_PEDIDO.slice(0, 30)) : -1;
+    return k >= 0 ? texto.slice(0, k) + novo + "\n" + texto.slice(k) : texto;
+  }
   function limparAjusteTarefa(aj, id) {
     const base = BASE_PERGUNTAS[id] ?? T[id]?.perguntas ?? [];
     const opcoes = {};
@@ -1801,23 +1854,41 @@
     return { opcoes, regras: regrasLimpas(aj?.regras) };
   }
   async function guardarAjustes() {
-    const json = JSON.stringify(ajustes);
+    const json = JSON.stringify({ ...ajustes, tarefas: { ...ajustes.tarefas, ...regrasGuardadas } });
     if (perfil) perfil.ajustes = json;
     try { await app.callServerTool({ name: "mesa_perfil", arguments: { ajustes: json } }); } catch {   }
   }
   function carregarAjustes(bruto) {
     const antigos = Object.keys(ajustes.tarefas);
-    ajustes = { tarefas: {}, skills: {} };
+    ajustes = { tarefas: {}, skills: {}, modelosMantidos: {} }; regrasGuardadas = {};
     antigos.forEach(aplicarAjusteTarefa);
     let o = {}; try { o = JSON.parse(bruto || "{}") || {}; } catch { o = {}; }
     for (const [id, aj] of Object.entries(o.tarefas ?? {}).slice(0, 40)) {
-      if (!T[id]) continue;
+      if (!T[id]) { guardarRegrasQueSairam(id, aj); continue; }
       aplicarAjusteTarefa(id);
       ajustes.tarefas[id] = limparAjusteTarefa(aj, id);
       aplicarAjusteTarefa(id);
     }
     for (const [s, r] of Object.entries(o.skills ?? {}).slice(0, 20)) if (SKILLS_CONHECIDAS.includes(s)) ajustes.skills[s] = regrasLimpas(r);
+    for (const [id, a] of Object.entries(o.modelosMantidos ?? {})) if (TEXTO_ANTIGO[id] && typeof a === "string") ajustes.modelosMantidos[id] = a.slice(0, 40);
   }
+  // Regras pessoais de tarefa que saiu do menu: ficam guardadas como vieram, sem valer sozinhas, e são oferecidas nas
+  // tarefas que fazem agora o papel dela até o assessor usar ou dispensar. Restaurar a tarefa antiga as apaga.
+  function guardarRegrasQueSairam(id, aj) {
+    const regras = SAIRAM_DO_MENU[id] ? regrasLimpas(aj?.regras) : [];
+    if (regras.length) regrasGuardadas[id] = { regras, ...(aj?.avisado === true ? { avisado: true } : {}) };
+  }
+  const regrasParaHerdar = (id) => Object.entries(regrasGuardadas)
+    .filter(([sid, g]) => !g.avisado && SAIRAM_DO_MENU[sid].agora.includes(id) && g.regras.some((r) => !(ajustes.tarefas[id]?.regras ?? []).includes(r)))
+    .map(([sid, g]) => ({ id: sid, nome: SAIRAM_DO_MENU[sid].nome, regras: g.regras }));
+  function herdarRegras(id, sid) {
+    const g = regrasGuardadas[sid]; if (!g || !T[id]) return;
+    aplicarAjusteTarefa(id);
+    const aj = ajustes.tarefas[id] ?? { opcoes: {}, regras: [] };
+    aj.regras = regrasLimpas([...aj.regras, ...g.regras.filter((r) => !aj.regras.includes(r))]);
+    ajustes.tarefas[id] = aj; aplicarAjusteTarefa(id);
+  }
+  const dispensarRegras = (sid) => { if (regrasGuardadas[sid]) regrasGuardadas[sid].avisado = true; };
   const minhasRegras = (id, t) => [
     ...(ajustes.tarefas[id]?.regras ?? []),
     ...skillsDe(t).flatMap((s) => (ajustes.skills[s] ?? []).map((r) => `[${s}] ${r}`)),
@@ -1855,6 +1926,12 @@
     async restaurar(ref) {
       const s = String(ref ?? "").trim();
       if (SKILLS_CONHECIDAS.includes(s)) { delete ajustes.skills[s]; await guardarAjustes(); return { ok: true, nome: s }; }
+      const saiu = achaTarefa(s || estado.tarefa) ? null : idQueSaiu(s || estado.tarefa);
+      if (saiu) {
+        if (!regrasGuardadas[saiu]) return { ok: false, motivo: "essa tarefa não tem ajustes seus." };
+        delete regrasGuardadas[saiu]; await guardarAjustes();
+        return { ok: true, nome: SAIRAM_DO_MENU[saiu].nome };
+      }
       const id = s ? achaTarefa(s) : estado.tarefa;
       if (!id || !ajustes.tarefas[id]) return { ok: false, motivo: "essa tarefa não tem ajustes seus." };
       delete ajustes.tarefas[id]; aplicarAjusteTarefa(id); await guardarAjustes(); render();
@@ -2288,6 +2365,47 @@
     }
     meio.append(det, acoes, tamanho); medir();
     if (pr.modelo) meio.append(el("p", "ajuda", "Este pedido começou do seu modelo salvo. As respostas e os campos acima foram atualizados nele."));
+    // Modelo salvo ou rascunho com o texto da versão anterior, e regras guardadas de tarefa que saiu do menu: a tela
+    // avisa e só muda o texto, o modelo ou as regras quando o assessor pede.
+    const avisoVersao = (texto, botoes) => {
+      const d = el("div", "aviso-versao"); d.style.cssText = "margin-top:12px;padding:10px 14px;border:1px solid rgba(232,200,142,.45);border-radius:12px";
+      const linha = el("div", "linha-acoes");
+      for (const [rotulo, fn] of botoes) { const b = el("button", "mini", rotulo); b.onclick = fn; linha.append(b); }
+      d.append(el("p", "ajuda", esc(texto)), linha); meio.append(d); return d;
+    };
+    const modeloSalvo = perfil?.modelos?.[estado.tarefa];
+    const velhoNoModelo = pr.modelo && modeloSalvo && ajustes.modelosMantidos[estado.tarefa] !== assinatura(modeloSalvo) ? trechosAntigos(modeloSalvo, estado.tarefa) : [];
+    if (velhoNoModelo.length) avisoVersao(`Seu modelo salvo ainda traz o texto da versão anterior. Mudou nesta versão: ${oQueMudou(velhoNoModelo)}.`, [
+      ["Trazer o texto novo", async () => {
+        const novo = trocarTrechos(modeloSalvo, estado.tarefa, pr.base);
+        try {
+          const r = await app.callServerTool({ name: "mesa_perfil", arguments: { modelo: { tarefa: estado.tarefa, texto: novo } } });
+          perfil = r?.structuredContent?.perfil ?? perfil;
+          pr.texto = pr.editado ? trocarTrechos(pr.texto, estado.tarefa, pr.base) : aplicarModelo(novo, pr.base);
+          agendarRascunho(); render();
+        } catch { const st = $(".estado"); st.className = "estado erro"; st.textContent = "Não consegui salvar o modelo agora."; }
+      }],
+      ["Manter o meu modelo", async () => { ajustes.modelosMantidos[estado.tarefa] = assinatura(modeloSalvo); await guardarAjustes(); render(); }],
+    ]);
+    if (pr.antigo) {
+      const d = avisoVersao(`Este rascunho foi montado com o texto da versão anterior. Mudou nesta versão: ${oQueMudou(pr.antigo)}.`, [
+        ["Trazer o texto novo", () => {
+          pr.texto = aplicarModelo(trocarTrechos(pr.texto, estado.tarefa, pr.base), pr.base); pr.antigo = null;
+          if (pr.texto === pr.base) pr.editado = false;
+          agendarRascunho(); render();
+        }],
+      ]);
+      for (const b of [restaurar, refazer]) b.addEventListener("click", () => { pr.antigo = null; d.remove(); });
+    }
+    for (const g of regrasParaHerdar(estado.tarefa)) avisoVersao(`Suas regras pessoais de «${g.nome}», tarefa que saiu do menu, estão guardadas: ${g.regras.map((r) => `«${r}»`).join("; ")}.`, [
+      ["Usar nesta tarefa", async () => {
+        herdarRegras(estado.tarefa, g.id); await guardarAjustes();
+        const base = montarPedido(t, ps);
+        pr.texto = pr.editado ? trocarRegras(pr.texto, base) : pr.modelo && modeloSalvo ? aplicarModelo(modeloSalvo, base) : base; pr.base = base;
+        agendarRascunho(); render();
+      }],
+      ["Não mostrar mais", async () => { dispensarRegras(g.id); await guardarAjustes(); render(); }],
+    ]);
     if (typeof app?.melhorarPrompt === "function") {
       const desfazer = el("button", "mini", "Desfazer a última mudança do Claude"); desfazer.hidden = true;
       desfazer.onclick = () => { area.value = pr.anterior; pr.texto = pr.anterior; desfazer.hidden = true; agendarRascunho(); };
@@ -2601,6 +2719,7 @@
     meio.append(el("h2", "", esc(h.nome || t.nome)));
     meio.append(el("p", "detalhe", "O resultado desta rotina está na conversa ao lado. Para ajustar ou continuar de onde parou, escreva na caixa de baixo."));
     if (!T[estado.tarefa]) meio.append(el("p", "detalhe", esc(saiuDoMenu(estado.tarefa) || "Esta tarefa não está mais no menu da Mesa.")));
+    else if (h.nome && h.nome !== T[estado.tarefa].nome) meio.append(el("p", "detalhe", esc(`Esta tarefa agora se chama «${T[estado.tarefa].nome}».`)));
     vidro.append(meio);
     const rod = el("div", "rodape"), volta = el("button", "fantasma", "← Início"); volta.onclick = () => ir("inicio"); rod.append(volta); vidro.append(rod);
     guia.append(vidro, dossie(t, ps, true)); v.append(guia);
@@ -2733,7 +2852,8 @@
       if (!estado.tarefa || !T[estado.tarefa]) return;
       const tela = estado.tela === "acompanhar" ? "fim" : estado.tela;
       if (!["guia", "fim"].includes(tela)) return;
-      const salvo = JSON.stringify({ v: 1, em: Date.now(), estado: { tela, area: estado.area, tarefa: estado.tarefa, passo: estado.passo, respostas: estado.respostas, campos: estado.campos }, texto: tela === "fim" ? promptEdit.texto : "" });
+      const salvo = JSON.stringify({ v: 1, em: Date.now(), estado: { tela, area: estado.area, tarefa: estado.tarefa, passo: estado.passo, respostas: estado.respostas, campos: estado.campos }, texto: tela === "fim" ? promptEdit.texto : "",
+        ...(tela === "fim" ? { editado: !!promptEdit.editado || (!promptEdit.modelo && promptEdit.texto !== promptEdit.base), modelo: !!promptEdit.modelo } : {}) });
       if (perfil) perfil.rascunho = salvo;
       app.callServerTool({ name: "mesa_perfil", arguments: { rascunho: salvo } }).catch(() => {});
     }, 800);
@@ -2758,11 +2878,33 @@
     let s; try { s = JSON.parse(perfil?.rascunho || ""); } catch { return false; }
     const e = s?.estado;
     if (!e || !T[e.tarefa] || !AREAS.some((a) => a.id === e.area) || Date.now() - (s.em || 0) > 14 * 864e5) return false;
-    Object.assign(estado, { tela: e.tela === "fim" ? "fim" : "guia", area: e.area, tarefa: e.tarefa,
-      passo: Math.min(Number(e.passo) || 0, Math.max(0, perguntasDe(T[e.tarefa]).length - 1)), respostas: e.respostas && typeof e.respostas === "object" ? e.respostas : {}, campos: e.campos && typeof e.campos === "object" ? e.campos : {} });
-    if (estado.tela === "fim" && s.texto) promptEdit = { base: montarPedido(T[estado.tarefa], perguntasDe(T[estado.tarefa])), texto: String(s.texto), modelo: false };
+    // Resposta que deixou de ser opção (versão anterior, opção pessoal apagada) sai, com aviso, e a tela volta para a
+    // pergunta dela. Resposta de pergunta que saiu da tarefa some sem aviso: ela não muda mais o pedido.
+    const t = T[e.tarefa], ps = perguntasDe(t), respostas = {}, perdidas = [];
+    let passo = Math.min(Number(e.passo) || 0, Math.max(0, ps.length - 1));
+    for (const [pid, v] of Object.entries(e.respostas && typeof e.respostas === "object" ? e.respostas : {})) {
+      const p = (t.perguntas ?? [RESULTADO]).find((x) => x.id === pid); if (!p) continue;
+      const ops = (p.opcoes || []).map((o) => o.t), dadas = (Array.isArray(v) ? v : [v]).map(String), ficam = dadas.filter((x) => ops.includes(x));
+      dadas.filter((x) => !ops.includes(x)).forEach((valor) => perdidas.push({ curto: p.curto, valor }));
+      if (ficam.length) respostas[pid] = ficam;
+      if (ficam.length < dadas.length && ps.includes(p)) passo = Math.min(passo, ps.indexOf(p));
+    }
+    const comTexto = e.tela === "fim" && !!s.texto;
+    Object.assign(estado, { tela: comTexto || (e.tela === "fim" && !perdidas.length) ? "fim" : "guia", area: e.area, tarefa: e.tarefa, passo, respostas, campos: e.campos && typeof e.campos === "object" ? e.campos : {} });
+    if (comTexto) {
+      // O texto volta como estava. Rascunho da versão anterior não diz se foi editado à mão: é editado o que não volta
+      // ao pedido (ou ao modelo salvo) de hoje depois de trocar os trechos antigos.
+      const base = montarPedido(t, perguntasDe(t)), texto = String(s.texto), m = perfil?.modelos?.[e.tarefa];
+      const hoje = (x) => aplicarModelo(trocarTrechos(x, e.tarefa, base), base);
+      const marcas = typeof s.editado === "boolean" ? { modelo: !!s.modelo && !!m, editado: s.editado }
+        : hoje(texto) === base ? { modelo: false, editado: false } : m && hoje(texto) === hoje(m) ? { modelo: true, editado: false } : { modelo: false, editado: true };
+      const antigo = [...trechosAntigos(texto, e.tarefa), ...(perdidas.length ? ["opcao"] : [])];
+      promptEdit = { base, texto, ...marcas, antigo: antigo.length ? antigo : null };
+    }
     render();
-    if (auto) avisar("Voltei para onde você parou: " + T[estado.tarefa].nome + ".", "Começar do zero", descartarRascunho);
+    const perdeu = perdidas.length === 1 ? ` A opção «${perdidas[0].valor}», da pergunta ${perdidas[0].curto}, saiu desta tarefa: escolha outra.`
+      : perdidas.length ? ` As opções ${perdidas.map((x) => `«${x.valor}» (${x.curto})`).join(", ")} saíram desta tarefa: escolha outras.` : "";
+    if (auto) avisar("Voltei para onde você parou: " + t.nome + "." + perdeu, "Começar do zero", descartarRascunho);
     return true;
   }
 
@@ -2772,7 +2914,7 @@
     const blocoRe = /Minhas escolhas:\n(?:- .*(?:\n|$))*/;
     const novoBloco = base.match(blocoRe)?.[0];
     if (novoBloco && blocoRe.test(t)) t = t.replace(blocoRe, () => novoBloco);
-    return t;
+    return trocarRegras(t, base);
   };
   const promptAtual = (t, ps) => {
     const base = montarPedido(t, ps);
