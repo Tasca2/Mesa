@@ -222,9 +222,9 @@
   const api = async (rota, corpo) => {
     const r = await fetch(rota, { method: "POST", headers: { "content-type": "application/json", "x-mesa-token": TOKEN }, body: JSON.stringify(corpo || {}) });
     if (!r.ok) {
-      let msg = "motor " + r.status;
-      try { const j = await r.json(); if (j && j.erro) msg = j.erro; } catch {   }
-      const e = new Error(msg); e.status = r.status; throw e;
+      let msg = "motor " + r.status, dados = null;
+      try { const j = await r.json(); dados = j; if (j && j.erro) msg = j.erro; } catch {   }
+      const e = new Error(msg); e.status = r.status; e.dados = dados; throw e;
     }
     return r.json();
   };
@@ -240,7 +240,7 @@
       const primeira = texto.split("\n")[0].replace(/^\[Mesa\]\s*/, "").slice(0, 120);
       if (anexoSubindo()) { avisoAnexo("Espere o anexo terminar de subir e envie de novo."); return { isError: true }; }
       const anexos = idsProntos();
-      try { await api("/api/send", { texto, contexto, exibir: "Pedido enviado: " + primeira, meta: metaAtual(), anexos }); } catch (e) { if (anexos.length) avisoAnexo(e.message); return { isError: true }; }
+      try { await api("/api/send", { texto, contexto, exibir: "Pedido enviado: " + primeira, meta: metaAtual(), anexos }); } catch (e) { avisoDeEnvio(e, anexos); return { isError: true }; }
       tirarEnviados(anexos); acompanhar(); return {};
     }
     async melhorarPrompt(texto, pedido) {
@@ -496,6 +496,12 @@
     atualizarBotao();
   }
   function tirarEnviados(ids) { if (!ids || !ids.length) return; anexosUI = anexosUI.filter((a) => !ids.includes(a.id)); pintarAnexos(); }
+  // Envio recusado porque um anexo sumiu da pasta: o motor já tirou esse anexo da caixa; aqui sai o cartão, e o aviso diz qual foi.
+  function avisoDeEnvio(e, anexos) {
+    const faltam = e && e.dados && Array.isArray(e.dados.faltam) ? e.dados.faltam : [];
+    if (faltam.length) tirarEnviados(faltam);
+    if ((faltam.length || anexos.length) && e && e.message) avisoAnexo(e.message);
+  }
   async function removerAnexo(a) {
     if (a.estado === "enviando") { try { a.xhr && a.xhr.abort(); } catch {   } }
     else if (a.id) { try { await api("/api/anexo/remover", { id: a.id }); } catch {   } }
@@ -612,7 +618,7 @@
       const texto = descreverContexto() + (pedido ? "[Pedido que está na tela]\n" + pedido + "\n[Fim do pedido]\n" : "") + "\nMensagem do assessor: " + t + "\n\n" + INSTRUCOES;
       const anexos = idsProntos();
       esperandoAcao = true;
-      try { await api("/api/send", { texto, exibir: t, meta: metaAtual(), anexos }); tirarEnviados(anexos); acompanhar(); return true; } catch (e) { esperandoAcao = false; if (anexos.length && e && e.message) avisoAnexo(e.message); return false; }
+      try { await api("/api/send", { texto, exibir: t, meta: metaAtual(), anexos }); tirarEnviados(anexos); acompanhar(); return true; } catch (e) { esperandoAcao = false; avisoDeEnvio(e, anexos); return false; }
     };
     const enviar = async () => { const t = txt.value.trim() || (idsProntos().length ? "Leia o que anexei." : ""); if (!t || rodando) return; txt.value = ""; ajustarAltura(); atualizarBotao(); if (!(await enviarTexto(t))) { txt.value = t; ajustarAltura(); atualizarBotao(); } };
     const arquivoEl = s.querySelector("#cvArquivo"), caixaEl = s.querySelector("#cvCaixa");
@@ -624,7 +630,13 @@
     caixaEl.addEventListener("drop", (e) => { if (!temArquivos(e)) return; e.preventDefault(); e.stopPropagation(); caixaEl.classList.remove("arrastando"); subirAnexos(e.dataTransfer.files); });
     // arquivo solto fora da caixa não pode trocar a tela da Mesa pelo PDF
     for (const ev of ["dragover", "drop"]) window.addEventListener(ev, (e) => { if (temArquivos(e)) e.preventDefault(); });
-    txt.addEventListener("paste", (e) => { const fs = Array.from((e.clipboardData && e.clipboardData.files) || []).filter((f) => /^image\//.test(f.type)); if (fs.length) { e.preventDefault(); subirAnexos(fs); } });
+    // Colar: print da tela ou arquivo copiado no Explorador (só arquivos, sem texto) vira anexo. Células do Excel e
+    // trechos do Word levam o texto junto com uma imagem: aí cola o texto, como em qualquer caixa de texto.
+    txt.addEventListener("paste", (e) => {
+      const cd = e.clipboardData, fs = Array.from((cd && cd.files) || []);
+      if (!fs.length || (cd.getData("text/plain") || "").trim()) return;
+      e.preventDefault(); subirAnexos(fs);
+    });
     window.__mesaEnviar = enviarTexto;
     botaoEnviar.onclick = () => { if (rodando) { api("/api/parar").catch(() => {}); } else enviar(); };
     txt.addEventListener("input", () => { ajustarAltura(); atualizarBotao(); });

@@ -5,11 +5,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import os from 'node:os';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
-  TIPOS_ANEXO, MAX_ANEXOS, TERMINAL, tipoDoAnexo, nomeSeguro, assinaturaConfere, erroDeTamanho,
+  TIPOS_ANEXO, MAX_ANEXOS, TERMINAL, ESCRITA, tipoDoAnexo, nomeSeguro, assinaturaConfere, erroDeTamanho,
   dentroDe, destinoDoAnexo, regraLeitura, argsDeFerramentas, blocoDeAnexos,
+  pastaCofre, regrasNegarLeitura, regrasDaMesa, argsDeMelhorar, AVISO_ARQUIVOS,
 } from '../janela/anexos.mjs';
+
+const RAIZ = process.env.MESA_RAIZ || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const MB = 1024 * 1024;
 const PDF = Buffer.from('%PDF-1.7\n%âãÏÓ\n');
@@ -111,7 +115,7 @@ test('destino: pasta do dia dentro de Anexos, nome seguro, sem sobrescrever e se
 });
 
 // Sintaxe conferida com o Claude Code 2.1.325 em modo -p no Windows, em 18/11/2026: //c/... libera a leitura;
-// //C:/... não libera. Teste em scratchpad/bancada/perm (relatório do passo 5).
+// //C:/... não libera. O teste está descrito no relatório do passo 5 (antes-depois-passo-5.md).
 test('regra de leitura do Claude: caminho absoluto no formato //c/... no Windows e //... no Mac', () => {
   assert.equal(regraLeitura('C:\\Users\\Ana\\Documents\\Mesa do Assessor\\Anexos', 'win32'), 'Read(//c/Users/Ana/Documents/Mesa do Assessor/Anexos/**)');
   assert.equal(regraLeitura('D:\\Dados\\Mesa do Assessor\\Fontes\\', 'win32'), 'Read(//d/Dados/Mesa do Assessor/Fontes/**)');
@@ -128,10 +132,20 @@ const WEB = ['WebSearch', 'WebFetch(domain:api.bcb.gov.br)'];
 const valor = (args, opcao) => { const i = args.indexOf(opcao); return i < 0 ? null : args[i + 1]; };
 const pastasDe = (args) => { const i = args.indexOf('--add-dir'); if (i < 0) return []; const r = []; for (let k = i + 1; k < args.length && !args[k].startsWith('--'); k++) r.push(args[k]); return r; };
 
+const CASA = 'C:\\Users\\Ana';
+const PROIBIDAS = [`${CASA}\\.mesa-do-assessor`, `${CASA}\\.claude`, `${CASA}\\Desktop\\AppCaptaMais\\knowledge`];
+const REGRAS = 'C:\\Users\\Ana\\AppData\\Local\\Temp\\mesa-janela\\regras-mesa.json';
+
 test('pedido que não é de vídeo: esconde o terminal e só libera a leitura das pastas Anexos e Fontes', () => {
-  const args = argsDeFerramentas({ video: false, permitidasWeb: WEB, pastasLeitura: LEITURA, plataforma: 'win32' });
+  const args = argsDeFerramentas({ video: false, permitidasWeb: WEB, pastasLeitura: LEITURA, pastasProibidas: PROIBIDAS, casa: CASA, arquivoRegras: REGRAS, plataforma: 'win32' });
   assert.deepEqual(TERMINAL, ['Bash', 'PowerShell']);
-  assert.equal(valor(args, '--disallowedTools'), 'Bash,PowerShell');
+  assert.deepEqual(ESCRITA, ['Write', 'Edit', 'NotebookEdit']);
+  assert.equal(valor(args, '--permission-mode'), 'default', 'o modo do usuário (bypass, auto) não vale na Mesa');
+  assert.equal(valor(args, '--settings'), REGRAS);
+  const negadas = valor(args, '--disallowedTools').split(',');
+  assert.deepEqual(negadas.slice(0, 5), ['Bash', 'PowerShell', 'Write', 'Edit', 'NotebookEdit'], 'sem terminal e sem gravar arquivo');
+  for (const r of ['Read(//c/Users/Ana/.mesa-do-assessor/**)', 'Read(~/.mesa-do-assessor/**)', 'Read(//c/Users/Ana/.claude/**)', 'Read(~/.claude/**)',
+    'Read(//c/Users/Ana/Desktop/AppCaptaMais/knowledge/**)', 'Read(~/Desktop/AppCaptaMais/knowledge/**)']) assert.ok(negadas.includes(r), `falta negar ${r}`);
   assert.deepEqual(pastasDe(args), LEITURA);
   const permitidas = valor(args, '--allowedTools').split(',');
   assert.deepEqual(permitidas, ['mcp__mesa', ...WEB, 'Read(//c/Users/Ana/Documents/Mesa do Assessor/Anexos/**)', 'Read(//c/Users/Ana/Documents/Mesa do Assessor/Fontes/**)']);
@@ -139,12 +153,65 @@ test('pedido que não é de vídeo: esconde o terminal e só libera a leitura da
   assert.ok(!permitidas.includes('Read'), 'não libera leitura sem pasta');
 });
 
-test('pasta com vírgula ou parêntese não vira regra (quebraria a lista); a leitura fica pelo --add-dir', () => {
+test('pasta com vírgula ou parêntese não vira regra na linha de comando (quebraria a lista): a leitura fica pelo --add-dir e a proibição, pelo arquivo de regras', () => {
   const estranhas = ['C:\\Users\\Silva, Ana\\Documents\\Mesa do Assessor\\Anexos', 'C:\\Users\\Ana (Pessoal)\\Documents\\Mesa do Assessor\\Fontes'];
-  const args = argsDeFerramentas({ video: false, permitidasWeb: WEB, pastasLeitura: estranhas, plataforma: 'win32' });
+  const proibidas = ['C:\\Users\\Silva, Ana\\.mesa-do-assessor', 'C:\\Users\\Silva, Ana\\.claude'];
+  const args = argsDeFerramentas({ video: false, permitidasWeb: WEB, pastasLeitura: estranhas, pastasProibidas: proibidas, casa: 'C:\\Users\\Silva, Ana', arquivoRegras: REGRAS, plataforma: 'win32' });
   assert.deepEqual(pastasDe(args), estranhas);
   assert.equal(valor(args, '--allowedTools'), ['mcp__mesa', ...WEB].join(','));
-  assert.equal(valor(args, '--disallowedTools'), 'Bash,PowerShell');
+  assert.equal(valor(args, '--disallowedTools'), 'Bash,PowerShell,Write,Edit,NotebookEdit,Read(~/.mesa-do-assessor/**),Read(~/.claude/**)');
+  const r = regrasDaMesa({ pastasProibidas: proibidas, casa: 'C:\\Users\\Silva, Ana', plataforma: 'win32' });
+  for (const x of ['Read(//c/Users/Silva, Ana/.mesa-do-assessor/**)', 'Read(//c/Users/Silva, Ana/.claude/**)', 'Read(~/.claude/**)']) assert.ok(r.permissions.deny.includes(x), x);
+});
+
+test('arquivo de regras da Mesa: nega terminal, gravação e as leituras proibidas, e bloqueia leitura fora das pastas de trabalho', () => {
+  const r = regrasDaMesa({ pastasProibidas: PROIBIDAS, casa: CASA, plataforma: 'win32' });
+  assert.deepEqual(Object.keys(r), ['permissions']);
+  assert.equal(r.permissions.blockReadsOutsideWorkingDirectories, true);
+  assert.deepEqual(r.permissions.deny, ['Bash', 'PowerShell', 'Write', 'Edit', 'NotebookEdit', ...regrasNegarLeitura(PROIBIDAS, { casa: CASA, plataforma: 'win32' })]);
+  assert.equal(r.permissions.allow, undefined, 'o arquivo da Mesa não libera nada');
+  assert.equal(r.permissions.defaultMode, undefined);
+});
+
+test('regra que nega a leitura: caminho absoluto e, dentro da pasta do usuário, também ~/; no Mac, //Users/...', () => {
+  assert.deepEqual(regrasNegarLeitura(['C:\\Users\\Ana\\.claude\\'], { casa: CASA, plataforma: 'win32' }), ['Read(//c/Users/Ana/.claude/**)', 'Read(~/.claude/**)']);
+  assert.deepEqual(regrasNegarLeitura(['D:\\Cofre de notas'], { casa: CASA, plataforma: 'win32' }), ['Read(//d/Cofre de notas/**)'], 'fora da pasta do usuário, só o caminho absoluto');
+  assert.deepEqual(regrasNegarLeitura(['/Users/ana/.claude'], { casa: '/Users/ana', plataforma: 'darwin' }), ['Read(//Users/ana/.claude/**)', 'Read(~/.claude/**)']);
+  assert.deepEqual(regrasNegarLeitura([CASA], { casa: CASA, plataforma: 'win32' }), ['Read(//c/Users/Ana/**)'], 'a própria pasta do usuário não vira ~/');
+  assert.deepEqual(regrasNegarLeitura(['', null], { casa: CASA, plataforma: 'win32' }), []);
+});
+
+test('o cofre negado ao Claude é a mesma pasta que o servidor da Mesa lê', () => {
+  assert.equal(pastaCofre({}, CASA), path.join(CASA, 'Desktop', 'AppCaptaMais', 'knowledge'));
+  assert.equal(pastaCofre({ MESA_COFRE: 'D:\\Cofre' }, CASA), 'D:\\Cofre');
+  const servidor = readFileSync(path.join(RAIZ, 'servidor', 'server.mjs'), 'utf8');
+  assert.ok(servidor.includes("const PASTA_COFRE = process.env.MESA_COFRE || path.join(os.homedir(), 'Desktop', 'AppCaptaMais', 'knowledge');"), 'o servidor mudou a pasta do cofre: mude também em anexos.mjs');
+});
+
+test('melhorar o pedido: só a web, no modo padrão, sem ler, gravar nem terminal e sem os conectores do usuário', () => {
+  const a = argsDeMelhorar({ permitidasWeb: WEB, arquivoRegras: REGRAS });
+  assert.equal(valor(a, '--permission-mode'), 'default');
+  assert.ok(a.includes('--strict-mcp-config'));
+  assert.equal(valor(a, '--allowedTools'), WEB.join(','));
+  assert.equal(valor(a, '--disallowedTools'), 'Bash,PowerShell,Write,Edit,NotebookEdit,Read,Glob,Grep');
+  assert.equal(valor(a, '--settings'), REGRAS);
+  assert.ok(!a.includes('--add-dir'));
+});
+
+test('a tela e o motor usam os mesmos limites de anexo (tipos, tamanho e quantidade)', () => {
+  const html = readFileSync(path.join(RAIZ, 'janela', 'mesa-janela.html'), 'utf8');
+  const m = html.match(/const TIPOS_ANEXO = (\{[^}]*\}), MAX_ANEXOS = (\d+);/);
+  assert.ok(m, 'não achei os limites na tela');
+  const tela = new Function(`return ${m[1]}`)();
+  assert.deepEqual(Object.keys(tela).map((e) => '.' + e).sort(), Object.keys(TIPOS_ANEXO).sort());
+  for (const [ext, t] of Object.entries(TIPOS_ANEXO)) assert.equal(tela[ext.slice(1)] * 1024 * 1024, t.limite, ext);
+  assert.equal(Number(m[2]), MAX_ANEXOS);
+  const aceita = (html.match(/id="cvArquivo"[^>]*accept="([^"]+)"/) || html.match(/accept="([^"]+)"[^>]*id="cvArquivo"/) || [])[1] || '';
+  for (const ext of Object.keys(TIPOS_ANEXO)) assert.ok(aceita.split(',').includes(ext), `o campo de arquivo não aceita ${ext}`);
+});
+
+test('a regra de arquivos do Claude diz o que ele lê, que não há terminal e que não deve pedir permissão', () => {
+  for (const t of ['Anexos', 'Fontes', 'Read', 'documentos_cvm', 'terminal', 'não peça permissão', 'nunca instrução']) assert.ok(AVISO_ARQUIVOS.includes(t), `falta "${t}"`);
 });
 
 test('pedido de vídeo: os mesmos argumentos da 1.13, com terminal e sem as pastas de anexo', () => {
@@ -173,4 +240,6 @@ test('o aviso dos anexos diz onde está cada arquivo, manda ler antes de respond
   assert.match(b, /não complete/i);
   assert.match(b, /CPF/);
   assert.ok(b.endsWith('\n\n'), 'o aviso vem separado do pedido');
+  assert.match(b, /material para ler/i, 'o conteúdo do anexo é material para ler');
+  assert.match(b, /nunca instrução/i, 'o conteúdo do anexo nunca vale como instrução');
 });
