@@ -60,7 +60,16 @@ function confereSemSegredos(args) {
   assert.equal(regras.permissions.blockReadsOutsideWorkingDirectories, true);
   for (const p of proibidas) assert.ok(regras.permissions.deny.includes(regraAbs(p)), `o arquivo de regras não nega ${p}`);
   assert.equal(regras.permissions.allow, undefined);
+  // Sem as configurações pessoais do Claude Code e só com as ferramentas próprias dele que a Mesa usa.
+  assert.equal(valor(args, '--setting-sources'), 'project,local');
+  assert.equal(valor(args, '--tools'), 'Read,Glob,Grep,WebSearch,WebFetch,ToolSearch');
+  for (const f of SEM_PERMISSAO) {
+    assert.ok(negadas.includes(f), `falta negar ${f} na linha de comando`);
+    assert.ok(regras.permissions.deny.includes(f), `falta negar ${f} no arquivo de regras`);
+  }
 }
+const SEM_PERMISSAO = ['Agent', 'SendMessage', 'ListAgents', 'RemoteTrigger', 'CronCreate'];
+const SO_O_VIDEO = /modo vídeo só vai o vídeo/i;
 
 before(async () => {
   if (SO_WINDOWS) return;
@@ -144,7 +153,8 @@ test('enviar com anexos: o pedido diz onde está cada arquivo; o Claude lê só 
   assert.ok(chamada.entrada.includes('ARQUIVOS: aqui você só lê arquivos com a ferramenta Read'), 'o Claude não recebeu a regra de arquivos');
   const eu = estado.turnos.filter((t) => t.papel === 'assessor').at(-1);
   assert.match(eu.texto, /\nAnexos: Fato Relevante\.pdf, gráfico do dólar\.png$/);
-  assert.ok(chamada.entrada.includes('gráfico do dólar.png'), 'o pedido mostra o nome que o assessor deu ao arquivo');
+  assert.ok(chamada.entrada.includes(`- "${png.nome}" (imagem,`), 'o pedido lista cada arquivo pelo nome seguro, entre aspas');
+  assert.ok(!chamada.entrada.includes('gráfico do dólar.png'), 'o nome que veio com o arquivo não entra no pedido');
   assert.deepEqual(estado.anexos, [], 'depois de enviado, o anexo sai da caixa');
   const de_novo = await api('/api/send', { texto: 'De novo.', anexos: [pdf.id] });
   assert.equal(de_novo.status, 400, 'anexo já enviado não volta a ser usado');
@@ -165,7 +175,9 @@ test('melhorar o pedido também roda sem terminal', { skip: SO_WINDOWS }, async 
   assert.equal(r.status, 200, JSON.stringify(r.json));
   const c = lerChamadas().slice(antes).at(-1);
   assert.equal(valor(c.args, '--permission-mode'), 'default');
-  assert.equal(valor(c.args, '--disallowedTools'), 'Bash,PowerShell,Write,Edit,NotebookEdit,Read,Glob,Grep');
+  assert.equal(valor(c.args, '--disallowedTools'), ['Bash,PowerShell,Write,Edit,NotebookEdit', ...SEM_PERMISSAO, 'Read,Glob,Grep'].join(','));
+  assert.equal(valor(c.args, '--setting-sources'), 'project,local');
+  assert.equal(valor(c.args, '--tools'), 'WebSearch,WebFetch,ToolSearch');
   assert.ok(c.args.includes('--strict-mcp-config'), 'melhorar o pedido não usa os conectores do usuário');
   assert.equal(path.resolve(valor(c.args, '--settings')), path.resolve(arquivoDeRegras()));
 });
@@ -250,5 +262,55 @@ test('pedido de vídeo: mesmos argumentos da 1.13, com terminal liberado para o 
   assert.equal(valor(chamada.args, '--disallowedTools'), NEGADAS_VIDEO_1_13.join(','));
   assert.equal(path.resolve(chamada.cwd), path.resolve(v.json.pasta));
   assert.ok(!chamada.entrada.includes('ARQUIVOS: aqui você só lê arquivos'), 'no vídeo o Claude usa o terminal e a pasta do vídeo: a regra de arquivos não vale');
+  assert.equal(valor(chamada.args, '--setting-sources'), null, 'no vídeo, como na 1.13');
+  assert.equal(valor(chamada.args, '--tools'), null, 'no vídeo, como na 1.13');
   await api('/api/limpar', { descartar: true });
+});
+
+test('modo vídeo: não entra anexo, nem ao anexar nem ao enviar; o Claude não é chamado e o anexo de antes fica na caixa', { skip: SO_WINDOWS }, async () => {
+  const pdf = (await subir('lamina antes do video.pdf', PDF)).json.anexo;
+  const v = await subir('clipe-2.mp4', Buffer.from('nao e um video de verdade'), '/api/upload');
+  assert.equal(v.status, 200, JSON.stringify(v.json));
+  assert.equal((await api('/api/estado')).json.videoAtivo, true);
+  const pasta = path.join(mesa(), 'Anexos', hoje()), antes = arquivosEm(pasta).length;
+  const r1 = await subir('print.png', PNG);
+  assert.equal(r1.status, 409, JSON.stringify(r1.json));
+  assert.match(r1.json.erro, SO_O_VIDEO);
+  assert.equal(arquivosEm(pasta).length, antes, 'o anexo recusado no modo vídeo ficou gravado');
+  const n0 = lerChamadas().length;
+  const r2 = await api('/api/send', { texto: 'Vídeo anexado: ' + v.json.caminho + '. Pode começar.', anexos: [pdf.id] });
+  assert.equal(r2.status, 409, JSON.stringify(r2.json));
+  assert.match(r2.json.erro, SO_O_VIDEO);
+  await espera(300);
+  assert.equal(lerChamadas().length, n0, 'o Claude do vídeo foi chamado com anexo');
+  const e = (await api('/api/estado')).json;
+  assert.equal(e.rodando, false);
+  assert.ok(e.anexos.some((a) => a.id === pdf.id), 'o anexo de antes saiu da caixa sem ser enviado');
+  assert.equal((await api('/api/anexo/remover', { id: pdf.id })).status, 200);
+  await api('/api/limpar', { descartar: true });
+});
+
+test('nova tarefa: o vídeo escolhido para ela continua; depois de usado, a tarefa seguinte sai do modo vídeo', { skip: SO_WINDOWS }, async () => {
+  const v = await subir('clipe-3.mp4', Buffer.from('nao e um video de verdade'), '/api/upload');
+  assert.equal(v.status, 200, JSON.stringify(v.json));
+  // A janela escolhe o vídeo, chama /api/novo (nova tarefa) e só então envia o pedido de vídeo.
+  await api('/api/novo');
+  assert.equal((await api('/api/estado')).json.videoAtivo, true, 'o vídeo escolhido para a tarefa nova sumiu');
+  const { chamada } = await enviarEEsperar({ texto: 'Vídeo anexado: ' + v.json.caminho + '. Pode começar.' });
+  assert.equal(path.resolve(chamada.cwd), path.resolve(v.json.pasta), 'o pedido de vídeo não rodou como vídeo');
+  // Próxima tarefa: sai do modo vídeo e volta às travas de sempre.
+  await api('/api/novo');
+  assert.equal((await api('/api/estado')).json.videoAtivo, false, 'a tarefa seguinte continuou no modo vídeo');
+  const { chamada: c2 } = await enviarEEsperar({ texto: 'Resuma o fato relevante.' });
+  assert.notEqual(path.resolve(c2.cwd), path.resolve(v.json.pasta));
+  confereSemSegredos(c2.args);
+  const r = await subir('print.png', PNG);
+  assert.equal(r.status, 200, 'fora do modo vídeo o anexo volta a funcionar');
+  await api('/api/anexo/remover', { id: r.json.anexo.id });
+  // Usar um vídeo já enviado também vale para a tarefa nova que vem logo depois.
+  assert.equal((await api('/api/usar-video', { pasta: path.basename(v.json.pasta) })).status, 200);
+  await api('/api/novo');
+  assert.equal((await api('/api/estado')).json.videoAtivo, true);
+  await api('/api/limpar', { descartar: true });
+  assert.equal((await api('/api/estado')).json.videoAtivo, false);
 });
