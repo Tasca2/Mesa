@@ -47,3 +47,11 @@ Mantenha valores na moeda original, salvo conversão solicitada e documentada.
 - Dado de mercado exige fonte e data visíveis. Ausência é “não informado”; não é zero nem autorização para estimar. Cálculos derivados devem mostrar os dados e a fórmula.
 - Usar rótulos genéricos e dados minimizados para pessoas; não solicitar identificadores, contas ou informações confidenciais. Não usar informação relevante ainda não pública nem dados obtidos no trabalho de assessoria. Não expor empregador ou clientes do operador.
 - Esta skill prepara análise ou rascunho. Não envia mensagem, publica, movimenta carteira, contrata serviço nem gasta créditos.
+
+## Na Mesa do Assessor (acrescentado)
+
+- **Documento**: o texto colado pelo assessor é o documento. Com só o link ou só o nome da empresa, tente abrir o original; se o texto integral não abrir (o PDF do sistema Rad da CVM pode chegar ilegível pela leitura de página), não resuma por notícia: diga isso na primeira linha, entregue a ficha do que achou e peça o texto colado.
+- **Formato**: dentro da Mesa vale a lista do pedido (ficha, o que foi divulgado, etapas, tamanho, o que muda, casas de research, sequência, cliente, monitorar e conferir), no lugar do resumo em cinco seções desta skill.
+- **Trecho ao lado**: todo número da tabela "O que foi divulgado" tem o trecho do documento ao lado.
+- **Tamanho**: o número do comunicado é sempre comparado com um número da empresa (receita, lucro, dívida líquida ou valor de mercado), com data-base e a conta. Os números da empresa vêm de `analise_ativo` com `pesquisa=true`.
+- **Casas de research**: é opinião delas. Entra com a data e marcada como anterior ou posterior ao comunicado.

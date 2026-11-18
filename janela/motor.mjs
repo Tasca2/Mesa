@@ -526,7 +526,7 @@ const servidor = http.createServer(async (req, res) => {
       }
       case '/api/send': {
         if (estado.rodando) return json(res, 409, { erro: 'O Claude ainda está respondendo.' });
-        const texto = String(corpo.texto || '').trim().slice(0, 12000);
+        const texto = String(corpo.texto || '').trim().slice(0, 40000);
         if (!texto) return json(res, 400, { erro: 'vazio' });
         if (corpo.meta) estado.meta = limpaMeta(corpo.meta);
         rodarClaude(texto, String(corpo.contexto || '').slice(0, 4000), corpo.exibir ? String(corpo.exibir).slice(0, 4000) : '');

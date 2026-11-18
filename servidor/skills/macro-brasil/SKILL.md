@@ -77,3 +77,15 @@ Se o IPCA do último mês ainda não aparece no SGS (433), consulte o IBGE (SIDR
 - Dado de mercado exige fonte e data visíveis. Ausência é “não informado”; não é zero nem autorização para estimar. Cálculos derivados devem mostrar os dados e a fórmula.
 - Usar rótulos genéricos e dados minimizados para pessoas; não solicitar identificadores, contas ou informações confidenciais. Não usar informação relevante ainda não pública nem dados obtidos no trabalho de assessoria. Não expor empregador ou clientes do operador.
 - Esta skill prepara análise ou rascunho. Não envia mensagem, publica, movimenta carteira, contrata serviço nem gasta créditos.
+
+## Na Mesa do Assessor (acrescentado)
+
+- **Formato**: dentro da Mesa vale o formato do pedido: painel em tabela, com as colunas que o pedido escreve. A regra "uma linha por indicador, sem tabela" desta skill fica para o uso fora da Mesa.
+- **Busca por código**: cada número vem da série oficial, não de texto de página. Últimos valores: `https://api.bcb.gov.br/dados/serie/bcdata.sgs.CODIGO/dados/ultimos/N?formato=json`. Valor numa data de referência: `https://api.bcb.gov.br/dados/serie/bcdata.sgs.CODIGO/dados?formato=json&dataInicial=dd/mm/aaaa&dataFinal=dd/mm/aaaa`.
+- **Séries do painel**: 432 (meta Selic, % ao ano); 4389 (CDI, % ao ano) e 4391 (CDI acumulado no mês); 433 (IPCA do mês) e 13522 (IPCA em 12 meses); 13521 (meta de inflação); 189 (IGP-M do mês); 1 (dólar PTAX, venda); 21619 (euro, venda); 195 (poupança, % no mês); 24369 (taxa de desocupação).
+- **Copom**: `https://www.bcb.gov.br/api/servico/sitebcb/copom/comunicados?quantidade=2` lista as duas últimas reuniões; `https://www.bcb.gov.br/api/servico/sitebcb/copom/comunicados_detalhes?nro_reuniao=N` traz o texto do comunicado, de onde saem a decisão, os votos e a frase central; `https://www.bcb.gov.br/api/servico/sitebcb/copom/atas?quantidade=1` traz a data da ata. A data da próxima reunião não tem endereço de dados confirmado: busque no calendário do Banco Central e, sem achar, marque [CONFERIR].
+- **IBGE**: IPCA de conferência em `https://servicodados.ibge.gov.br/api/v3/agregados/1737/periodos/-2/variaveis/63%7C2265?localidades=N1%5Ball%5D`. Agenda de divulgações em `https://servicodados.ibge.gov.br/api/v3/calendario/?qtd=60&de=MM-DD-AAAA&ate=MM-DD-AAAA` (o mês vem antes do dia).
+- **Focus**: é a mediana do mercado. Escreva "o mercado espera" e "Focus publicado em dd/mm": a imprensa dá a data da publicação (em geral segunda-feira) e o relatório leva a data da sexta-feira anterior, então não chame a data da notícia de data do relatório. O endereço oficial dos dados (olinda.bcb.gov.br) ainda não abre na Mesa e o PDF do relatório não é lido pela leitura de página: busque na web, cite quem publicou e, sem achar, diga isso em vez de estimar.
+- **Variações**: o "Antes" é o valor da mesma série na referência que o assessor escolheu (mês passado, semana passada ou início do ano). Mostre a conta e não arredonde diferente da fonte.
+- **Juro real**: mostre a conta e diga qual inflação usou (a de 12 meses ou a esperada).
+- **Conversa de WhatsApp**: fonte e data ficam fora da mensagem, nas duas linhas finais para o assessor.

@@ -320,8 +320,10 @@
       { id: "parado", curto: "Parado há", titulo: "Há quanto tempo o contato parou?", opcoes: [{ t: "Menos de 30 dias" }, { t: "De 1 a 3 meses" }, { t: "Mais de 3 meses" }] } ] },
     "estudo": { nome: "Estudo e apresentação", linha: "Dados da Análise de Ativo do CaptaMais em um material completo.", ref: "skill estudo-de-ativo", acao: "Montar o estudo",
       extra: "Os números vêm da Análise de Ativo do CaptaMais; sem fonte, não entram.", perguntas: [
-      { id: "formato", curto: "Formato", titulo: "O que você vai levar para o cliente?", opcoes: [{ t: "Apresentação (slides)", d: "Até 8 slides" }, { t: "Estudo em PDF", d: "Para ler e enviar" }, { t: "Resumo de uma página", d: "Para a conversa" }] }, USO_MERCADO ] },
-    "macro": { nome: "Juros, inflação e câmbio", linha: "Selic, IPCA e dólar direto do Banco Central.", ref: "skill macro-brasil", acao: "Montar o panorama", perguntas: [USO_MERCADO] },
+      { id: "formato", curto: "Formato", titulo: "O que você vai levar para o cliente?", opcoes: [{ t: "Apresentação (slides)", d: "Até 8 slides" }, { t: "Estudo em PDF", d: "Para ler e enviar" }, { t: "Resumo de uma página", d: "Para a conversa" }] } ] },
+    "macro": { nome: "Juros, inflação e câmbio", linha: "Painel do dia: juros, inflação, dólar, expectativas e agenda.", ref: "skill macro-brasil", acao: "Montar o panorama", perguntas: [USO_MERCADO,
+      { id: "situacoes", curto: "Situações", titulo: "Que situações de cliente o painel deve cobrir?", ajuda: "Marque quantas quiser. Para cada uma, o painel diz o que o dado de hoje mexe e a pergunta para abrir a conversa.", multi: true,
+        opcoes: [{ t: "Reserva em pós-fixado" }, { t: "Prefixado ou IPCA+" }, { t: "Dólar ou exterior" }, { t: "Aluguel ou contrato reajustado por índice" }, { t: "Vai financiar imóvel" }] } ] },
     "fato": { nome: "Fato relevante", linha: "Resumo do comunicado e o que muda na tese.", ref: "skill resumo-de-fato-relevante", acao: "Resumir o fato", perguntas: [USO_MERCADO] },
     "grafico": { nome: "Leitura de gráfico", linha: "Descrição de preço e indicadores, sem previsão.", ref: "skill leitura-grafica", acao: "Ler o gráfico", perguntas: [USO_MERCADO] },
     "acao": { nome: "Analisar uma ação", linha: "Uma empresa pelo método: números, critérios e lacunas.", ref: "skill fundamentalista-metodo", acao: "Analisar a ação", perguntas: [USO_MERCADO] },
@@ -626,63 +628,96 @@
       ]
     },
     "estudo": {
-      "obj": "Montar um material de ativo para levar ao cliente, só com dados que tenham fonte.",
+      "obj": "Montar o material que eu levo ao cliente sobre um ativo: o que ele é, o que fez, como se compara e o que observar, em páginas prontas.",
       "entrega": [
-        "Histórico e rentabilidade com data-base e fonte",
-        "Comparação com índice",
-        "Contexto macro e fatos relevantes",
-        "Pontos de atenção e lacunas",
-        "No formato escolhido (resumo de uma página, estudo em PDF ou até 8 slides, um título-conclusão por slide)",
-        "Mensagem curta de envio ao cliente",
-        "Sem recomendação de compra ou venda"
+        "Em uma frase (negrito): o que o material mostra sobre o ativo, com o período e a data-base",
+        "Ficha em UMA tabela de até 8 linhas (Item | Dado | Data): o que é, setor ou segmento, preço, valor de mercado ou patrimônio, liquidez, proventos em 12 meses e índice de comparação",
+        "Quatro números em destaque para o topo do material (Rótulo | Valor | Referência), escolhidos pelo tipo do ativo. Ação: P/L, EV/EBITDA, dividend yield e dívida líquida sobre resultado operacional. Fundo imobiliário: P/VP, rendimento em 12 meses, vacância e número de imóveis ou de devedores. Fundo: patrimônio, taxa de administração, retorno contra o índice e volatilidade",
+        "Histórico em UMA tabela (Janela | Ativo | Índice | Diferença) nas janelas de 12, 24 e 36 meses que os dados cobrirem",
+        "O que explica o período em UMA tabela de até 5 linhas (Data | Fato | Efeito): resultados, fatos relevantes e mudanças de juros",
+        "Fortes e pontos de atenção em UMA tabela de duas colunas, até 3 de cada, cada um com o número que sustenta",
+        "Casas de research em UMA linha (mediana do alvo, recomendação mais comum, número de casas e data), só para ação e fundo imobiliário; opinião delas",
+        "Para que situação de cliente o ativo conversa, em UMA tabela (Situação | Encaixe ▲ ● ▼ | Motivo): prazo, necessidade de liquidez, tolerância a oscilação e renda; descreva a característica do ativo, a adequação ao cliente é minha",
+        "O material no formato escolhido, gerado com a ferramenta. Resumo de uma página e Estudo em PDF: mesa_documento, com os quatro números numa tabela no topo e as seções na ordem acima (o resumo traz só os destaques, o histórico e os fortes e pontos de atenção). Apresentação: mesa_apresentacao com até 8 páginas (capa, numeros, tabela, barras, lista, frase e fechamento), um título-conclusão por página. O arquivo é do cliente: o Conferir e o Próximo passo ficam só na conversa, fora do arquivo (vale no lugar da regra geral do PDF)",
+        "Mensagem curta de envio ao cliente, em peça separada (tipo whatsapp)",
+        "Com mais de um ativo: tudo lado a lado na mesma data-base, uma coluna por ativo",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens"
       ],
       "insumos": [
         "Ativo(s), até 3: ticker, nome do fundo ou CNPJ",
         "Para qual perfil de cliente é o material (sem nome)",
-        "Período que quero destacar"
+        "Período que quero destacar",
+        "Índice de comparação"
       ],
-      "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo; em ações e FIIs use pesquisa=true para trazer também múltiplos, preço-alvo das casas, relatórios resumidos e balanços) e complete com fontes oficiais. Só me peça o que não achar por lá."
+      "fonte": "Chame analise_ativo para cada ativo com o tipo certo (em ação e fundo imobiliário, pesquisa=true) e use todos os blocos que voltarem, não só o histórico: multiplosEIndicadores, balancosTrimestrais, precoAlvoPorCasa, ajustesDeAlvoEm30Dias, ultimosRelatorios e lacunas. Confira o retorno de 12 meses do resumo contra a composição dos 12 retornos mensais (historicoMensal): se não bater, mostre os dois e marque [CONFERIR]. Só me peça o que não achar."
     },
     "macro": {
-      "obj": "Ver o cenário de juros, inflação e câmbio hoje, com fonte e data.",
+      "obj": "Ter o painel de juros, inflação e câmbio de hoje pronto para a conversa: o número, o que mudou, o que o mercado espera, o que vem na agenda e o que isso mexe para cada tipo de cliente.",
       "entrega": [
-        "Selic, IPCA e dólar com definição, unidade e data",
-        "O que mudou desde a última leitura",
-        "Fonte oficial de cada número",
-        "Leitura para o cliente: o que isso muda na conversa, em 3 frases simples, sem sugerir investimento"
+        "Em uma frase (negrito): o que mudou desde a referência escolhida e o dado que mais pesa na conversa de hoje",
+        "Painel em UMA tabela (Indicador | Hoje | Data do dado | Antes | Variação | Leitura), no máximo 10 linhas: Selic, CDI ao ano e ao mês, IPCA do mês e em 12 meses contra a meta, IGP-M, dólar com a variação no dia, no mês e no ano, euro, poupança e desemprego; fonte e código de cada série no rodapé da tabela",
+        "Juro real em UMA linha: Selic contra o IPCA de 12 meses (o que já aconteceu) e contra o IPCA esperado pelo Focus, com a conta mostrada",
+        "Copom em UMA tabela de 2 linhas (Reunião | Data | Decisão | Placar | Frase central do comunicado) e a data da próxima reunião",
+        "Expectativas do Focus em UMA tabela (Indicador | Este ano | Próximo ano | Há 4 semanas | Mudou?): IPCA, Selic, PIB e câmbio, com a data do relatório; é a mediana do mercado, escreva \"o mercado espera\"",
+        "Agenda dos próximos 30 dias em UMA tabela de até 6 linhas (Data | Divulgação | Por que importa para o cliente)",
+        "O que muda na conversa em UMA tabela (Situação do cliente | O que o dado de hoje mexe | Pergunta para abrir a conversa), para as situações que marquei",
+        "Cliente: leitura em 3 a 5 frases simples e as 3 perguntas mais prováveis com a resposta em uma frase cada",
+        "Monitorar em UMA tabela de até 4 linhas (Indicador | Hoje | Muda a leitura se | Quando sai o dado)",
+        "Se eu pedir na conversa: o post do dia a partir do dado principal, com mesa_carrossel, sem refazer a pesquisa",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (dado defasado, série que não respondeu, diferença entre Banco Central e IBGE), sem repetir o que já aparece acima. Em arquivo para o cliente ficam de fora o Conferir, o Próximo passo e o que é orientação para mim (vale no lugar da regra geral do PDF)"
       ],
       "insumos": [
-        "Indicador ou período específico (deixe em branco para o painel completo)"
-      ]
+        "Recorte do painel",
+        "Referência para comparar"
+      ],
+      "fonte": "Busque cada número por código, na série oficial, e não em texto de página: os endereços estão na seção Na Mesa do Assessor da skill. O Antes de cada linha é o valor da mesma série na referência que escolhi, com a conta da variação. Série que não responder fica marcada, sem estimar. Com recorte menor que o painel completo, entregue só as linhas e as tabelas do recorte."
     },
     "fato": {
-      "obj": "Entender um comunicado ao mercado e o que muda para a tese.",
+      "obj": "Entender um comunicado da empresa em minutos: o que foi dito, quanto pesa no tamanho da empresa, o que muda nas premissas e como falar disso com o cliente.",
       "entrega": [
-        "Resumo do comunicado em poucas linhas",
-        "O que foi divulgado separado do que é interpretação",
-        "Pontos que afetam a tese",
-        "Leitura para o cliente em 3 frases simples, sem dizer o que fazer",
-        "Perguntas que o cliente pode fazer, com resposta descritiva"
+        "Em uma frase (negrito): o que a empresa comunicou, com o número principal e a data",
+        "Ficha do documento em UMA tabela de 1 linha (Empresa | Tipo | Entregue em | Assunto | Protocolo | Link); o que não estiver no documento fica em branco",
+        "O que foi divulgado em UMA tabela (Item | Número ou condição | Trecho do documento), só o que está escrito; o que for interpretação vai numa linha separada abaixo, marcada como interpretação",
+        "Etapas em UMA tabela (Etapa | Depende de | Prazo informado): o que já vale e o que ainda precisa de aprovação, assembleia ou data",
+        "Tamanho em UMA tabela (Número do comunicado | Comparado com | Equivale a): contra receita, lucro, dívida líquida e valor de mercado, com data-base e a conta mostrada",
+        "O que muda em UMA tabela (Premissa | Antes | Depois do comunicado | Efeito): receita, margem, dívida, proventos e governança; se informei minha tese, use as premissas dela",
+        "O que as casas de research diziam antes do comunicado, em UMA linha (mediana do alvo, recomendação mais comum e data), e se alguma já revisou depois",
+        "Sequência em UMA tabela de até 3 linhas (Data | Tipo | Assunto): comunicados anteriores da mesma empresa que ajudam a entender este",
+        "Cliente: leitura em 3 a 5 frases simples e as 3 perguntas mais difíceis com a resposta em uma frase cada, ajustadas ao que marquei sobre a posição do cliente",
+        "Monitorar em UMA tabela de até 4 linhas (O que acompanhar | Hoje | Muda a leitura se | Quando sai)",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (trecho ambíguo, número que não bate entre o comunicado e o balanço, documento que falta abrir). Em arquivo para o cliente ficam de fora o Conferir, o Próximo passo e o que é orientação para mim (vale no lugar da regra geral do PDF)"
       ],
       "insumos": [
+        "Empresa (nome ou ticker)",
         "Texto integral do comunicado ou link da página oficial",
-        "Minha tese ou o motivo de acompanhar a empresa"
-      ]
+        "Minha tese ou o motivo de acompanhar a empresa",
+        "Se o cliente tem o papel"
+      ],
+      "fonte": "O documento é o texto que colei. Se passei só o link ou só a empresa, tente abrir o original; se o texto integral não abrir, não resuma por notícia: diga isso na primeira linha, entregue só a ficha do que achou e me peça o texto colado. Para o tamanho e as premissas, chame analise_ativo com tipo acoes e pesquisa=true (balancosTrimestrais, multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias). Não complete trecho do comunicado de memória."
     },
     "grafico": {
-      "obj": "Descrever o gráfico de forma objetiva, sem previsão.",
+      "obj": "Descrever o gráfico com medidas: onde o preço está, o que fez no período, os níveis que o mercado respeitou e o que mudaria a leitura.",
       "entrega": [
-        "Estrutura de preços e níveis observados",
-        "Leitura dos indicadores que pedi",
-        "Condições e o que invalidaria a leitura",
-        "Leitura para o cliente em 2 a 3 frases, sem previsão"
+        "Em uma frase (negrito): onde o preço está em relação à faixa do período e qual é a estrutura (alta, queda ou lateral), com a data do último preço",
+        "Base em 1 linha: ativo, período, escala, origem dos dados (série que enviei ou série do CaptaMais) e se a série é diária ou mensal",
+        "Medidas em UMA tabela (Medida | Valor | Data): último preço, máxima e mínima do período, distância até cada uma, retorno no período contra o índice, maior queda do período (do topo ao fundo) e volatilidade; com série mensal, em base 100",
+        "Estrutura em 2 linhas: sequência de topos e fundos, com as datas dos pontos usados",
+        "Níveis em UMA tabela de até 5 linhas (Preço | Suporte ou resistência | Vezes testado | Datas)",
+        "Indicadores que pedi em UMA tabela (Indicador | Parâmetro | Valor hoje | O que a regra do indicador diz), só os que os dados permitem calcular; o que não der, diga por quê",
+        "O que distorce o gráfico em UMA tabela (Data | Evento | Efeito no preço): proventos, desdobramento, resultado e fato relevante do período",
+        "Condições em UMA tabela de até 3 linhas (Se o preço | A leitura passa a ser | O que invalida)",
+        "Cliente: leitura em 2 a 3 frases simples e as 2 perguntas mais prováveis com a resposta em uma frase cada",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens. Em arquivo para o cliente ficam de fora o Conferir, o Próximo passo e o que é orientação para mim (vale no lugar da regra geral do PDF)"
       ],
       "insumos": [
-        "Imagem do gráfico, série de preços ou descrição",
-        "Ativo, período e escala de tempo",
-        "Indicadores que quero ver (ex.: média móvel, IFR)"
+        "Ativo (ticker)",
+        "Período",
+        "Escala de tempo",
+        "Índice de comparação",
+        "Indicadores que quero ver (ex.: média móvel, IFR)",
+        "Imagem do gráfico, série de preços ou descrição"
       ],
-      "fonte": "Se eu não enviar imagem nem série de preços, busque o histórico na Análise de Ativo do CaptaMais (analise_ativo)."
+      "fonte": "Se enviei a série de preços ou descrevi o gráfico, comece por aí e diga o que não dá para ler. Sem isso, chame analise_ativo com o ticker e o tipo certo e confira a periodicidade que veio: se forem retornos mensais (sem preço em reais, máxima, mínima nem volume), monte a base 100, calcule só o que a série mensal permite e diga isso na Base. O que pedir outra escala (média móvel de dias, IFR de 14 dias, volume) fica pendente, com o pedido da série ou do print na escala certa. Não desenhe nível nem indicador que os dados não sustentam."
     },
     "acao": {
       "obj": "Ler uma empresa pelos meus critérios, mostrando evidências e lacunas.",
@@ -799,8 +834,8 @@
     }
   };
   const ONDE_PESQUISAR = {
-    macro: "Selic e Copom: bcb.gov.br (comunicados e atas do Copom); Selic, IPCA e dólar em série: API do Banco Central (api.bcb.gov.br, SGS); expectativas de mercado: relatório Focus, em bcb.gov.br; IPCA oficial: IBGE (SIDRA, tabela 1737, servicodados.ibge.gov.br).",
-    fato: "O documento original: sistema Rad da CVM (rad.cvm.gov.br) ou a página de Relações com Investidores da empresa; confira data e hora do envio; compare com o último ITR ou DFP (dados.cvm.gov.br) para ver o que de fato mudou.",
+    macro: "API de séries do Banco Central (api.bcb.gov.br, SGS): 432 Selic, 4389 e 4391 CDI, 433 e 13522 IPCA, 13521 meta de inflação, 189 IGP-M, 1 dólar, 21619 euro, 195 poupança e 24369 desemprego; Copom: comunicados e atas em www.bcb.gov.br; IPCA de conferência e agenda de divulgações: IBGE (servicodados.ibge.gov.br, tabela 1737 e calendário); Focus: o endereço oficial dos dados ainda não abre na Mesa, então busque na web a mediana mais recente e cite quem publicou e a data do relatório.",
+    fato: "O documento original: sistema Rad da CVM (rad.cvm.gov.br; o PDF de lá nem sempre abre na Mesa) ou a página de Relações com Investidores da empresa; confira a data do envio; comunicados anteriores da empresa: busca na web, com a fonte; números da empresa para a comparação: analise_ativo e, de reserva, o último ITR ou DFP (dados.cvm.gov.br).",
     grafico: "Histórico de preço e rentabilidade: Análise de Ativo do CaptaMais (analise_ativo); cotação e volume: b3.com.br; proventos, desdobramentos e eventos que distorcem o gráfico: RI da empresa e B3.",
     estudo: "Dados do ativo: Análise de Ativo do CaptaMais (analise_ativo); demonstrações e fatos relevantes: CVM (dados.cvm.gov.br e rad.cvm.gov.br); contexto macro: Banco Central e IBGE; para fundos, lâmina e regulamento no site da CVM.",
     acao: "Demonstrações (ITR, DFP) e fatos relevantes: CVM (dados.cvm.gov.br, rad.cvm.gov.br) e RI da empresa; preço, rentabilidade e, conectado, múltiplos e pesquisa das casas: Análise de Ativo do CaptaMais (analise_ativo); setor e regulação: agências e ministérios em gov.br.",
@@ -808,12 +843,19 @@
     fii: "Composição e distribuições: relatório gerencial e fatos relevantes do fundo (site do gestor e Fundos.NET da B3; o Claude não abre o Fundos.NET, então diga o caminho para eu abrir); regulamento e dados cadastrais: CVM; preço, P/VP e histórico: Análise de Ativo do CaptaMais (analise_ativo).",
     rf: "Tesouro Direto: tesourodireto.com.br (taxas e preços do dia); debêntures e curvas de juros: data.anbima.com.br; limite e cobertura do FGC: fgc.org.br; tabela de imposto de renda: gov.br (Receita Federal); CDI e Selic: api.bcb.gov.br.",
   };
-  const USO_ENTREGA = (base) => () => {
+  // Na opção "Conversa de WhatsApp" a lista de entrega é trocada pelas mensagens: esta linha diz o que a mensagem de cada tarefa precisa trazer.
+  const NA_MENSAGEM = {
+    macro: "Na mensagem não pode faltar: o número de hoje, quanto mudou desde a referência e o que isso mexe para a situação do cliente",
+    fato: "Na mensagem não pode faltar: o que a empresa comunicou, o número principal e o que ainda depende de aprovação",
+    grafico: "Na mensagem não pode faltar: onde o preço está na faixa do período e o nível que o mercado respeitou, com as datas",
+  };
+  const USO_ENTREGA = (base, naMensagem) => () => {
     const uso = (estado.respostas.uso ?? [])[0] ?? "";
     if (/WhatsApp/i.test(uso)) return [
       "Antes, pesquise tudo o que a rotina pede (dados, fontes e datas), mas entregue só o que eu vou mandar e o que preciso para sustentar a conversa",
       "Resumo para mim em 2 linhas: o que aconteceu e o que muda na conversa com o cliente",
       "Mensagem principal de WhatsApp, pronta para colar, em peça separada (tipo whatsapp): 3 a 5 linhas, começa pelo que importa para a pessoa, traduz o termo técnico e usa uma analogia do dia a dia",
+      ...(naMensagem ? [naMensagem] : []),
       "Versão de 2 linhas, em peça separada, para quando o cliente só quer saber o essencial",
       "Resposta pronta, em peça separada, para as 2 perguntas que o cliente mais provavelmente fará depois",
       "Uma pergunta aberta no fim da mensagem para continuar a conversa e entender a situação dele",
@@ -827,7 +869,7 @@
   };
   ["macro", "fato", "grafico", "estudo", "acao", "setor", "fii", "rf"].forEach((id) => {
     const p = PEDIDO[id]; if (!p) return;
-    p.entrega = USO_ENTREGA(Array.isArray(p.entrega) ? p.entrega : []);
+    if (id !== "estudo") p.entrega = USO_ENTREGA(Array.isArray(p.entrega) ? p.entrega : [], NA_MENSAGEM[id]); // o Estudo é sempre material para o cliente: não tem a pergunta de uso
     p.fonte = (p.fonte ? p.fonte + " " : "") + "Onde pesquisar, nesta ordem: " + ONDE_PESQUISAR[id] + " Cite a fonte e a data de cada número.";
     if (["estudo", "acao", "setor", "fii", "grafico"].includes(id)) p.fonte += " Índice de comparação na mesma janela: analise_ativo com tipo indice (IFIX para FII, IBOV para ações, CDI para renda fixa).";
   });
@@ -951,18 +993,25 @@
       { rotulo: "Ativo(s), até 3 (ticker, nome do fundo ou CNPJ)", dica: "Ex.: PETR4, HGLG11" },
       { rotulo: "Para qual perfil de cliente é o material", opcoes: ["Conservador", "Moderado", "Arrojado", "Qualquer"], padrao: "Moderado" },
       { rotulo: "Período que quero destacar", opcoes: ["12 meses", "24 meses", "36 meses", "Desde o início"], padrao: "12 meses" },
+      { rotulo: "Comparar com", opcoes: ["IBOV", "IFIX", "CDI", "IPCA"], opcional: true, dica: "Em branco: IBOV (ação) ou IFIX (FII)" },
     ],
     "macro": [
-      { rotulo: "Indicador ou período", opcoes: ["Painel completo (Selic, IPCA e dólar)", "Só Selic", "Só IPCA", "Só dólar"], padrao: "Painel completo (Selic, IPCA e dólar)" },
+      { rotulo: "Recorte", opcoes: ["Painel completo", "Juros e Copom", "Inflação", "Dólar e câmbio"], padrao: "Painel completo" },
+      { rotulo: "Comparar com", opcoes: ["Mês passado", "Semana passada", "Início do ano"], padrao: "Mês passado" },
     ],
     "fato": [
-      { rotulo: "Texto integral do comunicado ou link da página oficial", longo: true, dica: "Cole o texto ou o link do site da empresa, da CVM ou da B3" },
+      { rotulo: "Empresa (nome ou ticker)", dica: "Ex.: PETR4" },
+      { rotulo: "Texto integral do comunicado ou link da página oficial", longo: true, dica: "Cole o texto do comunicado. Só com o link, o PDF da CVM nem sempre abre" },
       { rotulo: "Minha tese ou motivo de acompanhar a empresa", opcional: true, dica: "Ex.: tese de dividendos" },
+      { rotulo: "O cliente tem o papel?", opcoes: ["Tem, posição relevante", "Tem, posição pequena", "Não tem, está olhando", "Não sei"], opcional: true },
     ],
     "grafico": [
-      { rotulo: "Ativo, período e escala", dica: "Ex.: IVVB11, 12 meses, diário" },
-      { rotulo: "Imagem do gráfico, série ou descrição", longo: true, opcional: true, dica: "Se você não enviar, busco o histórico na Análise de Ativo" },
+      { rotulo: "Ativo (ticker)", dica: "Ex.: VALE3, IVVB11" },
+      { rotulo: "Período", opcoes: ["3 meses", "6 meses", "12 meses", "3 anos", "5 anos"], padrao: "12 meses" },
+      { rotulo: "Escala", opcoes: ["Diário", "Semanal", "Mensal"], opcional: true, dica: "Em branco, uso a escala que os dados permitirem" },
+      { rotulo: "Comparar com", opcoes: ["IBOV", "IFIX", "CDI", "Dólar"], opcional: true, dica: "Em branco: IBOV (ação) ou IFIX (FII)" },
       { rotulo: "Indicadores que quero ver", opcoes: ["Médias móveis", "IFR", "Volume", "Bandas de Bollinger"], opcional: true },
+      { rotulo: "Imagem do gráfico, série ou descrição", longo: true, opcional: true, dica: "Se você não enviar, busco o histórico na Análise de Ativo" },
     ],
     "acao": [
       { rotulo: "Empresa (ticker)", dica: "Ex.: WEGE3" },

@@ -42,3 +42,11 @@ Em todos: ao final, uma mensagem curta de envio ao cliente (`whatsapp`, sem `**`
 - Nenhuma indicação de compra ou venda, preço-alvo próprio ou projeção de retorno.
 - Número sem fonte e data não entra; cálculo derivado mostra os dados e a fórmula.
 - Não envia nada ao cliente.
+
+## Na Mesa do Assessor (acrescentado)
+
+- **O material nasce da análise**: chame `analise_ativo` e use todos os blocos que voltarem antes de montar página. Em ação e fundo imobiliário, com `pesquisa=true`.
+- **Formato**: dentro da Mesa vale a lista do pedido. Resumo de uma página e Estudo em PDF usam `mesa_documento`, com as tabelas no texto de cada seção. Apresentação usa `mesa_apresentacao`, com os layouts capa, numeros, tabela, barras, lista, frase e fechamento.
+- **Sem gráfico inventado**: o PDF ainda não desenha gráfico de linha. Não descreva gráfico que não foi gerado; a evolução vai em tabela ou no layout barras.
+- **Título-conclusão**: um por página, com o número que sustenta.
+- **Mais de um ativo**: mesma data-base para todos, ou diga qual ficou diferente.
