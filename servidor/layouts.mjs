@@ -5,9 +5,9 @@ export const W = 1920;
 export const H = 1080;
 
 const TEMAS = {
-  escuro: { fundo: '#0E0E10', painel: '#17171A', tinta: '#F2EDE4', suave: '#9C9CA3', cor: '#C9A24B', linha: 'rgba(255,255,255,.15)' },
-  claro: { fundo: '#F6F2EA', painel: '#ECE6D9', tinta: '#1A1A1C', suave: '#66666C', cor: '#8A6A2B', linha: 'rgba(0,0,0,.15)' },
-  marinho: { fundo: '#0B1F33', painel: '#12304C', tinta: '#F1F4F7', suave: '#A3B3C4', cor: '#D8B26A', linha: 'rgba(255,255,255,.17)' },
+  escuro: { fundo: '#0E0E10', painel: '#17171A', tinta: '#F2EDE4', suave: '#9C9CA3', cor: '#C9A24B', linha: 'rgba(255,255,255,.15)', neg: '#E07A62' },
+  claro: { fundo: '#F6F2EA', painel: '#ECE6D9', tinta: '#1A1A1C', suave: '#66666C', cor: '#8A6A2B', linha: 'rgba(0,0,0,.15)', neg: '#B0432B' },
+  marinho: { fundo: '#0B1F33', painel: '#12304C', tinta: '#F1F4F7', suave: '#A3B3C4', cor: '#D8B26A', linha: 'rgba(255,255,255,.17)', neg: '#E8836A' },
 };
 const ESTILOS = {
   serifada: { titulo: "Georgia,'Times New Roman',serif", peso: 400, espaco: '-0.012em', pv: true },
@@ -140,7 +140,7 @@ td{font-size:30px;line-height:1.35;padding:28px 24px 28px 0;border-bottom:1px so
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th.n:last-child,td.n:last-child{padding-right:0}
 /* barras */
 .bar{margin-top:24px;display:flex;flex-direction:column;justify-content:space-around;gap:30px}.leg{display:flex;gap:44px;font-size:28px;color:${t.suave};margin-top:36px}.leg i{display:inline-block;width:30px;height:12px;margin-right:14px;vertical-align:middle}
-.bl{display:grid;grid-template-columns:400px 1fr 200px;gap:34px;align-items:center}.bl .r{font-size:30px;line-height:1.25}.bl .t{display:flex;flex-direction:column;gap:8px}.bl .t div{height:24px;background:${t.painel};position:relative}.bl .t b{display:block;height:100%}
+.bl{display:grid;grid-template-columns:400px 1fr 200px;gap:34px;align-items:center}.bl .r{font-size:30px;line-height:1.25}.bl .t{display:flex;flex-direction:column;gap:8px}.bl .t div{height:24px;background:${t.painel};position:relative}.bl .t b{position:absolute;top:0;height:100%}.bl .t i.zero{position:absolute;top:-8px;bottom:-8px;width:2px;margin-left:-1px;background:${t.tinta};opacity:.6}
 .bl .p{font-family:${NUMS};font-size:38px;line-height:1.15;text-align:right;color:${t.tinta}}.bl .p span{display:block;color:${t.suave}}
 /* frase */
 .frase .corpo{justify-content:center;padding-left:56px;border-left:3px solid ${cor}}.frase h2{font-size:84px;line-height:1.16;max-width:1500px}.frase .sub{font-size:34px}
@@ -336,6 +336,7 @@ function serieLinha(s) {
   return { rotulos: rot, series: ser.map((x) => ({ ...x, valores: x.valores.map((v) => (v / x.valores[0]) * 100) })) };
 }
 
+const temValor = (v) => v !== undefined && v !== null && String(v).trim() !== '';
 // Gráficos com número que não é número viram erro antes do PDF, com o motivo.
 export function problemasDosSlides(slides) {
   const out = [];
@@ -348,6 +349,20 @@ export function problemasDosSlides(slides) {
       if (its.length >= 2 && its.every((x) => numeroDe(x.valor) === 0)) out.push(`${onde}: todos os valores da rosca são zero`);
     }
     if (s.layout === 'linha') { try { serieLinha(s); } catch (e) { out.push(`${onde}: ${e.message}`); } }
+    if (s.layout === 'barras') {
+      const its = itensDe(s, 8), duplo = its.some((x) => temValor(x.valor2));
+      if (!its.length) out.push(`${onde}: as barras precisam de pelo menos 1 item`);
+      for (const x of its) {
+        const nome = String(x.rotulo || x.titulo || '').trim();
+        if (!nome) out.push(`${onde}: cada barra precisa de um rótulo (rotulo)`);
+        for (const [campo, v] of [['valor', x.valor], ...(duplo ? [['segundo valor (valor2)', x.valor2]] : [])]) {
+          const l = temValor(v) ? lerNumero(v) : null;
+          if (!temValor(v)) out.push(`${onde}: "${nome || '?'}": falta o ${campo}, que as outras barras têm`);
+          else if (!l) out.push(`${onde}: "${nome || '?'}": o ${campo} precisa ser um número em % (ex.: 12,5% ou -3,2%), não "${v}"`);
+          else if (l.unidade && l.unidade !== '%') out.push(`${onde}: "${nome || '?'}": as barras mostram valores em %, e "${v}" tem outra unidade (para R$ ou múltiplos, use numeros, tabela ou rosca)`);
+        }
+      }
+    }
   });
   return out;
 }
@@ -461,13 +476,20 @@ const LAYOUTS = {
     const duplo = its.some((x) => x.valor2 !== undefined && x.valor2 !== null && x.valor2 !== '');
     const fr = porQtd(k, [4, 40], [6, 34], [8, 30]), fv = porQtd(k, [4, 50], [6, 42], [8, duplo ? 32 : 34]), alt = porQtd(k, [4, duplo ? 40 : 64], [6, duplo ? 30 : 48], [8, duplo ? 22 : 36]);
     const gap = porQtd(k, [4, 44], [6, 30], [8, duplo ? 14 : 22]);
-    const cores = [m.cor, m.suave];
-    const ler = (v) => { const x = numeroDe(v); return Number.isFinite(x) ? Math.max(0, Math.min(100, x)) : 0; };
-    const casas = Math.min(1, Math.max(0, ...its.flatMap((x) => [x.valor, x.valor2]).map((v) => lerNumero(v)?.casas ?? 0)));
+    const cores = [m.cor, m.suave], negs = [m.neg || '#E07A62', mixar(m.neg || '#E07A62', m.fundo, 0.35)];
+    // O número escrito é o enviado (com sinal e as casas dele, até 2). A trilha vai de min(0, valores) a max(100, valores):
+    // negativo sai à esquerda da linha do zero, em outra cor; acima de 100 a escala cresce e a barra nunca sai da trilha.
+    const vals = its.flatMap((x) => [numeroDe(x.valor), ...(duplo ? [numeroDe(x.valor2)] : [])]).filter(Number.isFinite);
+    const lo = Math.min(0, ...vals), hi = Math.max(100, ...vals), pos = (v) => Math.max(0, Math.min(100, ((v - lo) / (hi - lo || 1)) * 100)), zero = pos(0);
+    const casas = Math.min(2, Math.max(0, ...its.flatMap((x) => [x.valor, x.valor2]).map((v) => lerNumero(v)?.casas ?? 0)));
     const pct = formatador('%', casas);
+    const trilha = (v, j) => {
+      const b = Number.isFinite(v) ? `<b class="${v < 0 ? 'neg' : 'pos'}" style="left:${Math.min(pos(v), zero).toFixed(2)}%;width:${Math.abs(pos(v) - zero).toFixed(2)}%;background:${v < 0 ? negs[j] : cores[j]}"></b>` : '';
+      return `<div style="height:${alt}px">${lo < 0 ? `<i class="zero" style="left:${zero.toFixed(2)}%"></i>` : ''}${b}</div>`;
+    };
     const linhas = its.map((x) => {
-      const a = ler(x.valor), b = ler(x.valor2);
-      return `<div class="bl"><div class="r" style="font-size:${fr}px">${lim(x.rotulo)}</div><div class="t"><div style="height:${alt}px"><b style="width:${a}%;background:${cores[0]}"></b></div>${duplo ? `<div style="height:${alt}px"><b style="width:${b}%;background:${cores[1]}"></b></div>` : ''}</div><div class="p" style="font-size:${fv}px">${pct(a)}${duplo ? `<span style="font-size:${Math.max(28, fv - 6)}px">${pct(b)}</span>` : ''}</div></div>`;
+      const a = numeroDe(x.valor), b = numeroDe(x.valor2);
+      return `<div class="bl"><div class="r" style="font-size:${fr}px">${lim(x.rotulo)}</div><div class="t">${trilha(a, 0)}${duplo ? trilha(b, 1) : ''}</div><div class="p" style="font-size:${fv}px">${pct(a)}${duplo ? `<span style="font-size:${Math.max(28, fv - 6)}px">${pct(b)}</span>` : ''}</div></div>`;
     }).join('');
     const leg = duplo && Array.isArray(s.legenda) ? `<div class="leg">${s.legenda.slice(0, 2).map((l, j) => `<span><i style="background:${cores[j]}"></i>${lim(l)}</span>`).join('')}</div>` : '';
     return `<section class="s enche"><div class="c">${etiqueta(s)}${titulo(s, 70)}<div class="corpo"><div class="bar alto" style="gap:${gap}px">${linhas}</div>${leg}</div>${fonteTxt(s)}</div>${rodapePagina(m, i, n)}</section>`;
@@ -581,7 +603,7 @@ export function montarPaginas(slides, marca, deslocamento = 0, total = slides.le
   const t = TEMAS[marca.tema] ?? TEMAS.escuro;
   const est = ESTILOS[marca.estilo] ?? ESTILOS.serifada;
   const cor = /^#[0-9a-fA-F]{6}$/.test(marca.cor || '') ? marca.cor : t.cor;
-  const m = { ...marca, cor, suave: t.suave, fundo: t.fundo, tinta: t.tinta, painel: t.painel, linha: t.linha, pv: !!est.pv, cor2: mixar(cor, '#ffffff', 0.42) };
+  const m = { ...marca, cor, suave: t.suave, fundo: t.fundo, tinta: t.tinta, painel: t.painel, linha: t.linha, neg: t.neg, pv: !!est.pv, cor2: mixar(cor, '#ffffff', 0.42) };
   const html = slides.map((s, i) => {
     const h = (LAYOUTS[s.layout] ?? LAYOUTS.frase)(s, m, i + deslocamento, total);
     if (!s.ponte) return h;

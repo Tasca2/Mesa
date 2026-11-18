@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const RAIZ = process.env.MESA_RAIZ || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { montarPaginas, NOMES_LAYOUT, css } = await import(pathToFileURL(path.join(RAIZ, 'servidor', 'layouts.mjs')).href);
+const { montarPaginas, NOMES_LAYOUT, css, problemasDosSlides } = await import(pathToFileURL(path.join(RAIZ, 'servidor', 'layouts.mjs')).href);
 
 const MARCA = { nome: 'Assessor Teste', escritorio: 'Escritório Teste', rodape: 'Material informativo. Assessor Teste, Escritório Teste.' };
 const pagina = (s, marca = MARCA) => montarPaginas([s], marca).html;
@@ -106,4 +106,30 @@ test('a frase-ponte fecha a área de conteúdo e não encosta no rodapé', () =>
 test('número grande em cor sólida (texto com gradiente recortado deixa fio no PDF)', () => {
   const folha = css({ fundo: '#000', painel: '#111', tinta: '#fff', suave: '#999', cor: '#C9A24B', linha: '#333' }, { titulo: 'serif', peso: 400, espaco: '0', pv: true }, '#C9A24B');
   assert.doesNotMatch(folha, /background-clip:text/);
+});
+
+// Correções depois da revisão do passo 4 (18/11): barras com o valor enviado, não o número limitado e arredondado.
+test('barras: escreve o valor enviado, com sinal e casas; só a barra fica dentro da trilha', () => {
+  const h = pagina({ layout: 'barras', titulo: 'Retorno em 24 meses até out/2026', itens: [{ rotulo: 'WEGE3', valor: '-5,71%' }, { rotulo: 'IBOV', valor: 29.46 }, { rotulo: 'Outro', valor: '112%' }] });
+  assert.match(h, /class="p"[^>]*>−5,71%</, 'o negativo sai com sinal, não como 0,0%');
+  assert.match(h, /class="p"[^>]*>29,46%</, 'as casas enviadas ficam');
+  assert.match(h, /class="p"[^>]*>112,00%</, 'acima de 100 sai o valor enviado');
+  const barras = [...h.matchAll(/<b class="([^"]*)" style="left:([\d.]+)%;width:([\d.]+)%/g)].map(([, c, l, w]) => ({ c, l: Number(l), w: Number(w) }));
+  assert.equal(barras.length, 3);
+  for (const b of barras) assert.ok(b.l >= 0 && b.w >= 0 && b.l + b.w <= 100.0001, `barra fora da trilha: ${JSON.stringify(b)}`);
+  assert.match(barras[0].c, /\bneg\b/, 'o negativo é desenhado diferente');
+  assert.doesNotMatch(barras[1].c, /\bneg\b/);
+  assert.ok(barras[0].l + barras[0].w <= barras[1].l + 0.0001, 'o negativo vai para a esquerda do zero');
+  assert.match(h, /class="zero"/, 'linha do zero quando há negativo');
+  assert.ok(barras[2].w > barras[1].w, 'a barra de 112% é maior que a de 29,46%');
+});
+
+test('barras: valor que não é número, rótulo vazio, unidade que não é % e valor2 faltando viram erro antes do PDF', () => {
+  const p = (itens, extra = {}) => problemasDosSlides([{ layout: 'barras', titulo: 'T', itens, ...extra }]);
+  assert.deepEqual(p([{ rotulo: 'a', valor: '70%' }, { rotulo: 'b', valor: -5.71 }]), []);
+  assert.match(p([{ rotulo: 'a', valor: 'n/d' }]).join(' '), /"a".*número/);
+  assert.match(p([{ rotulo: '', valor: 10 }]).join(' '), /rótulo/);
+  assert.match(p([{ rotulo: 'a', valor: 'R$ 1.000' }]).join(' '), /%/);
+  assert.match(p([{ rotulo: 'a', valor: 10, valor2: 20 }, { rotulo: 'b', valor: 30 }]).join(' '), /"b".*segundo valor/);
+  assert.match(p([]).join(' '), /pelo menos 1 item/);
 });
