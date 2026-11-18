@@ -4,11 +4,13 @@
 // Não faz parte do produto: nada aqui é copiado para o computador do assessor.
 //
 // Uso: node bancada/rodar.mjs --caso <arquivo.json> --saida <pasta> --dados <pasta>
-//        [--raiz <pasta da Mesa>] [--porta 47822] [--perfil <arquivo.json>] [--claude <executável>] [--rotulo antes] [--seguir "mensagem"] [--so-montar] [--so-abrir]
+//        [--raiz <pasta da Mesa>] [--porta 47822] [--perfil <arquivo.json>] [--claude <executável>] [--rotulo antes] [--seguir "mensagem"] [--anexo <arquivo>]... [--so-montar] [--so-abrir]
 //
 // --dados: pasta só da bancada; recebe o perfil (dados/perfil) e os temporários (dados/tmp).
 // --claude: executável do Claude Code a usar (por exemplo bancada/claude-limpo.cmd).
 // --seguir: depois da resposta, manda esta segunda mensagem na mesma conversa (por exemplo, pedir o PDF) e grava a resposta.
+// --anexo: anexa este arquivo (PDF ou imagem) ao pedido, pela mesma rota do botão Anexar arquivo; pode repetir.
+//          A cópia vai para Documentos › Mesa do Assessor › Anexos, como na Mesa de verdade.
 // --so-montar: grava só o pedido montado, sem chamar o Claude.
 // --so-abrir: sobe a Mesa com o perfil de teste e fica no ar, para conferir a tela no navegador.
 import { spawn } from 'node:child_process';
@@ -26,6 +28,9 @@ const SAIDA = path.resolve(arg('saida', ''));
 const ROTULO = arg('rotulo', '');
 const CLAUDE = arg('claude', '');
 if (!arg('caso') || !arg('saida') || !arg('dados')) { console.error('Faltou --caso, --saida ou --dados.'); process.exit(2); }
+const ANEXOS = process.argv.flatMap((v, i) => (v === '--anexo' && process.argv[i + 1] ? [path.resolve(process.argv[i + 1])] : []));
+const faltando = ANEXOS.filter((a) => !existsSync(a));
+if (faltando.length) { console.error('Anexo não encontrado: ' + faltando.join(', ')); process.exit(2); }
 const caso = JSON.parse(readFileSync(arg('caso'), 'utf8'));
 const perfilTeste = arg('perfil') ? JSON.parse(readFileSync(arg('perfil'), 'utf8')) : null;
 const TELA = path.join(RAIZ, 'janela', 'mesa-janela.html');
@@ -97,7 +102,14 @@ if (process.argv.includes('--so-montar')) {
 
 await api('/api/limpar', { descartar: true });
 await api('/api/novo');
-await api('/api/send', { texto, contexto: montado.contexto, exibir: 'Pedido enviado: ' + primeira, meta: { tarefa: caso.tarefa, nome: montado.nome, area: montado.area, areaNome: montado.areaNome } });
+const anexos = [];
+for (const arq of ANEXOS) {
+  const r = await fetch(`${base}/api/anexo?nome=${encodeURIComponent(path.basename(arq))}`, { method: 'POST', headers: { 'x-mesa-token': token, 'content-type': 'application/octet-stream' }, body: readFileSync(arq) });
+  const j = await r.json().catch(() => ({}));
+  if (r.status !== 200 || !j.anexo) falhar(`O motor recusou o anexo ${path.basename(arq)}: ${r.status} ${j.erro || ''}`);
+  anexos.push({ id: j.anexo.id, original: j.anexo.original, kb: j.anexo.kb, tipo: j.anexo.tipo, caminho: j.anexo.caminho, de: arq });
+}
+await api('/api/send', { texto, contexto: montado.contexto, exibir: 'Pedido enviado: ' + primeira, meta: { tarefa: caso.tarefa, nome: montado.nome, area: montado.area, areaNome: montado.areaNome }, anexos: anexos.map((a) => a.id) });
 const inicio = Date.now();
 let est = { rodando: true };
 while (est.rodando && Date.now() - inicio < 17 * 60 * 1000) { await espera(4000); try { est = await api('/api/estado'); } catch { } }
@@ -120,13 +132,14 @@ const registro = {
   caso: caso.nome || caso.tarefa, tarefa: caso.tarefa, rotulo: ROTULO, raiz: RAIZ, versao: diag.versao, modelo: diag.modeloUsado || diag.modelo, segundos,
   terminou: !est.rodando, erro: est.erro || '', respostas, camposDoCasoSemLugarNestaVersao: semUso,
   tamanhoDoPedido: montado.texto.length, corteDaTela: corte, pedidoCortado: montado.texto.trim().length > corte,
-  pedido: texto, contexto: montado.contexto, resposta, seguimento, entrega: andamento?.entrega ?? null, passos: andamento?.passos ?? null,
+  pedido: texto, contexto: montado.contexto, anexos: anexos.map(({ id, ...a }) => a), resposta, seguimento, entrega: andamento?.entrega ?? null, passos: andamento?.passos ?? null,
 };
 writeFileSync(path.join(SAIDA, nome + '.json'), JSON.stringify(registro, null, 2));
 const entregaTexto = String(andamento?.entrega?.texto || '');
 writeFileSync(path.join(SAIDA, nome + '.md'), [
   `# ${montado.nome} (${ROTULO || 'sem rótulo'})`, '',
   `Versão ${diag.versao || '?'} · modelo ${registro.modelo || '?'} · ${segundos} s · pedido com ${montado.texto.length} caracteres${registro.pedidoCortado ? ` (CORTADO em ${corte})` : ''}${registro.erro ? ' · ERRO: ' + registro.erro : ''}`, '',
+  ...(anexos.length ? ['Anexos enviados com o pedido (botão Anexar arquivo): ' + anexos.map((a) => `${a.original} (${a.kb} KB), copiado para ${a.caminho}`).join('; '), ''] : []),
   '## Pedido enviado', '', '```text', texto, '```', '',
   '## Resposta na conversa', '', resposta || '(vazia)', '',
   ...(seguimento ? ['## Segunda mensagem na mesma conversa (' + seguimento.segundos + ' s)', '', '> ' + seguimento.texto, '', seguimento.resposta || '(vazia)', ''] : []),
