@@ -130,7 +130,8 @@ const COMPARADOR_113 = {
     { titulo: 'Maiores posições', texto: '| Posição | Atual | Modelo |\n|---|---|---|\n| CDB Banco A | 35% | 10% |\n| Tesouro Selic | 25% | 15% |\n| Fundo multimercado B | 10% | 8% |' },
     { titulo: 'Liquidez e vencimentos', texto: '- Liquidez diária: 60% na atual, 45% na modelo\n- Vencimentos em 12 meses: 2 títulos na atual, 1 na modelo\n- Prazo médio: ● parcial, falta o vencimento de um CDB' },
     { titulo: 'Roteiro da conversa', texto: 'As duas carteiras diferem em concentração e prazo. Nenhuma é melhor em si: depende do objetivo e do prazo do cliente.\n\n1. O que você precisa ter disponível nos próximos 12 meses?\n2. Como você se sentiria com parte do patrimônio variando mais?\n3. Há algum objetivo com data marcada?' },
-    { titulo: 'Conferir', texto: '- Data-base das duas carteiras\n- Custos informados pela outra instituição' },
+    // O Conferir da 1.13 agora fica fora do PDF (é do assessor); a última seção do teste é texto do cliente, do mesmo tamanho.
+    { titulo: 'Premissas', texto: '- Data-base das duas carteiras\n- Custos informados pela outra instituição' },
   ],
 };
 

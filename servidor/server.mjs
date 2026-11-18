@@ -643,7 +643,8 @@ function buildServer() {
       try {
         const p = lerPerfil();
         const r = await gerarDocumento(args, { ...(p.marca || {}), nome: p.nome, escritorio: p.escritorio, cargo: p.atuacao });
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pdf: r.pdf }) }] };
+        const fora = r.foraDoPdf ? { aviso: `Ficou fora do PDF, porque é do assessor: ${r.foraDoPdf.join(', ')}. Entregue isso no chat, depois do link do arquivo.` } : {};
+        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pdf: r.pdf, ...fora }) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui gerar o PDF: ${e?.message ?? e}. Entregue o texto no chat.` }] };
       }

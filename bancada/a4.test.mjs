@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RAIZ = process.env.MESA_RAIZ || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { montarDocumento, mdParaHtml } = await import(new URL(`file:///${path.join(RAIZ, 'servidor', 'gerador.mjs').replace(/\\/g, '/')}`).href);
+const { montarDocumento, mdParaHtml, secoesDoCliente } = await import(new URL(`file:///${path.join(RAIZ, 'servidor', 'gerador.mjs').replace(/\\/g, '/')}`).href);
 
 const MARCA = { nome: 'Assessor Teste', escritorio: 'Escritório Teste' };
 const AVISO_RODAPE = 'Não é recomendação de compra, venda ou alocação de ativos, nem promessa de retorno';
@@ -119,7 +119,7 @@ test('chamada antiga, sem os campos novos, continua funcionando como hoje', () =
     secoes: [{ titulo: 'Resumo', texto: '**O patrimônio subiu no mês.**\n\n- item' }, { titulo: 'Conferir', texto: '- data-base' }] }, MARCA);
   assert.match(html, /<div class="eyebrow">Material de apoio ao atendimento · \d{2}\/\d{2}\/\d{4}<\/div>/);
   assert.match(html, /<p class="resumo"><b>O patrimônio subiu no mês\.<\/b><\/p>/);
-  assert.match(html, /<section class="conferir">/);
+  assert.doesNotMatch(html, /class="conferir"/, "o Conferir é do assessor: fica no chat, fora do PDF");
   assert.match(html, /Assessor Teste, Escritório Teste/);
   assert.doesNotMatch(html, /class="destaques|<figure|class="capa"/);
   assert.match(html.slice(html.indexOf('<div class="aviso">')), /Confira os dados nas fontes citadas/);
@@ -232,4 +232,22 @@ test('rosca com duas séries só em %, e bandas só com duas séries, uma por r�
   assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, bandas: [10, 5, -1, 2] } }] }, MARCA), /uma banda para cada rótulo/);
   assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, series: [REVISAO.series[1]] } }] }, MARCA), /bandas só valem com duas séries/);
   assert.throws(() => montarDocumento({ titulo: 'R', secoes: [{ grafico: { ...REVISAO, series: [REVISAO.series[0], { nome: 'Atual', valores: [62, 20, 12, 1] }] } }] }, MARCA), /soma 95%/);
+});
+
+test('PDF do cliente: seção Conferir ou Próximo passo fica fora do arquivo, e o resto continua', () => {
+  const html = montarDocumento({ titulo: 'Revisão de carteira', secoes: [
+    { titulo: 'Política × carteira atual', texto: '**Todas as classes dentro das bandas.**' },
+    { titulo: 'Conferir', texto: '- Apelido ou iniciais do cliente para o cabeçalho deste PDF' },
+    { titulo: 'O que conferir antes de usar', texto: '- Data-base conforme extrato' },
+    { titulo: 'Próximo passo', texto: 'Mande o convite pelo WhatsApp.' },
+  ] }, MARCA);
+  assert.match(html, /Todas as classes dentro das bandas/);
+  assert.doesNotMatch(html, /Apelido ou iniciais|Data-base conforme extrato|Mande o convite/);
+  assert.doesNotMatch(html, /class="conferir"/);
+});
+
+test('PDF do cliente: secoesDoCliente diz o que saiu, para a Mesa avisar o Claude', () => {
+  const r = secoesDoCliente([{ titulo: 'Resumo', texto: 'a' }, { titulo: 'CONFERIR', texto: 'b' }, { titulo: 'Próximos passos', texto: 'c' }, { titulo: 'Conferência de dados', texto: 'd' }, { texto: 'sem título' }]);
+  assert.deepEqual(r.saem, ['CONFERIR', 'Próximos passos']);
+  assert.deepEqual(r.ficam.map((s) => s.titulo), ['Resumo', 'Conferência de dados', undefined]);
 });

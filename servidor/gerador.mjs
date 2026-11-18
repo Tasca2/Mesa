@@ -563,10 +563,18 @@ function logosRodape(t) {
   return `url("data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}")`;
 }
 
+// O que é do assessor (Conferir, Próximo passo) vai no chat, nunca no arquivo do cliente: a seção sai e a Mesa avisa o Claude.
+const DO_ASSESSOR = /^\s*(o que |para )?conferir\b|^\s*pr[óo]ximos? passos?\b/i;
+export function secoesDoCliente(secoes) {
+  const ficam = [], saem = [];
+  for (const s of secoes) { if (DO_ASSESSOR.test(String(s?.titulo || ''))) saem.push(String(s.titulo).trim()); else ficam.push(s); }
+  return { ficam, saem };
+}
+
 export function montarDocumento(a, marcaBase = {}) {
-  const secoes = Array.isArray(a.secoes) ? a.secoes.slice(0, 30) : [];
+  const { ficam: secoes } = secoesDoCliente(Array.isArray(a.secoes) ? a.secoes.slice(0, 30) : []);
   if (!secoes.length) throw new Error('Envie pelo menos uma seção.');
-  const risco = revisarDocumento(a);
+  const risco = revisarDocumento({ ...a, secoes });
   if (risco.length) throw new Error(mensagemDaTrava(risco, 'seção'));
   const t = { ...(TEMAS_A4[a.tema] ?? TEMAS_A4.marinho) };
   const corEscolhida = [a.cor, marcaBase.cor].find((c) => /^#[0-9a-fA-F]{6}$/.test(c || ''));
@@ -685,7 +693,8 @@ export async function gerarDocumento(a, marcaBase = {}) {
   const pdf = path.join(pastaBase(), `${slug(a.titulo)}-${carimbo()}.pdf`);
   await renderizar(html, pdf, 'pdf', [794, 1123]);
   const justo = await justoSeEconomiza(html, pdf);
-  const r = { tipo: 'pdf', titulo: a.titulo, pasta: path.dirname(pdf), imagens: [], pdf, em: Date.now(), ...(justo ? { justo: true } : {}) };
+  const { saem } = secoesDoCliente(Array.isArray(a.secoes) ? a.secoes.slice(0, 30) : []);
+  const r = { tipo: 'pdf', titulo: a.titulo, pasta: path.dirname(pdf), imagens: [], pdf, em: Date.now(), ...(justo ? { justo: true } : {}), ...(saem.length ? { foraDoPdf: saem } : {}) };
   writeFileSync(ARQUIVO_GERACAO, JSON.stringify(r));
   return r;
 }
