@@ -86,7 +86,7 @@ class No {
 const DA_TELA = ['const $ = ', 'const el = ', 'const esc = ', 'const estado = ', 'let ultimaChaveTela', 'const GLIFOS', 'function porta', 'function trilho',
   'let videoEscolhido', 'function ir(', 'function render()', 'let editandoPerfil', 'function telaInicio', 'function dossie', 'function telaAcompanhar',
   'let andamento = null', 'const quando = ', 'function abrirDoHistorico', 'function telaHistorico', 'let promptEdit', 'let rascunhoTimer',
-  'function agendarRascunho', 'function restaurarRascunho', 'let app = null'];
+  'let medirPedido', 'function agendarRascunho', 'function restaurarRascunho', 'let app = null'];
 const PRELUDIO = 'function telaLista() {} function telaGuia() {} function telaFim() {} function avisar() {} function faixaCaptaMais() { return el("div"); } ' +
   'function linhaPerfil() { return el("div"); } function cartaoPerfil() { return el("div"); } function cartaoEditarPerfil() { return el("div"); }';
 const EPILOGO = `
