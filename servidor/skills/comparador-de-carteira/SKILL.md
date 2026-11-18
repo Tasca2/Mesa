@@ -32,6 +32,8 @@ Dar ao cliente e ao assessor uma leitura clara das diferenças entre duas cartei
 **Peças** (cada uma separada, sem comentário dentro): `relatorio` (tabelas A × B com fonte e data-base, e as observações), `roteiro-reuniao` (leitura simples + 3 perguntas, para até 30 minutos), `whatsapp` (convite para a conversa, até 4 linhas, sem alarmar), `nota-crm`.
 **Conferir** — datas-base, totais, custos e qualquer dado sem fonte.
 
+**Em PDF** (Resultado PDF): gere a peça `relatorio` com `mesa_documento`, `tipo: "carteira"`, `cliente` (apelido ou iniciais) e `dataBase`. Até 3 `destaques` com as maiores diferenças (ex.: rótulo "Renda fixa pós", valor "70% → 40%", nota "atual → modelo"), só com números do texto. A composição por classe vai em `grafico` `barras-duplas` (séries com os nomes das duas carteiras, `unidade` "%", `total: true`): o código desenha o gráfico e a tabela com a diferença, então não repita essa tabela no texto. Perguntas em lista numerada ("1. "). Roteiro, WhatsApp, nota de CRM e Conferir ficam no chat, fora do PDF.
+
 ## Exemplo
 Bom (observação): "A carteira atual concentra 42% no maior banco emissor; a carteira modelo limita cada emissor a 20%. Vale conversar sobre o quanto essa concentração faz sentido para você." Ruim: "A sua carteira está ruim, a modelo rende mais." (juízo, promessa e comparação sem base).
 

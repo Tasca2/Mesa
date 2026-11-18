@@ -535,12 +535,18 @@ function buildServer() {
         'agenda (titulo + itens {titulo, texto}: o roteiro da conversa) · secao (divisor de capítulo: etiqueta com o número, titulo, subtitulo) · templo (titulo + itens {titulo, texto}, 2 a 4: pilares de valores sustentando o escritório, subtitulo = nome no frontão) · ilustracao (titulo, subtitulo, ilustracao: ' + NOMES_ILUSTRACAO.join(', ') + ') · ' +
         'diagrama (titulo + itens {titulo, texto, icone, ligacao}, modelo "fluxo" com 2 a 5 nós ligados por seta, ou "hub" com o primeiro item no centro e até 6 ao redor) · imagem (titulo, subtitulo, imagem do assessor, modelo "metade" ou "cheia") · ' +
         'ícones da biblioteca (use em itens de pilares, etapas, lista e diagrama): ' + NOMES_ICONE.join(', ') + '; o assessor também pode usar a própria imagem, citando o nome do arquivo guardado na pasta "Minhas imagens" · ' +
-        'tabela (titulo, cabecalho[], linhas[][]) · barras (titulo + itens {rotulo, valor em %, valor2 opcional}, legenda[] se houver valor2) · frase (titulo como frase-conclusão) · lista (titulo + itens {titulo, texto}, até 6) · galeria (titulo, subtitulo opcional, itens {titulo, texto, imagem, icone}, 2 a 3 colunas com a foto do assessor ou de pessoas em moldura em arco; sem imagem, usa o ícone) · fechamento (titulo, passos[], contato[]). ' +
+        'tabela (titulo, cabecalho[], linhas[][]) · barras (titulo + itens {rotulo, valor em %, valor2 opcional}, legenda[] se houver valor2) · ' +
+        'rosca (titulo + itens {rotulo, valor, texto opcional}, 2 a 8: composição, ex.: classes da carteira em % ou em R$; as fatias saem dos valores enviados) · ' +
+        'linha (titulo + rotulos[] + series [{nome, valores[]}], até 3 séries: histórico em base 100 feito pelo código; com retornos=true os valores são o retorno % de cada período e inicio é o rótulo do ponto de partida; sem retornos, níveis como cota ou preço) · ' +
+        'comparativo (titulo + legenda [A, B] + itens {rotulo, valor, valor2, texto opcional}, até 7: A × B com a diferença calculada no meio; se o valor não for número, a diferença mostra o texto) · frase (titulo como frase-conclusão) · lista (titulo + itens {titulo, texto}, até 6) · galeria (titulo, subtitulo opcional, itens {titulo, texto, imagem, icone}, 2 a 3 colunas com a foto do assessor ou de pessoas em moldura em arco; sem imagem, usa o ícone) · fechamento (titulo, passos[], contato[]). ' +
         'Regras: um título-conclusão por página, textos curtos, sem emoji, sem dado inventado; use só os layouts que o assunto pede e varie-os (não repita o mesmo em páginas seguidas). Nome, escritório, logo e foto vêm do perfil (mesa_perfil, campo marca); se faltarem, a página sai sem eles. ' +
+        'cliente (apelido ou iniciais, nunca CPF, conta ou valor) vai na capa e no rodapé. tipo: reuniao (padrão) ou, em material de mercado, estudo ou mercado: aí a trava de palavras só barra promessa, risco zero e superlativo, e rentabilidade ou retorno precisa do período na mesma página (ex.: "em 12 meses até out/2026"); a linha de fonte não passa pela trava. ' +
         'O rodapé leva a identificação do profissional e o aviso de compliance. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF, e diga onde o arquivo ficou. Se vier "avisos", conte ao assessor.',
       inputSchema: {
         titulo: z.string().min(2).max(120).describe('Nome da peça (vira o nome da pasta)'),
         tema: z.enum(['escuro', 'claro', 'marinho']).optional().describe('Padrão: o do perfil, ou escuro'),
+        cliente: z.string().max(60).optional().describe('Nome curto do cliente na capa e no rodapé: apelido ou iniciais'),
+        tipo: z.enum(['reuniao', 'carteira', 'relatorio', 'proposta', 'diagnostico', 'estudo', 'mercado', 'geral']).optional().describe('reuniao (padrão): trava de palavras completa; estudo ou mercado: lista menor, para material de mercado'),
         estilo: z.enum(['serifada', 'moderna', 'minimo']).optional().describe('serifada e moderna: visual private, com cartões, degradês e molduras (padrão: serifada); minimo: o visual enxuto antigo'),
         cor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Cor de destaque; padrão: a do perfil ou a do tema'),
         rodape: z.string().max(260).optional().describe('Identificação do profissional e aviso, em uma linha, em todas as páginas'),
@@ -561,11 +567,15 @@ function buildServer() {
             icone: z.string().max(400).optional().describe('Nome de um ícone da biblioteca ou imagem do assessor (caminho ou nome do arquivo em "Minhas imagens")'),
             ligacao: z.string().max(40).optional().describe('diagrama fluxo: texto curto da seta que sai deste item'),
             rotulo: z.string().max(80).optional(), titulo: z.string().max(90).optional(), texto: z.string().max(260).optional(),
-            valor: z.union([z.string().max(24), z.number()]).optional(), valor2: z.number().optional(), fonte: z.string().max(100).optional(),
+            valor: z.union([z.string().max(24), z.number()]).optional(), valor2: z.union([z.string().max(24), z.number()]).optional().describe('barras: segundo valor em %; comparativo: o valor da coluna B'), fonte: z.string().max(100).optional(),
           })).max(8).optional(),
           cabecalho: z.array(z.string().max(60)).max(5).optional(),
           linhas: z.array(z.array(z.string().max(120)).max(5)).max(8).optional(),
           legenda: z.array(z.string().max(40)).max(2).optional(),
+          rotulos: z.array(z.string().max(24)).max(24).optional().describe('linha: um rótulo por ponto, ex.: meses'),
+          series: z.array(z.object({ nome: z.string().max(40), valores: z.array(z.number()).max(24) })).max(3).optional().describe('linha: até 3 séries, um valor por rótulo'),
+          retornos: z.boolean().optional().describe('linha: true quando os valores são o retorno % de cada período'),
+          inicio: z.string().max(20).optional().describe('linha com retornos: rótulo do ponto de partida (base 100), ex.: "dez/25"'),
           passos: z.array(z.string().max(140)).max(5).optional(),
           contato: z.array(z.string().max(120)).max(5).optional(),
           fonte: z.string().max(160).optional(),
@@ -590,12 +600,39 @@ function buildServer() {
       title: 'Gerar documento em PDF',
       description:
         'Gera um PDF (A4) com o texto final que você escreveu, em seções. Use quando o assessor pedir o resultado em PDF. ' +
-        'O texto de cada seção aceita parágrafos, listas com "- ", títulos com "## ", **negrito** e tabelas em linhas "| a | b |" (primeira linha é o cabeçalho). ' +
+        'O texto de cada seção aceita parágrafos, listas com "- ", listas numeradas com "1. ", títulos com "## ", **negrito** e tabelas em linhas "| a | b |" (primeira linha é o cabeçalho; coluna de números sai alinhada à direita; linha que começa com "Total" sai destacada). ' +
+        'cliente (apelido ou iniciais, nunca CPF, conta ou valor) e dataBase vão no cabeçalho: "Preparado para M. · Data-base 31/10/2026". capa=true abre com uma capa (título, cliente, logo e foto do perfil): use em Proposta e Estudo. ' +
+        'destaques: até 4 cartões no topo com número grande, rótulo e nota, só com números que estão no texto. grafico em uma seção (barras, barras-duplas, rosca ou linha, com rotulos e series): o código desenha o gráfico e, embaixo, a tabela com os mesmos números (diferença e total feitos pelo código), então não repita essa tabela no texto. ' +
+        'tipo escolhe o aviso do fim (carteira, relatorio, proposta, diagnostico, estudo, mercado ou geral); o rodapé de toda página já leva o aviso curto e o número da página. ' +
         'Dado de mercado leva fonte e data no próprio texto. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho devolvido, e diga ao assessor onde o arquivo ficou.',
       inputSchema: {
         titulo: z.string().min(2).max(120),
         subtitulo: z.string().max(200).optional().describe('Ex.: ativo e data-base'),
-        secoes: z.array(z.object({ titulo: z.string().max(120).optional(), texto: z.string().max(8000) })).min(1).max(30),
+        cliente: z.string().max(60).optional().describe('Para quem é o material: apelido ou iniciais, ex.: "M." ou "Família T."'),
+        dataBase: z.string().max(40).optional().describe('Data-base dos números, ex.: 31/10/2026'),
+        capa: z.boolean().optional().describe('true: página de capa (Proposta e Estudo)'),
+        tipo: z.enum(['reuniao', 'carteira', 'relatorio', 'proposta', 'diagnostico', 'estudo', 'mercado', 'geral']).optional().describe('Decide o texto do aviso no fim do documento'),
+        tema: z.enum(['marinho', 'escuro', 'claro']).optional().describe('Cores da folha, sempre em fundo branco: marinho (padrão), escuro (grafite) ou claro (bege)'),
+        destaques: z.array(z.object({ rotulo: z.string().max(40), valor: z.string().max(30), nota: z.string().max(80).optional() })).max(4).optional().describe('Até 4 números em destaque no topo, ex.: {rotulo: "Renda fixa pós", valor: "70% → 40%", nota: "atual → modelo"}'),
+        secoes: z.array(z.object({
+          titulo: z.string().max(120).optional(),
+          texto: z.string().max(8000).optional(),
+          grafico: z.object({
+            tipo: z.enum(['barras', 'barras-duplas', 'rosca', 'linha']),
+            titulo: z.string().max(100).optional(),
+            rotulos: z.array(z.string().max(60)).min(1).max(24),
+            series: z.array(z.object({ nome: z.string().max(40), valores: z.array(z.number()).max(24) })).min(1).max(3).describe('barras e rosca: 1 série; barras-duplas: 2 (A e B); linha: até 3'),
+            unidade: z.string().max(6).optional().describe('%, R$, US$ ou vazio'),
+            casas: z.number().int().min(0).max(4).optional(),
+            retornos: z.boolean().optional().describe('linha: valores são o retorno % de cada período; o código compõe a base 100'),
+            base100: z.boolean().optional().describe('linha: valores são níveis (cota, preço); o código põe em base 100'),
+            inicio: z.string().max(20).optional().describe('linha com retornos: rótulo do ponto de partida'),
+            categoria: z.string().max(30).optional().describe('Nome da primeira coluna da tabela'),
+            total: z.boolean().optional().describe('barras: linha de total na tabela (a rosca já soma)'),
+            tabela: z.boolean().optional().describe('false: só o gráfico, sem a tabela'),
+            fonte: z.string().max(160).optional(),
+          }).optional().describe('Gráfico desenhado pelo código a partir destes números, com a tabela dos mesmos números embaixo'),
+        })).min(1).max(30),
         rodape: z.string().max(400).optional().describe('Identificação do profissional e avisos, quando a peça for para o público'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
