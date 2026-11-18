@@ -540,7 +540,7 @@ function buildServer() {
         'linha (titulo + rotulos[] + series [{nome, valores[]}], até 3 séries: histórico em base 100 feito pelo código; com retornos=true os valores são o retorno % de cada período e inicio é o rótulo do ponto de partida; sem retornos, níveis como cota ou preço) · ' +
         'comparativo (titulo + legenda [A, B] + itens {rotulo, valor, valor2, texto opcional}, até 7: A × B com a diferença calculada no meio; se o valor não for número, a diferença mostra o texto) · frase (titulo como frase-conclusão) · lista (titulo + itens {titulo, texto}, até 6) · galeria (titulo, subtitulo opcional, itens {titulo, texto, imagem, icone}, 2 a 3 colunas com a foto do assessor ou de pessoas em moldura em arco; sem imagem, usa o ícone) · fechamento (titulo, passos[], contato[]). ' +
         'Regras: um título-conclusão por página, textos curtos, sem emoji, sem dado inventado; use só os layouts que o assunto pede e varie-os (não repita o mesmo em páginas seguidas). Nome, escritório, logo e foto vêm do perfil (mesa_perfil, campo marca); se faltarem, a página sai sem eles. ' +
-        'cliente (apelido ou iniciais, nunca CPF, conta ou valor) vai na capa e no rodapé. tipo: reuniao (padrão) ou, em material de mercado, estudo ou mercado: aí a trava de palavras só barra promessa, risco zero e superlativo, e rentabilidade ou retorno precisa do período na mesma página (ex.: "em 12 meses até out/2026"); a linha de fonte não passa pela trava. ' +
+        'cliente (apelido ou iniciais, nunca CPF, conta ou valor) vai na capa e no rodapé. tipo: reuniao (padrão) ou, em material de mercado, estudo ou mercado: aí a trava de palavras só barra promessa, risco zero e superlativo, e rentabilidade ou retorno precisa do período na mesma página (ex.: "em 12 meses até out/2026"); a linha de fonte, os valores e os rótulos dos gráficos só passam pela trava de promessa, risco zero e superlativo, como o titulo, o rodape e o cliente. ' +
         'O rodapé leva a identificação do profissional e o aviso de compliance. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF, e diga onde o arquivo ficou. Se vier "avisos", conte ao assessor.',
       inputSchema: {
         titulo: z.string().min(2).max(120).describe('Nome da peça (vira o nome da pasta)'),
@@ -603,7 +603,7 @@ function buildServer() {
         'O texto de cada seção aceita parágrafos, listas com "- ", listas numeradas com "1. ", títulos com "## ", **negrito** e tabelas em linhas "| a | b |" (primeira linha é o cabeçalho; coluna de números sai alinhada à direita; linha que começa com "Total" sai destacada). ' +
         'cliente (apelido ou iniciais, nunca CPF, conta ou valor) e dataBase vão no cabeçalho: "Preparado para M. · Data-base 31/10/2026". capa=true abre com uma capa (título, cliente, logo e foto do perfil): use em Proposta e Estudo. ' +
         'destaques: até 4 cartões no topo com número grande, rótulo e nota, só com números que estão no texto. grafico em uma seção (barras, barras-duplas, rosca ou linha, com rotulos e series): o código desenha o gráfico e, embaixo, a tabela com os mesmos números (diferença e total feitos pelo código), então não repita essa tabela no texto. ' +
-        'tipo escolhe o aviso do fim (carteira, relatorio, proposta, diagnostico, estudo, mercado ou geral); o rodapé de toda página já leva o aviso curto e o número da página. ' +
+        'tipo escolhe o aviso do fim (carteira, relatorio, proposta, diagnostico, estudo, mercado ou geral); o rodapé de toda página já leva o aviso curto e o número da página. Trava de palavras: promessa de retorno, risco zero e superlativo em qualquer texto (título, destaques, seções, gráfico, rodapé) impedem o PDF; em estudo e mercado, rentabilidade ou retorno pedem o período na mesma seção (ex.: "em 12 meses até out/2026"). ' +
         'Dado de mercado leva fonte e data no próprio texto. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho devolvido, e diga ao assessor onde o arquivo ficou.',
       inputSchema: {
         titulo: z.string().min(2).max(120),
@@ -634,6 +634,7 @@ function buildServer() {
           }).optional().describe('Gráfico desenhado pelo código a partir destes números, com a tabela dos mesmos números embaixo'),
         })).min(1).max(30),
         rodape: z.string().max(400).optional().describe('Identificação do profissional e avisos, quando a peça for para o público'),
+        termosConfirmados: z.array(z.string().max(40)).max(8).optional().describe('Só quando o assessor afirmou de fato algo que a trava de palavras bloqueou; nunca por conta própria'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },

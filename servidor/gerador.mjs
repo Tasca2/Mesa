@@ -144,7 +144,7 @@ const TERMOS_RISCO = [
   ['regulação ou supervisão', /regulad|regulat|supervisionad|fiscalizad|autorizad[oa] (pelo|pela)|banco central|\bcvm\b/],
   ['generalização sobre o mercado', /modelo padrao|padrao do (mercado|setor|assessor)|pratica (comum|de mercado)|comum no mercado|como todo|seguranca para (o|a|os|as) /],
   ['plataforma ou aplicativo de acompanhamento', /plataforma|aplicativo|\bapp\b/], ['garantia', /garantia|garantid[oa]|garantimos|\bgarante\b|garantir (retorno|rentab|resultado)/],
-  ['superlativo', /\b(o|a|os|as) melhor(es)? |\bmelhor (assessor|escritorio|opcao|carteira|solucao|do mercado)|visibilidade total|boas maos|equipe completa|multidisciplinar|\bunic[oa]s?\b|exclusiv|\blider|premiad|referencia (do|no) mercado/],
+  ['superlativo', /\b(o|a|os|as) melhor(es)?\b|\bmelhor (assessor|escritorio|opcao|carteira|solucao|do mercado)|visibilidade total|boas maos|equipe completa|multidisciplinar|\bunic[oa]s?\b|exclusiv|\blider|premiad|referencia (do|no) mercado/],
   ['risco', /sem risco|risco zero|seguranca total/], ['retorno', /rentabilidade|retorno (de|acima)|\brende\b|\brendimento (de|acima)/],
 ];
 // Lista menor do material de mercado (estudo, juros, fato relevante): fonte, órgão e rentabilidade com período passam;
@@ -152,7 +152,9 @@ const TERMOS_RISCO = [
 const TERMOS_RISCO_MERCADO = [
   ['promessa de retorno', /garantia de (retorno|rentabilidade|resultado|lucro|ganho|rendimento)|(retorno|rentabilidade|resultado|lucro|ganho|rendimento)s? (garantid|cert[oa]s?\b|assegurad)|garantimos|\bgarante (o |a )?(retorno|rentabilidade|resultado|lucro|ganho)|\bvai (render|subir|disparar|valorizar|dobrar)|\brendera\b|\bsubira\b|valorizacao (garantida|certa)|nao tem como perder|dinheiro facil|ganho facil/],
   ['risco', /sem risco|risco zero|zero risco|seguranca total|100% segur/],
-  ['superlativo', /\b(o|a|os|as) melhor(es)? (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|momento|hora|oportunidade|escolha)\b|melhor do mercado|imperdivel|oportunidade unica|unica chance|\bimbativel|retorno extraordinario/],
+  // "o/a melhor" barra antes de produto, de "do/da" (a melhor do ano, da bolsa) e no fim da frase; o resultado da
+  // própria empresa contra o próprio histórico ("o melhor resultado trimestral desde 2019") passa.
+  ['superlativo', /\b(o|a|os|as) melhor(es)?(?= (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|carteiras|momento|hora|oportunidade|escolha|escolhas|relacao|alternativa|alternativas|papel|papeis|empresa|empresas|aposta|apostas|compra|entrada|produto|produtos|titulo|titulos)\b| (do|da|dos|das|de)\b|\s*[.,;:!?)]|\s*$)|melhor do mercado|imperdivel|oportunidade unica|unica chance|\bimbativel|retorno extraordinario/],
 ];
 const RETORNO = /\b(rentabilidade|retorno|rendimento|rende)\b/;
 const MESES = 'jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez';
@@ -162,7 +164,8 @@ const PERIODO = new RegExp([
   String.raw`\b(${MESES})[a-z]*\.?\/?\s?(de\s)?((19|20)?\d{2})\b`, String.raw`\bjanela\b`, String.raw`\bytd\b`, String.raw`\bdata-base\b`,
 ].join('|'));
 
-// Textos que a trava lê: tudo o que a página afirma. A linha de fonte (página e número) fica fora: é referência, não afirmação.
+// Textos que a trava lê: tudo o que a página afirma. A linha de fonte, a fonte do item, os valores e os rótulos do gráfico
+// são referência: ficam fora das regras de regulação e de retorno, mas passam pela de promessa, risco zero e superlativo.
 function textosDaPagina(s) {
   const out = [];
   const add = (t) => { if (typeof t === 'string' && t.trim()) out.push(t); };
@@ -173,17 +176,37 @@ function textosDaPagina(s) {
   (s.series || []).forEach((x) => add(x?.nome));
   return out;
 }
-const fontesDaPagina = (s) => [s.fonte, ...(s.itens || []).map((x) => x.fonte), ...(s.rotulos || [])].filter((t) => typeof t === 'string');
+const fontesDaPagina = (s) => [s.fonte, s.inicio, ...(s.itens || []).flatMap((x) => [x?.fonte, x?.valor, x?.valor2]), ...(s.rotulos || [])].filter((t) => typeof t === 'string' && t.trim());
 
-export function revisarApresentacao(slides, termosConfirmados = [], tipo) {
-  const ok = termosConfirmados.map(SEMACENTO);
+const liberador = (termosConfirmados) => {
+  const ok = (Array.isArray(termosConfirmados) ? termosConfirmados : []).map(SEMACENTO);
+  return (m) => ok.some((c) => c && (m.includes(c) || c.includes(m)));
+};
+// Promessa, risco zero e superlativo (a lista menor) num conjunto de textos; linha com [CONFERIR] fica de fora.
+function travaMenor(onde, textos, liberado, achados) {
+  for (const t of textos) {
+    if (typeof t !== 'string' || !t.trim() || /\[CONFERIR/i.test(t)) continue;
+    const n = SEMACENTO(t);
+    for (const [nome, re] of TERMOS_RISCO_MERCADO) {
+      const m = n.match(re);
+      if (m && !liberado(m[0])) achados.push(`${onde}: "${t.trim().slice(0, 90)}" (${nome})`);
+    }
+  }
+}
+const mensagemDaTrava = (risco, onde = 'página') => 'o PDF não foi gerado porque estas frases afirmam algo que o assessor pode não ter dito: ' + risco.join(' | ') +
+  '. Reescreva cada uma só com o que o assessor informou, ou acrescente [CONFERIR] no texto; se o assessor realmente afirmou o termo, repita a chamada com termosConfirmados (a lista dos termos).' +
+  (risco.some((x) => x.endsWith('(retorno sem período)')) ? ` Rentabilidade e retorno precisam do período na mesma ${onde} (ex.: "em 12 meses até out/2026").` : '');
+
+// geral: textos da apresentação fora das páginas (titulo, rodape, cliente), conferidos com a lista menor.
+export function revisarApresentacao(slides, termosConfirmados = [], tipo, geral = {}) {
   const mercado = tipo === 'mercado' || tipo === 'estudo';
   const lista = mercado ? TERMOS_RISCO_MERCADO : TERMOS_RISCO;
-  const liberado = (m) => ok.some((c) => c && (m.includes(c) || c.includes(m)));
+  const liberado = liberador(termosConfirmados);
   const achados = [];
+  for (const [nome, t] of [['título', geral.titulo], ['rodapé', geral.rodape], ['cliente', geral.cliente]]) travaMenor(nome, [t], liberado, achados);
   slides.forEach((s, k) => {
-    const textos = textosDaPagina(s);
-    const comPeriodo = PERIODO.test(SEMACENTO([...textos, ...fontesDaPagina(s)].join(' · ')));
+    const textos = textosDaPagina(s), fontes = fontesDaPagina(s);
+    const comPeriodo = PERIODO.test(SEMACENTO([...textos, ...fontes].join(' · ')));
     for (const t of textos) {
       if (/\[CONFERIR/i.test(t)) continue;
       const n = SEMACENTO(t);
@@ -196,6 +219,37 @@ export function revisarApresentacao(slides, termosConfirmados = [], tipo) {
         if (m && !liberado(m[0])) achados.push(`página ${k + 1}: "${t.slice(0, 90)}" (retorno sem período)`);
       }
     }
+    travaMenor(`página ${k + 1}`, fontes, liberado, achados);
+  });
+  return achados;
+}
+
+// Folha A4: a lista menor (promessa, risco zero e superlativo) vale para todo texto que vai ao cliente: cabeçalho, destaques,
+// seções, gráficos e rodapé, linha por linha. Estudo e mercado também pedem o período junto de rentabilidade e retorno,
+// na mesma seção (texto, gráfico e a fonte dele). A lista completa da reunião não entra: a folha cita órgão, FGC e
+// rentabilidade do período o tempo todo.
+export function revisarDocumento(a, termosConfirmados = a?.termosConfirmados) {
+  const mercado = a?.tipo === 'mercado' || a?.tipo === 'estudo';
+  const liberado = liberador(termosConfirmados);
+  const achados = [];
+  const linhas = (xs) => xs.filter((t) => typeof t === 'string').flatMap((t) => t.split('\n')).map((t) => t.trim()).filter(Boolean);
+  const unidade = (onde, afirmacoes, referencias) => {
+    const af = linhas(afirmacoes), ref = linhas(referencias);
+    travaMenor(onde, [...af, ...ref], liberado, achados);
+    if (!mercado || PERIODO.test(SEMACENTO([...af, ...ref].join(' · ')))) return;
+    for (const t of af) {
+      if (/\[CONFERIR/i.test(t)) continue;
+      const m = SEMACENTO(t).match(RETORNO);
+      if (m && !liberado(m[0])) achados.push(`${onde}: "${t.slice(0, 90)}" (retorno sem período)`);
+    }
+  };
+  const lista = (x) => (Array.isArray(x) ? x : []);
+  unidade('cabeçalho', [a?.titulo, a?.subtitulo], [a?.cliente, a?.dataBase, a?.rodape]);
+  lista(a?.secoes).slice(0, 30).forEach((s, i) => {
+    const g = s?.grafico || {};
+    const cartoes = i === 0 ? lista(a?.destaques).flatMap((x) => [x?.rotulo, x?.valor, x?.nota]) : [];
+    unidade(`seção ${i + 1}${s?.titulo ? ` (${String(s.titulo).slice(0, 40)})` : ''}`, [s?.titulo, s?.texto, g.titulo, ...cartoes],
+      [g.fonte, g.categoria, g.inicio, ...lista(g.rotulos), ...lista(g.series).map((x) => x?.nome)]);
   });
   return achados;
 }
@@ -205,13 +259,8 @@ export async function gerarApresentacao(a, marcaBase = {}) {
   if (!slides.length) throw new Error('Envie pelo menos um slide.');
   const graficos = problemasDosSlides(slides);
   if (graficos.length) throw new Error('o PDF não foi gerado porque um gráfico está com número faltando ou que não é número: ' + graficos.join(' | ') + '. Corrija os valores e chame de novo.');
-  const risco = revisarApresentacao(slides, a.termosConfirmados || [], a.tipo);
-  if (risco.length) {
-    const semPeriodo = risco.some((x) => x.endsWith('(retorno sem período)'));
-    throw new Error('o PDF não foi gerado porque estas frases afirmam algo que o assessor pode não ter dito: ' + risco.join(' | ') +
-      '. Reescreva cada uma só com o que o assessor informou, ou acrescente [CONFERIR] no texto; se o assessor realmente afirmou o termo, repita a chamada com termosConfirmados (a lista dos termos).' +
-      (semPeriodo ? ' Rentabilidade e retorno precisam do período na mesma página (ex.: "em 12 meses até out/2026").' : ''));
-  }
+  const risco = revisarApresentacao(slides, a.termosConfirmados || [], a.tipo, { titulo: a.titulo, rodape: a.rodape, cliente: a.cliente });
+  if (risco.length) throw new Error(mensagemDaTrava(risco));
   const avisos = [];
   const marca = {
     ...marcaBase,
@@ -466,6 +515,8 @@ function logosRodape(t) {
 export function montarDocumento(a, marcaBase = {}) {
   const secoes = Array.isArray(a.secoes) ? a.secoes.slice(0, 30) : [];
   if (!secoes.length) throw new Error('Envie pelo menos uma seção.');
+  const risco = revisarDocumento(a);
+  if (risco.length) throw new Error(mensagemDaTrava(risco, 'seção'));
   const t = { ...(TEMAS_A4[a.tema] ?? TEMAS_A4.marinho) };
   const corEscolhida = [a.cor, marcaBase.cor].find((c) => /^#[0-9a-fA-F]{6}$/.test(c || ''));
   if (corEscolhida) t.acento = corEscolhida;

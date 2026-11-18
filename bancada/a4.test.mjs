@@ -139,3 +139,41 @@ test('os três temas mudam as cores da folha, e a folha sem tema continua azul-m
   assert.notEqual(cor('escuro'), cor('claro'));
   assert.notEqual(cor('escuro'), cor('marinho'));
 });
+
+// Correções depois da revisão do passo 4 (18/11): a folha A4 passa pela trava de promessa, risco zero e superlativo,
+// em todo texto que vai ao cliente; fonte, órgão, FGC e rentabilidade com período continuam passando.
+const TRAVA = /afirmam algo que o assessor pode não ter dito/;
+test('A4: promessa, risco zero e superlativo em qualquer texto que vai ao cliente impedem o PDF', () => {
+  const base = { titulo: 'Comparador de carteira', secoes: [{ titulo: 'Resumo', texto: 'Texto.' }] };
+  const CASOS = [
+    { ...base, titulo: 'A melhor carteira para você' },
+    { ...base, subtitulo: 'Retorno garantido' },
+    { ...base, cliente: 'Cliente sem risco' },
+    { ...base, destaques: [{ rotulo: 'Renda fixa', valor: '70%', nota: 'sem risco' }] },
+    { ...base, secoes: [{ titulo: 'Resumo', texto: 'Linha um.\n- Esta carteira vai render mais' }] },
+    { ...base, secoes: [{ titulo: 'Oportunidade única', texto: 'x' }] },
+    { ...base, secoes: [{ titulo: 'Composição', grafico: { ...COMPOSICAO, titulo: 'A melhor escolha' } }] },
+    { ...base, secoes: [{ titulo: 'Composição', grafico: { ...COMPOSICAO, rotulos: ['Sem risco', ...COMPOSICAO.rotulos.slice(1)] } }] },
+    { ...base, secoes: [{ titulo: 'Composição', grafico: { ...COMPOSICAO, fonte: 'Retorno garantido pelo escritório' } }] },
+    { ...base, secoes: [{ titulo: 'Composição', grafico: { ...COMPOSICAO, series: [{ ...COMPOSICAO.series[0], nome: 'A melhor' }, COMPOSICAO.series[1]] } }] },
+    { ...base, rodape: 'Assessor Teste, o melhor do mercado' },
+  ];
+  for (const a of CASOS) assert.throws(() => montarDocumento(a, MARCA), TRAVA, `passou: ${JSON.stringify(a).slice(0, 160)}`);
+});
+
+test('A4: fonte, órgão, FGC e rentabilidade com período passam; [CONFERIR] e termos confirmados liberam', () => {
+  const ok = { titulo: 'Relatório mensal', tipo: 'relatorio', rodape: 'Assessor Teste, assessor de investimentos vinculado ao Escritório Teste. Regulado pela CVM.',
+    secoes: [{ titulo: 'Resumo', texto: '**A carteira rendeu 1,02% em outubro de 2026, contra 1,15% do CDI (Banco Central, SGS 4391).**\n\n- CDB com garantia do FGC até R$ 250 mil por CPF e instituição\n- Fonte: CVM, dados abertos, 10/11/2026' },
+      { titulo: 'Composição', grafico: COMPOSICAO }] };
+  assert.doesNotThrow(() => montarDocumento(ok, MARCA));
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'T', secoes: [{ texto: 'Resgate sem risco de mercado [CONFERIR: frase do assessor]' }] }, MARCA));
+  assert.throws(() => montarDocumento({ titulo: 'T', secoes: [{ texto: 'Tesouro Selic sem risco de crédito privado' }] }, MARCA), TRAVA);
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'T', termosConfirmados: ['sem risco'], secoes: [{ texto: 'Tesouro Selic sem risco de crédito privado' }] }, MARCA));
+});
+
+test('A4 de estudo e de mercado: rentabilidade ou retorno pedem o período na mesma seção', () => {
+  assert.throws(() => montarDocumento({ titulo: 'Estudo', tipo: 'estudo', secoes: [{ titulo: 'Histórico', texto: 'Rentabilidade de 12,4%.' }] }, MARCA), /retorno sem período/);
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'Estudo', tipo: 'estudo', secoes: [{ titulo: 'Histórico', texto: 'Rentabilidade de 12,4% em 12 meses até out/2026.' }] }, MARCA));
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'Estudo', tipo: 'mercado', secoes: [{ titulo: 'Histórico', texto: 'Retorno de 12,4%.', grafico: { ...COMPOSICAO, fonte: 'CaptaMais, 12 meses até out/2026' } }] }, MARCA), 'o período pode estar na fonte do gráfico da seção');
+  assert.doesNotThrow(() => montarDocumento({ titulo: 'Relatório', tipo: 'relatorio', secoes: [{ texto: 'Rendimento de R$ 2.000 por mês.' }] }, MARCA), 'fora de estudo e mercado, o período não é exigido');
+});
