@@ -349,3 +349,11 @@ test('servidor da Mesa: as duas ferramentas aparecem para o Claude e respondem p
     assert.ok(vazio.isError);
   } finally { await c.close().catch(() => {}); rmSync(dados, { recursive: true, force: true }); }
 });
+
+// Revisão final: em janeiro e fevereiro, se a base do ano novo ainda não saiu, a Mesa usa a do ano anterior e registra a lacuna.
+test('CVM no começo do ano: sem a base do ano novo, usa a do ano anterior e avisa', async () => {
+  const novo = new Date().getFullYear() + 1; // base que ainda não existe hoje
+  const r = await D.documentosCvm({ empresa: 'Petrobras', quantidade: 5 }, { hoje: `${novo}-01-02` });
+  assert.ok(r.lacunas.some((l) => l.item.includes(String(novo))), 'falta a lacuna da base do ano novo');
+  assert.ok(r.documentos.length > 0, 'não usou a base do ano anterior');
+});

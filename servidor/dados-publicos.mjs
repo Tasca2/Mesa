@@ -692,13 +692,16 @@ async function baixarPdf(doc, pasta) {
 export async function documentosCvm({ empresa, tipos, quantidade, protocolo } = {}, opcoes = {}) {
   const hoje = opcoes.hoje || hojeSP(), ano = +hoje.slice(0, 4);
   const lacunas = [];
-  let base;
-  try { base = await baseCvm(ano); } catch (e) {
-    return { fonte: 'CVM, Dados Abertos: documentos das companhias abertas (IPE)', empresa: null, documentos: [], lacunas: [{ item: `base de documentos da CVM de ${ano}`, motivo: motivo(e) }] };
+  const vazio = (l) => ({ fonte: 'CVM, Dados Abertos: documentos das companhias abertas (IPE)', empresa: null, documentos: [], lacunas: l });
+  const inicioDoAno = hoje.slice(5, 7) <= '02';
+  let base, docs = [];
+  try { base = await baseCvm(ano); docs = base.docs; } catch (e) {
+    lacunas.push({ item: `base de documentos da CVM de ${ano}`, motivo: motivo(e) });
+    if (!inicioDoAno) return vazio(lacunas); // em janeiro e fevereiro a base do ano novo pode não ter saído: segue com a do ano anterior
   }
-  let docs = base.docs;
-  if (hoje.slice(5, 7) <= '02') {
-    try { docs = [...docs, ...(await baseCvm(ano - 1)).docs]; } catch (e) { lacunas.push({ item: `base de documentos da CVM de ${ano - 1}`, motivo: motivo(e) }); }
+  if (inicioDoAno) {
+    try { const ant = await baseCvm(ano - 1); docs = [...docs, ...ant.docs]; base = base || ant; } catch (e) { lacunas.push({ item: `base de documentos da CVM de ${ano - 1}`, motivo: motivo(e) }); }
+    if (!base) return vazio(lacunas);
   }
   const info = {
     fonte: 'CVM, Dados Abertos: documentos das companhias abertas (IPE)', baseConsultada: base.url, baseAtualizadaEm: base.atualizadaEm, documentoMaisRecenteNaBase: base.maisRecente,
