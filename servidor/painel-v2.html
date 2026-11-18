@@ -823,7 +823,10 @@
   };
   // Na opção "Conversa de WhatsApp" a lista de entrega é trocada pelas mensagens: esta linha diz o que a mensagem de cada tarefa precisa trazer.
   const NA_MENSAGEM = {
-    macro: "Na mensagem não pode faltar: o número de hoje, quanto mudou desde a referência e o que isso mexe para a situação do cliente",
+    macro: [
+      "Na mensagem não pode faltar: o número de hoje, quanto mudou desde a referência e o que isso mexe para a situação do cliente",
+      "Dentro das mensagens, nenhuma data e nenhuma fonte (nem «Focus», nem «BC», nem código de série): escreva «hoje», «há um mês» (ou o período da referência) e «o mercado espera»; fonte e data de cada número ficam só nas 2 linhas finais",
+    ],
     fato: "Na mensagem não pode faltar: o que a empresa comunicou, o número principal e o que ainda depende de aprovação",
     grafico: "Na mensagem não pode faltar: onde o preço está na faixa do período e o nível que o mercado respeitou, com as datas",
   };
@@ -833,7 +836,7 @@
       "Antes, pesquise tudo o que a rotina pede (dados, fontes e datas), mas entregue só o que eu vou mandar e o que preciso para sustentar a conversa",
       "Resumo para mim em 2 linhas: o que aconteceu e o que muda na conversa com o cliente",
       "Mensagem principal de WhatsApp, pronta para colar, em peça separada (tipo whatsapp): 3 a 5 linhas, começa pelo que importa para a pessoa, traduz o termo técnico e usa uma analogia do dia a dia",
-      ...(naMensagem ? [naMensagem] : []),
+      ...[].concat(naMensagem ?? []),
       "Versão de 2 linhas, em peça separada, para quando o cliente só quer saber o essencial",
       "Resposta pronta, em peça separada, para as 2 perguntas que o cliente mais provavelmente fará depois",
       "Uma pergunta aberta no fim da mensagem para continuar a conversa e entender a situação dele",
