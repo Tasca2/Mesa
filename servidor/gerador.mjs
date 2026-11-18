@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync, copyFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync, copyFileSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -11,6 +11,7 @@ const TAMANHOS = { feed: [1080, 1350], quadrado: [1080, 1080], stories: [1080, 1
 const TEMAS = {
   escuro: { fundo: '#101113', tinta: '#F3EEE6', suave: '#A7A7AB', cor: '#E8C88E' },
   claro: { fundo: '#F7F3EC', tinta: '#1B1B1D', suave: '#6B6B70', cor: '#A8741A' },
+  marinho: { fundo: '#0B1F33', tinta: '#F1F4F7', suave: '#A3B3C4', cor: '#D8B26A' },
 };
 const FONTE = "'Segoe UI','Helvetica Neue',Arial,sans-serif";
 
@@ -66,70 +67,228 @@ async function renderizar(html, saida, tipo, [w, h]) {
   } finally { try { rmSync(tmp, { recursive: true, force: true }); } catch {   } }
 }
 
-const tam = (texto, base, min, passo = 0.18) => Math.max(min, Math.round(base - Math.max(0, String(texto || '').length - 28) * passo));
+// ---------- Carrossel e arte de Instagram (mesa_carrossel) ----------
+
+// Tipos de slide. capa e fechamento levam a foto, o nome e o cargo do assessor (do perfil); os outros variam o ritmo.
+const TIPOS_SLIDE = ['capa', 'conteudo', 'numero', 'lista', 'comparacao', 'passos', 'citacao', 'fechamento'];
+
+// Maior tamanho de letra (de base até min, de 2 em 2) em que os textos cabem na altura dada, um embaixo do outro.
+// Estimativa: largura média de um caractere em "em" e 10% a mais de linha pela quebra de palavra.
+const linhasDe = (t, f, largura, em) => String(t ?? '').split('\n')
+  .reduce((n, p) => n + Math.max(1, Math.ceil((p.length * 1.1) / Math.max(1, Math.floor(largura / (f * em))))), 0);
+const caberLista = (textos, base, min, largura, altura, lh = 1.2, em = 0.55, gap = 0) => {
+  const ts = textos.filter((t) => String(t ?? '').trim());
+  for (let f = base; f > min; f -= 2) {
+    const h = ts.reduce((s, t) => s + linhasDe(t, f, largura, em) * f * lh, 0) + gap * Math.max(0, ts.length - 1);
+    if (h <= altura) return f;
+  }
+  return min;
+};
+const caber = (t, base, min, largura, altura, lh, em) => caberLista([t], base, min, largura, altura, lh, em);
+
+// Contraste entre duas cores (fórmula do WCAG); abaixo de 3, a cor da marca não serve para texto sobre o fundo.
+const luminancia = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+  .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)).reduce((s, c, k) => s + c * [0.2126, 0.7152, 0.0722][k], 0);
+const contraste = (a, b) => { const [x, y] = [luminancia(a), luminancia(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const iniciaisDe = (nome) => { const p = String(nome || '').trim().split(/\s+/).filter((w) => /^\p{L}/u.test(w)); return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); };
+
+function autorHtml(ctx, grande = false) {
+  if (!ctx.foto && !ctx.nome) return '';
+  const rosto = ctx.foto ? `<img class="rosto" src="${ctx.foto}" alt="">` : `<span class="rosto iniciais">${esc(iniciaisDe(ctx.nome))}</span>`;
+  return `<div class="autor${grande ? ' grande' : ''}">${rosto}<div class="quem">${ctx.nome ? `<b>${esc(ctx.nome)}</b>` : ''}${ctx.cargo ? `<span>${esc(ctx.cargo)}</span>` : ''}</div></div>`;
+}
+
+// Rede de segurança: no navegador, se o texto passar da área do slide, todas as letras com tamanho calculado diminuem
+// juntas até caber (o cálculo acima é estimativa). Vai no HTML de cada imagem e do PDF.
+const AJUSTAR = '<script>for (const c of document.querySelectorAll(".corpo")) { const el = [...c.querySelectorAll("[style*=font-size]")]; ' +
+  'for (let k = 0; k < 24 && c.scrollHeight > c.clientHeight + 2; k++) for (const e of el) e.style.fontSize = Math.max(16, parseFloat(e.style.fontSize) * 0.94) + "px"; }</script>';
 
 function slideHtml(s, i, n, ctx) {
-  const { t, cor, rodape, W, H } = ctx;
-  const tipo = s.tipo || 'conteudo';
-  const titulo = esc(s.titulo), texto = esc(s.texto || ''), destaque = esc(s.destaque || ''), fonte = esc(s.fonte || '');
-  const tamTitulo = tipo === 'capa' ? tam(s.titulo, 118, 62) : tam(s.titulo, 76, 46);
-  const tamTexto = tam(s.texto, 46, 32, 0.07);
-  const ultimo = i === n - 1;
+  const { W, H } = ctx;
+  const alt = ctx.altBase - (s.fonte ? 16 + linhasDe(s.fonte, 26, W - 176, 0.5) * 35 : 0);
+  const tipo = TIPOS_SLIDE.includes(s.tipo) ? s.tipo : 'conteudo';
+  const L = W - 176, ultimo = i === n - 1;
+  const fs = (f) => `style="font-size:${f}px"`;
+  const h1 = (base, min, h) => `<h1 ${fs(caber(s.titulo, base, min, L, h, 1.08, 0.56))}>${esc(s.titulo)}</h1>`;
+  const p = (base, min, h) => (s.texto ? `<p ${fs(caber(s.texto, base, min, L, h, 1.42, 0.5))}>${esc(s.texto)}</p>` : '');
+  const grande = (d, max, h) => Math.max(64, Math.min(max, Math.floor(L / (0.6 * Math.max(1, String(d).length))), Math.floor(h)));
+  let corpo;
+  if (tipo === 'capa') {
+    corpo = `<div class="miolo"><div class="regua"></div>${h1(112, 54, alt * 0.55)}` +
+      `${s.texto ? `<p class="sub" ${fs(caber(s.texto, 40, 28, L, alt * 0.16, 1.35, 0.5))}>${esc(s.texto)}</p>` : ''}</div>` +
+      (ctx.nome || ctx.foto || n > 1 ? `<div class="assina">${autorHtml(ctx)}${n > 1 ? '<div class="arraste">Arraste para o lado <span>→</span></div>' : ''}</div>` : '');
+  } else if (tipo === 'numero') {
+    const d = String(s.destaque || '');
+    corpo = `${h1(64, 40, alt * 0.22)}${d ? `<div class="gigante" ${fs(grande(d, 300, alt * 0.34))}>${esc(d)}</div>` : ''}${p(44, 30, alt * 0.3)}`;
+  } else if (tipo === 'lista') {
+    const itens = (s.itens || []).filter((x) => x && (x.titulo || x.texto)).slice(0, 4);
+    const h = alt * 0.7 - 30 * Math.max(0, itens.length - 1);
+    const ft = caberLista(itens.map((x) => x.titulo), 50, 26, L - 100, h * 0.45, 1.18, 0.56);
+    const fx = caberLista(itens.map((x) => x.texto), 38, 22, L - 100, h * 0.55, 1.38, 0.5);
+    corpo = `${h1(72, 44, alt * 0.22)}<ol class="itens">${itens.map((x, k) => `<li><span class="n">${k + 1}</span><div>` +
+      `${x.titulo ? `<b ${fs(ft)}>${esc(x.titulo)}</b>` : ''}${x.texto ? `<span class="tx" ${fs(fx)}>${esc(x.texto)}</span>` : ''}</div></li>`).join('')}</ol>`;
+  } else if (tipo === 'comparacao') {
+    const cols = (s.colunas || []).filter((c) => c && (c.titulo || c.texto || c.itens?.length)).slice(0, 2);
+    const lc = (L - 32) / Math.max(1, cols.length) - 68;
+    const ftc = caberLista(cols.map((c) => c.titulo), 46, 28, lc, 110, 1.1, 0.56);
+    const fc = Math.min(...cols.map((c) => caberLista(c.itens?.length ? c.itens : [c.texto], 40, 20, lc - 30, alt * 0.62 - 140, 1.35, 0.5, 18)));
+    corpo = `${h1(72, 44, alt * 0.22)}<div class="lados">${cols.map((c, k) => `<div class="coluna ${k ? 'b' : 'a'}"><div class="ct" ${fs(ftc)}>${esc(c.titulo || '')}</div>` +
+      (c.itens?.length ? `<ul>${c.itens.slice(0, 4).map((x) => `<li ${fs(fc)}>${esc(x)}</li>`).join('')}</ul>` : c.texto ? `<p ${fs(fc)}>${esc(c.texto)}</p>` : '') + '</div>').join('')}</div>`;
+  } else if (tipo === 'passos') {
+    const ps = (s.passos || []).filter((x) => String(x ?? '').trim()).slice(0, 5);
+    const f = caberLista(ps, 46, 24, L - 102, alt * 0.66, 1.3, 0.52, 28);
+    corpo = `${h1(72, 44, alt * 0.22)}<ol class="etapas">${ps.map((x, k) => `<li><span class="n">${k + 1}</span><span class="t" ${fs(f)}>${esc(x)}</span></li>`).join('')}</ol>`;
+  } else if (tipo === 'citacao') {
+    corpo = `${s.titulo ? `<div class="etiqueta">${esc(s.titulo)}</div>` : ''}<div class="aspas">“</div>` +
+      `<blockquote ${fs(caber(s.texto || '', 62, 32, L, alt * 0.55, 1.3, 0.52))}>${esc(s.texto || '')}</blockquote>${s.autor ? `<div class="autoria">— ${esc(s.autor)}</div>` : ''}`;
+  } else if (tipo === 'fechamento') {
+    corpo = `${autorHtml(ctx, true)}${h1(88, 48, alt * 0.3)}${p(44, 30, alt * 0.22)}`;
+  } else {
+    const d = String(s.destaque || '');
+    corpo = `${h1(78, 46, alt * 0.36)}${d ? `<div class="destaque" ${fs(grande(d, 170, alt * 0.22))}>${esc(d)}</div>` : ''}${p(46, 30, alt * 0.4)}`;
+  }
   return `<section class="slide ${tipo}" style="width:${W}px;height:${H}px">
-  <div class="topo"><span class="marca"></span><span class="cont">${n > 1 ? `${i + 1} / ${n}` : ''}</span></div>
-  <div class="corpo">
-    ${tipo === 'capa' ? '<div class="regua"></div>' : ''}
-    <h1 style="font-size:${tamTitulo}px">${titulo}</h1>
-    ${destaque ? `<div class="destaque">${destaque}</div>` : ''}
-    ${texto ? `<p style="font-size:${tamTexto}px">${texto}</p>` : ''}
-  </div>
-  <div class="pe">
-    ${fonte ? `<div class="fonte">Fonte: ${fonte}</div>` : ''}
-    <div class="linha"><span>${esc(rodape)}</span><span class="seta">${!ultimo && n > 1 ? '→' : ''}</span></div>
-  </div>
+  <div class="topo"><span class="marca"></span><span class="cont">${n > 1 ? `${i + 1}/${n}` : ''}</span></div>
+  <div class="corpo">${corpo}</div>
+  <div class="pe">${s.fonte ? `<div class="fonte">Fonte: ${esc(s.fonte)}</div>` : ''}<div class="linha"><span>${esc(ctx.rodape)}</span>${!ultimo && n > 1 ? '<span class="seta">→</span>' : ''}</div></div>
 </section>`;
 }
 
-function cssCarrossel({ t, cor, W, H }) {
-  return `*{box-sizing:border-box;margin:0}html,body{background:${t.fundo}}body{font-family:${FONTE};-webkit-font-smoothing:antialiased}
-.slide{position:relative;overflow:hidden;background:${t.fundo};color:${t.tinta};padding:84px 88px 72px;display:flex;flex-direction:column;justify-content:space-between;page-break-after:always;break-after:page}
+function cssCarrossel({ t, cor, corTexto, sobreCor, formato }) {
+  return `*{box-sizing:border-box;margin:0;padding:0}html,body{background:${t.fundo}}body{font-family:${FONTE};-webkit-font-smoothing:antialiased}
+.slide{position:relative;overflow:hidden;background:${t.fundo};color:${t.tinta};padding:${formato === 'stories' ? '220px 88px 260px' : '84px 88px 72px'};display:flex;flex-direction:column;justify-content:space-between;page-break-after:always;break-after:page}
 .slide::before{content:"";position:absolute;right:-220px;top:-220px;width:620px;height:620px;border-radius:50%;background:${cor};opacity:.10}
 .slide::after{content:"";position:absolute;left:0;bottom:0;width:100%;height:10px;background:${cor}}
 .topo{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1}.marca{width:22px;height:22px;border-radius:50%;background:${cor}}
-.cont{font-size:30px;color:${t.suave};letter-spacing:.06em}
-.corpo{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:34px;flex:1;overflow:hidden;padding:30px 0}
+.cont{font-size:30px;font-weight:700;color:${t.suave};letter-spacing:.06em}
+.corpo{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:safe center;gap:34px;flex:1;min-height:0;overflow:hidden;padding:30px 0}
 .regua{width:120px;height:10px;background:${cor};border-radius:6px}
 h1{font-weight:800;line-height:1.08;letter-spacing:-.01em;word-break:break-word}
-.capa h1{color:${t.tinta}}
-.destaque{font-size:170px;font-weight:800;line-height:1;color:${cor};letter-spacing:-.02em}
 p{line-height:1.42;color:${t.tinta};opacity:.88;white-space:pre-wrap;word-break:break-word}
+.destaque,.gigante{font-weight:800;line-height:1;color:${corTexto};letter-spacing:-.02em;white-space:nowrap}
+.gigante{line-height:.95;letter-spacing:-.03em}
+.capa .corpo{justify-content:space-between}.miolo{display:flex;flex-direction:column;justify-content:safe center;gap:34px;flex:1}
+.sub{color:${t.suave};opacity:1;line-height:1.35}
+.assina{display:flex;align-items:center;justify-content:space-between;gap:28px}
+.autor{display:flex;align-items:center;gap:24px;min-width:0}
+.rosto{flex:none;width:124px;height:124px;border-radius:50%;object-fit:cover;border:4px solid ${cor}}
+.iniciais{display:flex;align-items:center;justify-content:center;background:${cor};color:${sobreCor};font-weight:800;font-size:46px;letter-spacing:.02em}
+.quem{display:flex;flex-direction:column;gap:6px;min-width:0}.quem b{font-size:34px;font-weight:700;line-height:1.2}.quem span{font-size:25px;color:${t.suave};line-height:1.3}
+.autor.grande .rosto{width:210px;height:210px;border-width:6px}.autor.grande .iniciais{font-size:76px}.autor.grande .quem b{font-size:44px}.autor.grande .quem span{font-size:30px}
+.arraste{flex:none;display:flex;align-items:center;gap:14px;font-size:28px;font-weight:700;border:2px solid ${corTexto};border-radius:999px;padding:14px 28px}
+.arraste span{color:${corTexto};font-size:38px;line-height:1}
+.n{flex:none;width:72px;height:72px;border-radius:50%;background:${cor};color:${sobreCor};font-weight:800;font-size:36px;display:flex;align-items:center;justify-content:center}
+.itens,.etapas{list-style:none;display:flex;flex-direction:column;position:relative}.itens{gap:30px}.etapas{gap:28px}
+.itens li{display:flex;gap:28px;align-items:flex-start}.itens b{display:block;font-weight:700;line-height:1.18}.itens .tx{display:block;margin-top:8px;line-height:1.38;color:${t.suave}}
+.etapas::before{content:"";position:absolute;left:34px;top:36px;bottom:36px;width:4px;background:${cor};opacity:.45}
+.etapas li{display:flex;gap:30px;align-items:center;position:relative}.etapas .t{line-height:1.3;font-weight:600}
+.lados{display:flex;gap:32px}.coluna{flex:1;min-width:0;border:2px solid ${t.suave}66;border-radius:28px;padding:34px 32px;display:flex;flex-direction:column;gap:20px}
+.coluna.b{border-color:${cor};background:${cor}14}.ct{font-weight:800;line-height:1.1}.coluna.b .ct{color:${corTexto}}
+.coluna ul{list-style:none;display:flex;flex-direction:column;gap:18px}.coluna li{line-height:1.35;padding-left:30px;position:relative}
+.coluna li::before{content:"";position:absolute;left:0;top:.5em;width:12px;height:12px;border-radius:50%;background:${cor}}.coluna p{line-height:1.4;opacity:1}
+.etiqueta{font-size:28px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${corTexto}}
+.aspas{font-family:Georgia,'Times New Roman',serif;font-size:220px;line-height:.62;height:110px;color:${cor}}
+blockquote{font-weight:600;line-height:1.3;word-break:break-word}.autoria{font-size:32px;color:${t.suave}}
 .pe{position:relative;z-index:1;display:flex;flex-direction:column;gap:16px}
 .fonte{font-size:26px;color:${t.suave}}
 .linha{display:flex;justify-content:space-between;align-items:flex-end;gap:30px;font-size:26px;line-height:1.35;color:${t.suave};border-top:2px solid ${t.suave}55;padding-top:18px}
-.seta{font-size:54px;color:${cor};line-height:1}`;
+.seta{font-size:54px;color:${corTexto};line-height:1}`;
 }
 
-export async function gerarCarrossel(a) {
+// Monta o HTML de cada slide, sem gerar arquivo. marcaBase: a marca do perfil (tema, cor, foto) com nome, cargo e escritório.
+export function montarCarrossel(a, marcaBase = {}) {
   const slides = Array.isArray(a.slides) ? a.slides.slice(0, 10) : [];
   if (!slides.length) throw new Error('Envie pelo menos um slide.');
-  const [W, H] = TAMANHOS[a.formato] ?? TAMANHOS.feed;
-  const t = TEMAS[a.tema] ?? TEMAS.escuro;
-  const cor = /^#[0-9a-fA-F]{6}$/.test(a.cor || '') ? a.cor : t.cor;
-  const ctx = { t, cor, rodape: a.rodape || '', W, H };
-  const pasta = path.join(pastaBase(), `${slug(a.titulo)}-${carimbo()}`);
+  const formato = TAMANHOS[a.formato] ? a.formato : 'feed';
+  const [W, H] = TAMANHOS[formato];
+  const t = TEMAS[a.tema] ?? TEMAS[marcaBase.tema] ?? TEMAS.escuro;
+  const hex = (c) => /^#[0-9a-fA-F]{6}$/.test(c || '');
+  const cor = hex(a.cor) ? a.cor : hex(marcaBase.cor) ? marcaBase.cor : t.cor;
+  const avisos = [];
+  const ctx = {
+    t, cor, formato, W, H, rodape: a.rodape || '',
+    corTexto: contraste(cor, t.fundo) >= 3 ? cor : t.cor,
+    sobreCor: contraste(t.fundo, cor) >= contraste(t.tinta, cor) ? t.fundo : t.tinta,
+    altBase: H - (formato === 'stories' ? 480 : 156) - 112 - (20 + linhasDe(a.rodape || '', 26, W - 260, 0.5) * 35),
+    foto: imagemEmbutida(marcaBase.foto, avisos, 'foto'),
+    nome: String(marcaBase.nome || '').trim(),
+    cargo: [marcaBase.cargo, marcaBase.escritorio].map((x) => String(x || '').trim()).filter(Boolean).join(' · '),
+  };
+  return { W, H, css: cssCarrossel(ctx), slides: slides.map((s, i) => slideHtml(s, i, slides.length, ctx)), avisos };
+}
+
+// Trava de palavras do carrossel: a imagem vai direto ao público, então todo texto do slide passa pela lista do material
+// de mercado (promessa, risco zero, superlativo) e rentabilidade ou retorno pede o período no mesmo slide. A fonte e o
+// rodapé também saem na imagem: passam pela lista, mas não contam como afirmação de retorno. [CONFERIR] não libera.
+const textosDoSlide = (s) => [s.titulo, s.texto, s.destaque, s.autor,
+  ...(s.itens || []).flatMap((x) => (typeof x === 'string' ? [x] : [x?.titulo, x?.texto])),
+  ...(s.colunas || []).flatMap((c) => [c?.titulo, c?.texto, ...(c?.itens || [])]),
+  ...(s.passos || [])].filter((t) => typeof t === 'string' && t.trim());
+export function revisarCarrossel(slides, termosConfirmados = [], rodape = '') {
+  const ok = (Array.isArray(termosConfirmados) ? termosConfirmados : []).map(SEMACENTO);
+  const liberado = (m) => ok.some((c) => c && (m.includes(c) || c.includes(m)));
+  const achados = [];
+  const lista = (onde, t) => {
+    const n = SEMACENTO(t);
+    for (const [nome, re] of TERMOS_RISCO_MERCADO) { const m = n.match(re); if (m && !liberado(m[0])) achados.push(`${onde}: "${t.trim().slice(0, 90)}" (${nome})`); }
+  };
+  if (typeof rodape === 'string' && rodape.trim()) lista('rodapé', rodape);
+  (Array.isArray(slides) ? slides : []).forEach((s, k) => {
+    const textos = textosDoSlide(s || {}), fonte = typeof s?.fonte === 'string' ? s.fonte : '';
+    const comPeriodo = PERIODO.test(SEMACENTO([...textos, fonte].join(' · ')));
+    for (const t of textos) {
+      lista(`slide ${k + 1}`, t);
+      const m = comPeriodo ? null : SEMACENTO(t).match(RETORNO);
+      if (m && !liberado(m[0])) achados.push(`slide ${k + 1}: "${t.trim().slice(0, 90)}" (retorno sem período)`);
+    }
+    if (fonte.trim()) lista(`slide ${k + 1}, fonte`, fonte);
+  });
+  return achados;
+}
+
+// Pasta pedida pelo Claude (ex.: "Semana de 23-11/1-seg-tema"), sempre dentro de base: cada parte só com letras, números,
+// espaço, ponto, hífen e sublinhado; até 3 partes de 60 caracteres; nome reservado do Windows ganha "_" na frente.
+// Pasta que já tem arquivo não é sobrescrita: ganha " (2)", " (3)"... Sem nada que sobre, devolve null.
+const RESERVADOS = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+export function resolverPasta(base, pedido) {
+  const partes = String(pedido ?? '').split(/[\\/]+/)
+    .map((p) => p.normalize('NFC').replace(/[^\p{L}\p{N} _.-]/gu, '').replace(/\s+/g, ' ').replace(/^[\s.]+|[\s.]+$/g, '').slice(0, 60).replace(/[\s.]+$/g, ''))
+    .filter(Boolean)
+    .map((p) => (RESERVADOS.test(p.split('.')[0]) ? '_' + p : p));
+  if (!partes.length) return null;
+  const segs = partes.length > 3 ? [...partes.slice(0, 2), partes.slice(2).join('-').slice(0, 60)] : partes;
+  const raiz = path.resolve(base);
+  const dentro = (p) => { const r = path.relative(raiz, p); return !!r && !r.startsWith('..') && !path.isAbsolute(r); };
+  const ocupada = (p) => { try { return existsSync(p) && (!statSync(p).isDirectory() || readdirSync(p).length > 0); } catch { return true; } };
+  let alvo = path.join(raiz, ...segs);
+  if (!dentro(alvo)) return null;
+  for (let k = 2; ocupada(alvo); k++) alvo = path.join(raiz, ...segs.slice(0, -1), `${segs[segs.length - 1]} (${k})`);
+  return alvo;
+}
+
+export async function gerarCarrossel(a, marcaBase = {}) {
+  const slides = Array.isArray(a.slides) ? a.slides.slice(0, 10) : [];
+  if (!slides.length) throw new Error('Envie pelo menos um slide.');
+  const risco = revisarCarrossel(slides, a.termosConfirmados || [], a.rodape);
+  if (risco.length) {
+    throw Object.assign(new Error('estas frases afirmam algo que o assessor pode não ter dito: ' + risco.join(' | ') +
+      '. Reescreva cada uma só com o que o assessor informou e chame de novo; se o assessor realmente afirmou o termo, repita a chamada com termosConfirmados (a lista dos termos).' +
+      (risco.some((x) => x.endsWith('(retorno sem período)')) ? ' Rentabilidade e retorno precisam do período no mesmo slide (ex.: "em 12 meses até out/2026").' : '')), { trava: true });
+  }
+  const m = montarCarrossel({ ...a, slides }, marcaBase);
+  const base = pastaBase();
+  const pasta = (a.pasta && resolverPasta(base, a.pasta)) || path.join(base, `${slug(a.titulo)}-${carimbo()}`);
   mkdirSync(pasta, { recursive: true });
   const imagens = [];
-  for (let i = 0; i < slides.length; i++) {
-    const html = `<!doctype html><meta charset="utf-8"><style>${cssCarrossel(ctx)}</style>${slideHtml(slides[i], i, slides.length, ctx)}`;
+  for (let i = 0; i < m.slides.length; i++) {
     const saida = path.join(pasta, `slide-${String(i + 1).padStart(2, '0')}.png`);
-    await renderizar(html, saida, 'png', [W, H]);
+    await renderizar(`<!doctype html><meta charset="utf-8"><style>${m.css}</style>${m.slides[i]}${AJUSTAR}`, saida, 'png', [m.W, m.H]);
     imagens.push(saida);
   }
   const pdf = path.join(pasta, `${slug(a.titulo)}.pdf`);
-  const tudo = `<!doctype html><meta charset="utf-8"><style>@page{size:${W}px ${H}px;margin:0}${cssCarrossel(ctx)}</style>${slides.map((s, i) => slideHtml(s, i, slides.length, ctx)).join('')}`;
-  await renderizar(tudo, pdf, 'pdf', [W, H]);
-  const r = { tipo: 'carrossel', titulo: a.titulo, pasta, imagens, pdf, em: Date.now() };
-  writeFileSync(ARQUIVO_GERACAO, JSON.stringify(r));
+  await renderizar(`<!doctype html><meta charset="utf-8"><style>@page{size:${m.W}px ${m.H}px;margin:0}${m.css}</style>${m.slides.join('')}${AJUSTAR}`, pdf, 'pdf', [m.W, m.H]);
+  const r = { tipo: 'carrossel', titulo: a.titulo, pasta, imagens, pdf, avisos: m.avisos, em: Date.now() };
+  writeFileSync(ARQUIVO_GERACAO, JSON.stringify({ ...r, avisos: undefined }));
   return r;
 }
 

@@ -73,7 +73,10 @@ Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta 
 | Comparar o setor | `comparativo-setorial` |
 | Fundo imobiliário | `analise-fii` |
 | Renda fixa | `comparacao-renda-fixa` |
-| Criar um post / post do mercado | `conteudo-para-cliente` (e `macro-brasil` no post do dia) |
+| Estudar perfis de referência · Como foram meus posts | `pauta-de-conteudo` |
+| Ideias para postar hoje | `pauta-de-conteudo` (e `macro-brasil` para o gatilho do dia) |
+| Semana de posts pronta | `calendario-de-conteudo` (e `pauta-de-conteudo` para os temas) |
+| Criar um post | `conteudo-para-cliente` (e `macro-brasil` no post do dia) |
 
 Peça no chat o que faltar (histórico da conversa, código do ativo, documento, tema), siga as instruções devolvidas por `carregar_metodo`, entregue como texto ou PDF (`mesa_documento`) e, no Instagram, gere as imagens com `mesa_carrossel`. Registre a tarefa com `mesa_perfil` (campo `registrar`).
 

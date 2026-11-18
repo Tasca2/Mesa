@@ -120,12 +120,12 @@ const pastaDa = (skill) => path.join(ROTINAS.includes(skill) ? PASTA_ROTINAS : P
 
 const AREAS = 'Rotinas do dia (antes da reunião: cliente novo, primeira reunião, segunda reunião, pré-reunião (cliente atual); depois da reunião: pós-reunião; carteira: revisão de carteira, comparador de carteira; cliente: diagnóstico financeiro, relatório mensal ao cliente, proposta de assessoria (documento), follow-up da proposta; relacionamento: ritmo e indicação, explicar ao cliente, conversa sobre sucessão; prospecção: primeira mensagem, ligação de primeiro contato, sequência para lead novo, pitch e e-mail, objeção do cliente, retomar lead parado); ' +
   'Mercado hoje (juros, inflação e câmbio, fato relevante, gráfico, ação, setor, fundo imobiliário, renda fixa, estudo e apresentação de ativo); ' +
-  'Marketing Profissional (Post para Instagram: criar um post, ideias para postar hoje, calendário de post; editar um Reels; landing page)';
+  'Marketing Profissional (Post para Instagram: estudar perfis de referência, ideias para postar hoje, semana de posts pronta, criar um post, como foram meus posts; editar um Reels; landing page)';
 const COMO_ATUALIZAR = 'Em toda tarefa enviada pela Mesa (mensagem que começa com [Mesa]), chame mesa_perfil para saber quem é o assessor, ' +
   'chame mesa_andamento antes de cada pedido ao assessor, dizendo em uma frase o que ele precisa responder ou anexar no chat, ' +
   'e ao terminar, com concluido=true; depois registre a tarefa com mesa_perfil (registrar).';
 
-const PERFIL_VAZIO = { nome: '', atuacao: '', escritorio: '', publico: '', tom: '', exemplo: '', canal: '', tamanho: '', tratamento: '', assinatura: '', evitar: '', exemplos: [], historico: [], modelos: {} };
+const PERFIL_VAZIO = { nome: '', atuacao: '', escritorio: '', publico: '', tom: '', exemplo: '', canal: '', tamanho: '', tratamento: '', assinatura: '', evitar: '', referencias: '', exemplos: [], historico: [], modelos: {} };
 const lerPerfil = () => {
   try { return { ...PERFIL_VAZIO, ...JSON.parse(readFileSync(ARQUIVO_PERFIL, 'utf8')) }; } catch { return { ...PERFIL_VAZIO }; }
 };
@@ -349,7 +349,7 @@ function buildServer() {
     {
       title: 'Perfil do assessor',
       description:
-        'Lê o perfil do assessor (nome, atuação, escritório, público, tom, canal, tamanho, tratamento, assinatura, termos que evita e até 3 mensagens de exemplo) e as últimas tarefas feitas na Mesa. ' +
+        'Lê o perfil do assessor (nome, atuação, escritório, público, tom, canal, tamanho, tratamento, assinatura, termos que evita, até 3 mensagens de exemplo e "Minhas referências", a ficha dos perfis de Instagram que ele acompanha) e as últimas tarefas feitas na Mesa. ' +
         'Chame no começo de toda tarefa da Mesa e use o que vier em vez de perguntar de novo. ' +
         'Para salvar ou atualizar o perfil, envie "salvar"; para lembrar a tarefa que acabou de entregar, envie "registrar".',
       inputSchema: {
@@ -366,6 +366,7 @@ function buildServer() {
           assinatura: z.string().max(200).optional().describe('Identificação que vai no fim das peças: nome, registro e escritório'),
           evitar: z.string().max(200).optional().describe('Palavras, expressões e emojis que o assessor nunca usa'),
           exemplos: z.array(z.string().max(600)).max(3).optional().describe('Até 3 mensagens reais do assessor, sem dados de cliente: modelo do jeito de escrever, nunca dos fatos'),
+          referencias: z.string().max(3000).optional().describe('Minhas referências: perfis de Instagram que o assessor acompanha, padrões e ganchos que funcionam, em até 15 linhas. Substitui a ficha anterior: grave só depois do ok do assessor'),
           avisoDados: z.enum(['nunca', 'sempre']).optional().describe('Uso do painel: se a Mesa deve voltar a perguntar sobre conectar os dados de mercado'),
           marca: z.object({
             tema: z.enum(['escuro', 'claro', 'marinho']).optional(),
@@ -495,31 +496,43 @@ function buildServer() {
     {
       title: 'Gerar imagens do carrossel ou da arte',
       description:
-        'Gera as imagens prontas para postar (PNG) e um PDF com todos os slides, a partir do texto que você escreveu. Use para carrossel (3 a 10 slides) ou para uma arte única (1 slide) de Instagram. ' +
-        'Slides curtos: título de até 12 palavras, texto de até 2 linhas, "destaque" só para um número grande (ex.: "10,75%"), "fonte" com órgão e data quando houver dado de mercado. ' +
-        'Capa no primeiro slide e fechamento com chamada no último. O rodapé leva a identificação do profissional conforme a atuação dele e o aviso "conteúdo educativo, não é recomendação". ' +
-        'Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF devolvido, e diga ao assessor onde ficou a pasta com as imagens.',
+        'Gera as imagens prontas para postar (PNG, uma por slide) e um PDF com todos os slides, a partir do texto que você escreveu. Use para carrossel (3 a 10 slides; o Meta Business Suite aceita até 10 fotos por post), para uma arte única (1 slide) e para a capa de um Reels. ' +
+        'Tipos de slide: capa (título; a foto, o nome e o cargo do assessor e a seta de arrastar entram sozinhos, vindos do perfil) · conteudo (título, texto e, se houver, destaque com um número curto) · numero (destaque = o número gigante, ex.: "6,2%", com título, texto e fonte) · ' +
+        'lista (itens [{titulo, texto}], 2 a 4) · comparacao (colunas: 2 × {titulo, itens[] ou texto}: A × B, antes × depois) · passos (passos[], 2 a 5) · citacao (texto = a frase, autor e fonte) · fechamento (a chamada no título; foto e nome do assessor entram sozinhos). Varie os tipos: nada de 7 telas iguais. ' +
+        'Slides curtos: título de até 12 palavras, texto de até 2 linhas, "fonte" com órgão e data quando houver dado de mercado. O contador (2/7) e a seta saem sozinhos. Tema e cor vêm da marca do perfil, se você não mandar outros. ' +
+        'pasta junta os posts da semana dentro de Documentos › Mesa do Assessor, ex.: "Semana de 23-11/1-seg-previdencia" (a semana com a data da segunda-feira; uma subpasta por post, com número, dia e tema). Pasta que já tem arquivo não é sobrescrita: ganha "(2)". ' +
+        'Trava de palavras: promessa de retorno, risco zero, superlativo e rentabilidade sem o período no mesmo slide barram a geração; reescreva só com o que o assessor informou ou, se ele afirmou o termo, repita a chamada com termosConfirmados. ' +
+        'O rodapé leva a identificação do profissional conforme a atuação dele e o aviso "conteúdo educativo, não é recomendação". ' +
+        'Depois de gerar a última peça do pedido, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF devolvido, e diga ao assessor onde ficaram as pastas com as imagens. Se vier "avisos", conte ao assessor.',
       inputSchema: {
         titulo: z.string().min(2).max(120).describe('Nome da peça (vira o nome da pasta)'),
         formato: z.enum(['feed', 'quadrado', 'stories']).optional().describe('feed 1080x1350 (padrão), quadrado 1080x1080, stories 1080x1920'),
-        tema: z.enum(['escuro', 'claro']).optional().describe('Fundo escuro (padrão) ou claro'),
-        cor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Cor de destaque em hexadecimal, ex.: #E8C88E'),
+        tema: z.enum(['escuro', 'claro', 'marinho']).optional().describe('Padrão: o tema da marca do perfil, ou escuro'),
+        cor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Cor de destaque em hexadecimal, ex.: #E8C88E; padrão: a da marca do perfil'),
         rodape: z.string().max(240).describe('Identificação do profissional e aviso, em uma linha'),
+        pasta: z.string().max(160).optional().describe('Subpasta dentro de Documentos › Mesa do Assessor, ex.: "Semana de 23-11/1-seg-previdencia". Sem ela, a peça ganha uma pasta própria'),
+        termosConfirmados: z.array(z.string().max(40)).max(8).optional().describe('Só quando o assessor afirmou de fato algo que a trava de palavras bloqueou; nunca por conta própria'),
         slides: z.array(z.object({
-          tipo: z.enum(['capa', 'conteudo', 'fechamento']).optional(),
+          tipo: z.enum(['capa', 'conteudo', 'numero', 'lista', 'comparacao', 'passos', 'citacao', 'fechamento']).optional(),
           titulo: z.string().min(1).max(140),
           texto: z.string().max(420).optional(),
           destaque: z.string().max(24).optional(),
           fonte: z.string().max(140).optional(),
+          itens: z.array(z.object({ titulo: z.string().min(1).max(80), texto: z.string().max(180).optional() })).max(4).optional().describe('lista: 2 a 4 itens'),
+          colunas: z.array(z.object({ titulo: z.string().min(1).max(40), itens: z.array(z.string().max(90)).max(4).optional(), texto: z.string().max(220).optional() })).max(2).optional().describe('comparacao: as 2 colunas'),
+          passos: z.array(z.string().max(120)).max(5).optional().describe('passos: 2 a 5 etapas, na ordem'),
+          autor: z.string().max(80).optional().describe('citacao: quem disse'),
         })).min(1).max(10),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     async (args) => {
       try {
-        const r = await gerarCarrossel(args);
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pasta: r.pasta, imagens: r.imagens.map((x) => path.basename(x)), pdf: r.pdf }) }] };
+        const p = lerPerfil();
+        const r = await gerarCarrossel(args, { ...(p.marca || {}), nome: p.nome, cargo: p.atuacao, escritorio: p.escritorio });
+        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pasta: r.pasta, imagens: r.imagens.map((x) => path.basename(x)), pdf: r.pdf, ...(r.avisos?.length ? { avisos: r.avisos } : {}) }) }] };
       } catch (e) {
+        if (e?.trava) return { isError: true, content: [{ type: 'text', text: `As imagens não foram geradas: ${e.message}` }] };
         return { isError: true, content: [{ type: 'text', text: `Não consegui gerar as imagens: ${e?.message ?? e}. Entregue o texto dos slides no chat.` }] };
       }
     },

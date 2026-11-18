@@ -248,7 +248,7 @@
       ] },
     { id: "instagram", nome: "Marketing Profissional", desc: "Posts, vídeos e páginas para atrair clientes, com a revisão das regras feita antes de publicar.", glifo: "quadros",
       grupos: [
-        { nome: "Post para Instagram", pasta: true, desc: "Do tema ao texto pronto, com a revisão das regras feita antes de publicar.", tarefas: ["post", "pauta", "calendario"] },
+        { nome: "Post para Instagram", pasta: true, desc: "Das referências aos números: ideias, a semana pronta numa pasta e a revisão das regras antes de publicar.", tarefas: ["referencias", "pauta", "calendario", "post", "meus-posts"] },
         { nome: "Landing Page", tarefas: ["landing"] },
       ] },
   ];
@@ -290,8 +290,10 @@
       { id: "tipo", curto: "Para quem", titulo: "Para quem é a proposta?", opcoes: [{ t: "Cliente novo" }, { t: "Cliente atual (ampliar)" }] }, RESULTADO ] },
     "followup": { nome: "Follow-up da proposta", linha: "3 toques para descobrir o que falta decidir.", ref: "skill relatorio-e-proposta", acao: "Montar o follow-up", perguntas: [
       { id: "tempo", curto: "Enviada há", titulo: "Há quanto tempo você enviou a proposta?", opcoes: [{ t: "2 dias" }, { t: "5 dias" }, { t: "10 dias ou mais" }] } ] },
-    "calendario": { nome: "Calendário de post", linha: "5 posts da semana com tema, gancho e legenda.", ref: "skills pauta-de-conteudo e calendario-de-conteudo", acao: "Montar a semana", perguntas: [
-      { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo da semana?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] } ] },
+    "calendario": { nome: "Semana de posts pronta", linha: "Os posts da semana criados: imagens, roteiros e legendas numa pasta, com dia e hora para programar.", ref: "skills pauta-de-conteudo e calendario-de-conteudo", acao: "Montar a semana", perguntas: [
+      { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo da semana?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] },
+      { id: "quantos", curto: "Posts", titulo: "Quantos posts?", opcoes: [{ t: "3" }, { t: "5", d: "Padrão: de segunda a sexta" }, { t: "7" }] },
+      { id: "programar", curto: "Programar", titulo: "Como você vai programar?", opcoes: [{ t: "Meta Business Suite", d: "Com o passo a passo da Central de Ajuda da Meta" }, { t: "Conector ligado ao Claude", d: "No Claude Desktop, com o conector já ligado" }, { t: "Só quero a pasta", d: "Imagens e legendas prontas; você programa como quiser" }] } ] },
     "cliente-novo": { nome: "Cliente novo", linha: "Ficha de entrada e o que pedir ao cliente.", ref: "rotina prospect-intake", acao: "Abrir a ficha", perguntas: [
       { id: "ponto", curto: "Momento", titulo: "Em que ponto está esse cliente?", opcoes: [{ t: "Antes da primeira conversa", d: "O que perguntar e pedir a ele" }, { t: "Já tenho notas ou documentos", d: "Extratos, IR ou carteira" }] } ] },
     "pre-reuniao": { nome: "Pré-reunião (cliente atual)", linha: "Para reunião com quem já é cliente: roteiro, pontos de atenção e perguntas.", ref: "rotina pre-meeting", acao: "Montar a pré-reunião", perguntas: [
@@ -324,8 +326,10 @@
     "setor": { nome: "Comparar o setor", linha: "Empresas lado a lado, na mesma base.", ref: "skill comparativo-setorial", acao: "Comparar", perguntas: [USO_MERCADO] },
     "fii": { nome: "Fundo imobiliário", linha: "Imóveis, crédito, P/VP e origem dos rendimentos.", ref: "skill analise-fii", acao: "Analisar o fundo", perguntas: [USO_MERCADO] },
     "rf": { nome: "Renda fixa", linha: "Títulos comparados com imposto e liquidez.", ref: "skill comparacao-renda-fixa", acao: "Comparar os títulos", perguntas: [USO_MERCADO] },
-    "pauta": { nome: "Ideias para postar hoje", linha: "O que seu público procura e o que está em alta hoje, com nota de impacto.", ref: "skill pauta-de-conteudo", acao: "Montar a pauta", perguntas: [
-      { id: "objetivo", curto: "Objetivo", titulo: "O que você quer com o conteúdo desta semana?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] } ] },
+    "pauta": { nome: "Ideias para postar hoje", linha: "5 ideias ranqueadas e a primeira já aberta, com gancho, roteiro e legenda.", ref: "skill pauta-de-conteudo", acao: "Montar a pauta", perguntas: [
+      { id: "objetivo", curto: "Objetivo", titulo: "O que você quer com o post de hoje?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] } ] },
+    "referencias": { nome: "Estudar perfis de referência", linha: "O que funciona nos perfis que você acompanha: formato, gancho, estrutura e temas. Fica guardado no seu perfil.", ref: "skill pauta-de-conteudo", acao: "Estudar os perfis", perguntas: [] },
+    "meus-posts": { nome: "Como foram meus posts", linha: "O que repetir e o que mudar, a partir dos números dos seus posts.", ref: "skill pauta-de-conteudo", acao: "Ler os números", perguntas: [] },
     "post": { nome: "Criar um post", linha: "Tema, texto e revisão das regras.", ref: "skills pauta-de-conteudo e conteudo-para-cliente", acao: "Criar o post",
       extra: "Depois do texto, faça o parecer de revisão da própria peça.", perguntas: [
       { id: "formato", curto: "Formato", titulo: "Qual formato?", ajuda: "O tema você escreve na conversa.", opcoes: [{ t: "Carrossel" }, { t: "Post único" }, { t: "Roteiro de Reels" }] }, ATUACAO ] },
@@ -467,26 +471,58 @@
         "Quando parar e o que registrar no CRM"
       ]
     },
-    "pauta": {
-      "obj": "Descobrir o que postar: as dúvidas que meu público mais tem, cruzadas com o que está acontecendo agora, com nota de impacto para cada ideia.",
+    "referencias": {
+      "obj": "Entender o que funciona nos perfis de assessores e influenciadores que eu acompanho e guardar isso como referência para as próximas pautas.",
       "entrega": [
-        "Resumo de 2 linhas: o público, o gatilho mais forte de agora e a ideia que você faria primeiro",
-        "Sinais usados, em tabela curta: sinal, fonte ou origem e data",
-        "De 5 a 6 ideias ranqueadas, cada uma com formato, dor do público, por que agora, gancho, o que a pessoa leva e nota nos cinco critérios",
-        "Como medir o resultado depois de postar",
-        "O que conferir antes de usar (datas, prazos, números, regras do escritório)"
+        "Em uma frase (negrito): o padrão que mais se repete nos posts que funcionam",
+        "Posts analisados em UMA tabela (Perfil | Data | Formato | Tema | Gancho da primeira tela | Estrutura | Chamada final | Números visíveis), um por linha",
+        "Padrões em UMA tabela (Padrão | Em quantos posts apareceu | Exemplo | Como adaptar ao meu perfil sem copiar)",
+        "Por perfil em UMA tabela (Perfil | Temas que repete | Formato mais usado | Frequência, se der para ver)",
+        "3 espaços vazios: o que meu público pergunta e nenhum desses perfis está fazendo",
+        "Ficha \"Minhas referências\" para guardar no perfil da Mesa (perfis, padrões e ganchos, em até 15 linhas); pergunte antes de gravar",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: o que não deu para ver (alcance, salvamentos) e de onde viria esse dado"
       ],
-      "fonte": "Busca na web das dúvidas e temas do meu público, com fonte e data; panorama do mercado e gatilhos do calendário (skills macro-brasil e pauta-de-conteudo). Diga o que é sinal e o que é hipótese; sem métrica do meu perfil, não invente alcance."
+      "fonte": "Só o que eu enviar (prints, links e legendas) e, se o conector de redes sociais estiver ligado, os posts e os números que ele trouxer dos perfis acompanhados. A busca na web serve para achar o perfil e o tema, não para afirmar número de engajamento. Para saber quais temas mais geram interação no Brasil, use o relatório FInfluence da ANBIMA, com a edição e a data. Não descreva post que você não viu."
+    },
+    "pauta": {
+      "obj": "Sair com o post de hoje decidido: o que meu público pergunta, o que os perfis que eu acompanho postaram e funcionou, e o que está acontecendo no mercado, com o gancho pronto.",
+      "entrega": [
+        "Em uma frase (negrito): a ideia que eu postaria hoje e o motivo",
+        "Sinais em UMA tabela de até 6 linhas (Sinal | De onde veio | Data | Tipo: dado, post de referência, pergunta de cliente ou busca)",
+        "O que os perfis de referência fizeram em UMA tabela de até 5 linhas (Perfil | Post | Formato | Gancho | O que dá para adaptar sem copiar); sem post visto, diga isso em uma linha e siga",
+        "5 ideias em UMA tabela, da melhor para a pior (Ideia | Formato | Dor do público | Por que agora | Gancho da primeira tela | Nota de 0 a 10 pelos cinco critérios da skill)",
+        "A ideia número 1 já aberta, em peça separada: título da capa, roteiro slide a slide (ou cena a cena, se for Reels), legenda com chamada e 5 hashtags",
+        "Pergunte se quero as imagens agora; se sim, gere com mesa_carrossel",
+        "Como medir em 48 horas: o número que mostra se deu certo (salvamentos, envios ou respostas), comparado com a média dos meus últimos posts, se eu informei",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (datas, números, regras do escritório)"
+      ],
+      "fonte": "Nesta ordem: (1) Minhas referências guardadas no perfil da Mesa e os arquivos que anexei (prints e links de posts); (2) se o conector de redes sociais estiver ligado, os posts dos perfis acompanhados e os números dos meus últimos posts; (3) painel_macro, para o dado novo do dia e a agenda de divulgações; (4) busca na web para dúvidas e temas em alta, com link e data; (5) relatório FInfluence da ANBIMA, para saber quais temas mais geram interação. Diga de onde veio cada sinal. Não descreva post que você não viu e não estime alcance sem número."
     },
     "calendario": {
-      "obj": "Ter os 5 posts da semana pensados, no jeito do assessor, para só aprovar e publicar.",
+      "obj": "Deixar a semana inteira pronta para programar: os posts criados (imagens, roteiros e legendas), com dia e horário, numa pasta só.",
       "entrega": [
-        "Visão da semana em tabela curta: dia, tema, formato e objetivo",
-        "Uma legenda por post, cada uma em peça separada (com gancho, chamada, 5 hashtags e o aviso educativo)",
-        "Texto de cada slide dos posts em carrossel, em peça separada",
-        "O que conferir antes de publicar (dados, fontes, regras do escritório)"
+        "Em uma frase (negrito): o fio da semana e o post em que eu mais aposto",
+        "Grade em UMA tabela (Dia e hora | Tema | Formato | Objetivo: alcance, autoridade, conversa ou contato | Gancho | De onde veio a ideia)",
+        "Cada carrossel pronto, gerado com mesa_carrossel no formato feed e salvo na pasta da semana: capa, 5 a 7 slides e fechamento com chamada",
+        "Cada Reels em peça separada: gancho dos 3 primeiros segundos, roteiro em tabela (cena, tempo, fala e texto na tela) de 30 a 45 segundos, e a capa gerada com mesa_carrossel",
+        "Uma legenda por post, em peça separada: gancho, corpo, chamada, 5 hashtags e o aviso educativo",
+        "Uma sequência de 3 stories para o dia do post principal, em peça separada",
+        "Tabela de programação (Post | Pasta e arquivos | Dia e hora | Legenda) e o passo a passo para programar pelo caminho que escolhi; com conector ligado, só deixe os posts agendados depois do meu ok",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (dados, datas, regras do escritório)"
       ],
-      "fonte": "Pauta pela skill pauta-de-conteudo (dúvidas do meu público e momento de agora), mais o panorama do mercado da semana com fonte e data (skill macro-brasil)"
+      "fonte": "as mesmas da tarefa Ideias para postar hoje (Minhas referências, anexos, conector de redes sociais se estiver ligado, busca e relatório FInfluence), mais painel_macro para encaixar o post no dia em que sai um dado (agenda de divulgações). Horário: use o que os meus números mostrarem; sem número, proponha e marque como hipótese."
+    },
+    "meus-posts": {
+      "obj": "Ler os números dos meus posts e decidir o que repetir e o que mudar na próxima semana.",
+      "entrega": [
+        "Em uma frase (negrito): o que funcionou e o que não funcionou, com o número",
+        "Posts em UMA tabela (Post | Data | Formato | Alcance | Salvamentos | Envios | Comentários | Seguidores ganhos | Leitura)",
+        "Repetir e parar em UMA tabela de duas colunas, até 3 de cada, com o número que sustenta",
+        "Testes para a próxima semana em UMA tabela de até 3 linhas (Hipótese | Como testar | O que medir)",
+        "Atualização da ficha \"Minhas referências\"; pergunte antes de gravar",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela"
+      ],
+      "fonte": "Os prints das estatísticas do Instagram que anexei, ou os números do conector de redes sociais, se estiver ligado. Sem número, não avalie o post."
     },
     "cliente-novo": {
       "obj": "Abrir a ficha de um cliente novo e saber o que ainda preciso pedir a ele.",
@@ -921,10 +957,23 @@
       { rotulo: "Para quem quero falar", dica: "Ex.: profissional liberal que só usa poupança", opcional: true },
       { rotulo: "Dúvidas que clientes e prospects mais me fazem (opcional)", opcional: true, dica: "Ex.: onde investir o 13º, CDB ou Tesouro", longo: true },
       { rotulo: "Meus posts que mais salvaram ou geraram conversa (opcional)", opcional: true, dica: "Ex.: carrossel sobre imposto no CDB", longo: true },
+      { rotulo: "Perfis que acompanho (opcional)", opcional: true, padrao: "@referencias", dica: "Ex.: @perfil1, @perfil2. Vem preenchido com as suas referências guardadas" },
+      { rotulo: "Links ou legendas de posts (opcional)", opcional: true, longo: true, dica: "Cole links ou legendas. Prints: anexe na conversa com o Claude" },
     ],
     "calendario": [
       { rotulo: "Semana ou período", dica: "Ex.: semana de 17 a 21/11", padrao: "Próxima semana" },
       { rotulo: "Temas que quero incluir (opcional)", opcional: true, dica: "Ex.: Copom, 13º salário" },
+      { rotulo: "Perfis que acompanho (opcional)", opcional: true, padrao: "@referencias", dica: "Ex.: @perfil1, @perfil2. Vem preenchido com as suas referências guardadas" },
+    ],
+    "referencias": [
+      { rotulo: "Perfis que acompanho (até 10)", padrao: "@referencias", longo: true, dica: "Ex.: @perfil1, @perfil2 ou os links dos perfis" },
+      { rotulo: "O que eu admiro neles (opcional)", opcional: true, longo: true, dica: "Ex.: a capa com uma pergunta, a explicação simples" },
+      { rotulo: "Dúvidas que meus clientes mais fazem (opcional)", opcional: true, longo: true, dica: "Ex.: previdência, imposto do CDB" },
+      { rotulo: "Links ou legendas de posts (opcional)", opcional: true, longo: true, dica: "Cole links ou legendas. Prints: anexe na conversa com o Claude" },
+    ],
+    "meus-posts": [
+      { rotulo: "Números dos posts (ou anexe os prints)", longo: true, dica: "Alcance, salvamentos, envios, comentários e seguidores de cada post, ou os prints das estatísticas anexados na conversa" },
+      { rotulo: "Período", dica: "Ex.: semana de 17 a 21/11", padrao: "Últimos 7 dias" },
     ],
     "cliente-novo": [
       { rotulo: "Apelido do cliente (sem nome nem CPF)", dica: "Ex.: Cliente A, empresário, 45 anos" },
@@ -1027,7 +1076,13 @@
     ],
   };
   const camposDe = (id) => CAMPOS[id] ?? (PEDIDO[id]?.insumos ?? []).map((rotulo) => ({ rotulo }));
-  const padraoDe = (f) => (f.padrao === "@hoje" ? hojeBR() : f.padrao ?? "");
+  // "@referencias": os perfis (@nome) guardados em Minhas referências, no perfil da Mesa; sem @, a primeira linha da ficha.
+  const perfisDasReferencias = () => {
+    const r = String(perfil?.referencias ?? "").trim();
+    const arrobas = [...new Set((r.match(/@[A-Za-z0-9._]{1,30}/g) ?? []).map((x) => x.replace(/\.+$/, "")))].slice(0, 10);
+    return arrobas.length ? arrobas.join(", ") : r.split(/\r?\n/)[0].trim().slice(0, 140);
+  };
+  const padraoDe = (f) => (f.padrao === "@hoje" ? hojeBR() : f.padrao === "@referencias" ? perfisDasReferencias() : f.padrao ?? "");
   const valorBruto = (id, i) => estado.campos?.[id]?.[i] ?? padraoDe(camposDe(id)[i] ?? {});
   const setValor = (id, i, v) => { estado.campos ??= {}; estado.campos[id] ??= []; estado.campos[id][i] = v; };
   const textoCampo = (f, v) => {
@@ -1147,10 +1202,13 @@
     "pre-reuniao": { nome: "Pré-reunião" },
   };
   const NOMES_ANTIGOS = Object.fromEntries(Object.entries(TEXTO_ANTIGO).filter(([, a]) => a.nome).map(([id, a]) => [a.nome, id]));
+  // Nomes antigos de tarefas de Marketing que continuam no menu com outro nome (passo 6).
+  const OUTROS_NOMES_ANTIGOS = { "calendário de post": "calendario" };
   const achaTarefa = (ref) => {
     const r = String(ref ?? "").trim().toLowerCase();
     return Object.keys(T).find((id) => id.toLowerCase() === r || String(T[id].nome).toLowerCase() === r)
-      ?? Object.entries(NOMES_ANTIGOS).find(([nome, id]) => nome.toLowerCase() === r && T[id])?.[1] ?? null;
+      ?? Object.entries(NOMES_ANTIGOS).find(([nome, id]) => nome.toLowerCase() === r && T[id])?.[1]
+      ?? (T[OUTROS_NOMES_ANTIGOS[r]] ? OUTROS_NOMES_ANTIGOS[r] : null);
   };
   // Tarefas que saíram do menu. Ficam aqui só para o histórico antigo e para quem ainda chamar pelo nome antigo:
   // a Mesa diz onde está agora o que a tarefa fazia.
