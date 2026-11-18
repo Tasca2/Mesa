@@ -19,15 +19,27 @@ const AGENTE = 'Mozilla/5.0 (compatible; MesaDoAssessor/1.0; dados publicos)';
 export const SERIES = {
   selic: { codigo: 432, nome: 'Selic (meta do Copom)', unidade: '% ao ano', tipo: 'taxa', freq: 'D', oficial: 'Taxa de juros - Meta Selic definida pelo Copom' },
   cdiAno: { codigo: 4389, nome: 'CDI ao ano', unidade: '% ao ano', tipo: 'taxa', freq: 'D', oficial: 'Taxa de juros - CDI anualizada base 252' },
-  cdiMes: { codigo: 4391, nome: 'CDI no mês', unidade: '% no mês', tipo: 'taxa', freq: 'M', acumula: true, oficial: 'Taxa de juros - CDI acumulada no mês' },
+  // parcialNoMes: só a 4391 publica o mês corrente antes de ele fechar (acumulado até o último dia útil). As outras
+  // séries mensais publicam o mês fechado, às vezes dentro do próprio mês (o IGP-M sai no fim do mês de referência).
+  cdiMes: { codigo: 4391, nome: 'CDI no mês', unidade: '% no mês', tipo: 'taxa', freq: 'M', acumula: true, parcialNoMes: true, oficial: 'Taxa de juros - CDI acumulada no mês' },
   ipcaMes: { codigo: 433, nome: 'IPCA do mês', unidade: '% no mês', tipo: 'taxa', freq: 'M', oficial: 'Índice nacional de preços ao consumidor-amplo (IPCA), variação % mensal' },
   ipca12m: { codigo: 13522, nome: 'IPCA em 12 meses', unidade: '% em 12 meses', tipo: 'taxa', freq: 'M', oficial: 'Índice nacional de preços ao consumidor - amplo (IPCA) - em 12 meses' },
   metaInflacao: { codigo: 13521, nome: 'Meta de inflação', unidade: '% ao ano', tipo: 'taxa', freq: 'A', oficial: 'Meta para a inflação' },
   igpmMes: { codigo: 189, nome: 'IGP-M do mês', unidade: '% no mês', tipo: 'taxa', freq: 'M', acumula: true, oficial: 'Índice geral de preços do mercado (IGP-M), variação % mensal' },
-  dolar: { codigo: 1, nome: 'Dólar (PTAX, venda)', unidade: 'R$ por US$', tipo: 'preco', freq: 'D', oficial: 'Taxa de câmbio - Livre - Dólar americano (venda) - diário' },
+  // Cadastro do SGS (consultado em 18/11/2026): série 1, "Taxa de câmbio - Livre - Dólar americano (venda) - diário", fonte
+  // Sisbacen PTAX800; o catálogo de dados abertos do Banco Central diz que essa taxa se chama taxa PTAX (fechamento).
+  dolar: { codigo: 1, nome: 'Dólar (PTAX de fechamento, venda)', unidade: 'R$ por US$', tipo: 'preco', freq: 'D', oficial: 'Taxa de câmbio - Livre - Dólar americano (venda) - diário',
+    oQueE: 'A série 1 do SGS é a taxa PTAX de fechamento, de venda, do Banco Central (fonte no cadastro: Sisbacen PTAX800): um valor por dia útil. Não é a cotação de agora nem o câmbio de varejo.' },
   euro: { codigo: 21619, nome: 'Euro (venda)', unidade: 'R$ por euro', tipo: 'preco', freq: 'D', oficial: 'Taxa de câmbio - Livre - Euro (venda)' },
   poupanca: { codigo: 195, nome: 'Poupança (rendimento no período de um mês)', unidade: '% no período', tipo: 'taxa', freq: 'D', oficial: 'Depósitos de poupança a partir de 04.05.2012 - Rentabilidade no período' },
   desemprego: { codigo: 24369, nome: 'Desemprego (PNAD Contínua, trimestre móvel)', unidade: '% da força de trabalho', tipo: 'taxa', freq: 'M', oficial: 'Taxa de desocupação - PNADC' },
+};
+// Séries usadas só nas contas dos acumulados (cadastro do SGS e do Ipeadata consultado em 18/11/2026). A 4391 é derivada
+// da 12: a fórmula do cadastro acumula, por multiplicação, os fatores diários (1 + CDI do dia) de cada mês.
+export const CDI_DIARIO = { codigo: 12, oficial: 'Taxa de juros - CDI', unidade: '% ao dia' };
+export const INDICE_IGPM = {
+  url: "https://www.ipeadata.gov.br/api/odata4/ValoresSerie(SERCODIGO='IGP12_IGPM12')",
+  nome: 'IGP-M - geral - índice (ago. 1994 = 100)', fonte: 'FGV (Conjuntura Econômica - IGP), série IGP12_IGPM12 do Ipeadata',
 };
 export const RECORTES = {
   'Painel completo': ['selic', 'cdiAno', 'cdiMes', 'ipcaMes', 'ipca12m', 'metaInflacao', 'igpmMes', 'dolar', 'euro', 'poupanca', 'desemprego'],
@@ -66,10 +78,21 @@ const pct = (x) => x.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximum
 const variacao = (tipo, atual, base) => (base == null || !Number.isFinite(base) ? null : tipo === 'preco' ? (base === 0 ? null : arred((atual / base - 1) * 100)) : arred(atual - base));
 const ultimoAte = (pts, limite) => { let r = null; for (const p of pts) { if (p.data <= limite) r = p; else break; } return r; };
 const sem = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+const num3 = (x) => x.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+// Os n meses (AAAA-MM) que terminam em "ate", em ordem.
+const mesesAte = (ate, n) => Array.from({ length: n }, (_, k) => iso(new Date(Date.UTC(+ate.slice(0, 4), +ate.slice(5, 7) - n + k, 1))).slice(0, 7));
+// Dias de segunda a sexta entre duas datas (sem contar as duas).
+const diasDeSemanaEntre = (a, b) => { let n = 0; for (let d = somarDias(a, 1); d < b; d = somarDias(d, 1)) { const w = utc(d).getUTCDay(); if (w > 0 && w < 6) n++; } return n; };
 
 // ---------- busca ----------
 const cache = new Map();
 const MINUTOS_DE_CACHE = 10;
+// Grava no cache e tira as entradas vencidas. Sem a limpeza o mapa cresce enquanto o servidor estiver aberto: o endereço
+// das consultas ao SGS muda a cada 10 minutos (veja recuoDaHora).
+export function guardarNoCache(mapa, chave, valor, validadeMs, agora = Date.now()) {
+  for (const [k, e] of mapa) if (agora - e.em >= validadeMs) mapa.delete(k);
+  mapa.set(chave, { em: agora, v: valor });
+}
 async function obter(url, { tipo = 'json', tempo = 25000, cabecalhos = {}, semCache = false } = {}) {
   const c = cache.get(url);
   if (!semCache && c && Date.now() - c.em < MINUTOS_DE_CACHE * 60000) return c.v;
@@ -78,7 +101,7 @@ async function obter(url, { tipo = 'json', tempo = 25000, cabecalhos = {}, semCa
   let v;
   if (tipo === 'json') { const t = await r.text(); try { v = JSON.parse(t); } catch { throw new Error('a resposta não veio em JSON'); } } else v = Buffer.from(await r.arrayBuffer());
   const vazio = Array.isArray(v) ? !v.length : (v && Array.isArray(v.value) && !v.value.length);
-  if (!vazio) cache.set(url, { em: Date.now(), v });
+  if (!vazio) guardarNoCache(cache, url, v, MINUTOS_DE_CACHE * 60000);
   return v;
 }
 const motivo = (e) => (e?.name === 'TimeoutError' ? 'o endereço não respondeu a tempo' : String(e?.message || e));
@@ -118,12 +141,13 @@ const urlOlinda = (recurso, filtro, extra = {}) => `${OLINDA}/${recurso}?` + new
 // ---------- contas ----------
 // Um indicador com o último valor e as variações já calculadas: no dia (contra o dado anterior), no mês (contra o
 // último dado do mês anterior; em série mensal, contra o mês anterior), no ano (contra o último dado do ano anterior)
-// e contra a referência escolhida. Em série mensal, o mês corrente ainda aberto fica à parte (mesEmAndamento).
+// e contra a referência escolhida. Só na série que publica o mês antes de ele fechar (parcialNoMes: o CDI do mês, 4391),
+// o mês corrente fica à parte (mesEmAndamento); nas outras, o dado do mês corrente já é o mês fechado e é o último dado.
 export function calcularIndicador(def, pontosBrutos, comparar = 'Mês passado', { hoje = hojeSP() } = {}) {
   const ref = REFERENCIAS.includes(comparar) ? comparar : 'Mês passado';
   let pts = (pontosBrutos || []).filter((p) => p && Number.isFinite(p.valor) && p.data <= hoje).sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
   let mesEmAndamento = null;
-  if (def.freq === 'M' && pts.length && pts.at(-1).data.slice(0, 7) === hoje.slice(0, 7)) {
+  if (def.parcialNoMes && pts.length && pts.at(-1).data.slice(0, 7) === hoje.slice(0, 7)) {
     const p = pts.at(-1);
     mesEmAndamento = { data: p.data, valor: p.valor, nota: 'mês em andamento: acumulado até o último dia útil publicado, ainda não fechou' };
     pts = pts.slice(0, -1);
@@ -134,6 +158,12 @@ export function calcularIndicador(def, pontosBrutos, comparar = 'Mês passado', 
   let dia = null, mes = null, ano = null, refPonto = null, nota = '';
   if (def.freq === 'D') {
     dia = contra(anterior);
+    if (dia) {
+      // "No dia" é contra o dado anterior, que pode não ser o dia útil anterior: o rótulo diz as duas datas.
+      dia.rotulo = `de ${br(anterior.data)} a ${br(u.data)}`;
+      const n = diasDeSemanaEntre(anterior.data, u.data);
+      if (n) dia.nota = `entre as duas datas há ${n} ${n > 1 ? 'dias' : 'dia'} de semana sem dado (feriado ou dado ainda não publicado): a variação cobre todo esse intervalo`;
+    }
     mes = contra(ultimoAte(pts, fimDoMesAnterior(u.data)));
     ano = contra(ultimoAte(pts, fimDoAnoAnterior(u.data)));
     refPonto = ultimoAte(pts, ref === 'Semana passada' ? somarDias(u.data, -7) : ref === 'Início do ano' ? fimDoAnoAnterior(u.data) : mesAntes(u.data));
@@ -163,11 +193,82 @@ export function calcularIndicador(def, pontosBrutos, comparar = 'Mês passado', 
   }
   return r;
 }
+// Composição dos meses publicados. As séries mensais vêm arredondadas em 2 casas, e a conta com elas pode diferir em
+// alguns centésimos do número oficial (em 18/11/2026: IGP-M em 12 meses 5,25% aqui contra 5,24% da FGV; CDI 14,23%
+// contra 14,24%). Por isso fica marcada como aproximada e só vale quando a conta oficial (abaixo) não puder ser feita.
 function composicao(lista) {
   if (!lista.length) return null;
   const f = lista.reduce((a, p) => a * (1 + p.valor / 100), 1);
-  return { valor: arred((f - 1) * 100), meses: lista.length, de: lista[0].data.slice(0, 7), ate: lista.at(-1).data.slice(0, 7),
+  return { valor: arred((f - 1) * 100), meses: lista.length, de: lista[0].data.slice(0, 7), ate: lista.at(-1).data.slice(0, 7), aproximado: true,
+    metodo: 'composição das variações mensais publicadas, que vêm arredondadas em 2 casas: valor calculado pela Mesa, pode diferir em alguns centésimos do número oficial',
     conta: `composição das ${lista.length} variações mensais (de ${lista[0].data.slice(0, 7)} a ${lista.at(-1).data.slice(0, 7)}): (1 + mês 1) × (1 + mês 2) × … − 1` };
+}
+
+// CDI acumulado no ano e em 12 meses pela composição dos fatores diários da série 12 (Taxa de juros - CDI, % ao dia): é
+// a conta da própria série 4391 (fórmula do cadastro do SGS) e a da Calculadora do Cidadão do Banco Central (em
+// 18/11/2026, de nov/2025 a out/2026: 14,243757% nas duas). Cada mês da janela é conferido com a 4391; se faltar dia ou
+// um mês não bater, aquele acumulado fica pela composição dos meses, marcada como aproximada, e a lacuna diz o motivo.
+export function acumuladosDoCdi(ind, dias, meses, lacunas, { consulta, erro } = {}) {
+  if (!ind) return ind;
+  if (!Array.isArray(dias) || !dias.length) {
+    lacunas.push({ bloco: 'indicadores', item: 'CDI acumulado (série diária 12)', motivo: `a série diária do CDI não veio${erro ? ` (${erro})` : ''}: os acumulados ficam pela composição dos meses, aproximada` });
+    return ind;
+  }
+  const porMes = new Map();
+  for (const p of [...dias].filter((p) => p && Number.isFinite(p.valor)).sort((a, b) => (a.data < b.data ? -1 : 1))) {
+    const m = p.data.slice(0, 7);
+    if (!porMes.has(m)) porMes.set(m, []);
+    porMes.get(m).push(p);
+  }
+  const daSerieMensal = new Map((meses || []).map((p) => [p.data.slice(0, 7), p.valor]));
+  const fator = (lista) => lista.reduce((a, p) => a * (1 + p.valor / 100), 1);
+  const bate = (m) => porMes.get(m)?.length && daSerieMensal.has(m) && Math.abs(arred((fator(porMes.get(m)) - 1) * 100) - daSerieMensal.get(m)) <= 0.01 + 1e-9;
+  const fim = ind.data.slice(0, 7), doze = mesesAte(fim, 12);
+  const r = { ...ind };
+  for (const [chave, janela, nome] of [['acumulado12Meses', doze, 'em 12 meses'], ['acumuladoNoAno', doze.filter((m) => m.slice(0, 4) === fim.slice(0, 4)), 'no ano']]) {
+    const falhos = janela.filter((m) => !bate(m));
+    if (falhos.length) {
+      lacunas.push({ bloco: 'indicadores', item: `CDI acumulado ${nome}`, motivo: `os dias da série 12 não batem com a série 4391 em ${falhos.join(', ')}: fica a composição dos meses, aproximada` });
+      continue;
+    }
+    const lista = janela.flatMap((m) => porMes.get(m));
+    const valor = arred((fator(lista) - 1) * 100);
+    r[chave] = {
+      valor, meses: janela.length, dias: lista.length, de: janela[0], ate: janela.at(-1), primeiroDia: lista[0].data, ultimoDia: lista.at(-1).data,
+      metodo: 'composição dos fatores diários do CDI (série 12 do SGS), a mesma conta da série mensal 4391; cada mês conferido com a 4391',
+      fonte: `Banco Central, SGS ${CDI_DIARIO.codigo}: ${CDI_DIARIO.oficial} (${CDI_DIARIO.unidade})`, ...(consulta ? { consulta } : {}),
+      conta: `(1 + CDI do 1º dia) × (1 + CDI do 2º dia) × … − 1, com os ${lista.length} dias úteis de ${br(lista[0].data)} a ${br(lista.at(-1).data)} = ${pct(valor)}`,
+    };
+  }
+  return r;
+}
+
+// IGP-M acumulado no ano e em 12 meses pelo número-índice da FGV (IGP-M geral, ago. 1994 = 100), como a FGV divulga: em
+// 18/11/2026 o índice dá 4,97% no ano e 5,24% em 12 meses, os números do release de 29/10/2026. O mês do índice é
+// conferido com a série 189 antes de usar; se faltar o mês ou não bater, ficam os meses compostos, marcados como aproximados.
+export function acumuladosDoIgpm(ind, indice, lacunas, { consulta, erro } = {}) {
+  if (!ind) return ind;
+  const item = 'IGP-M acumulado (número-índice da FGV)', depois = 'os acumulados ficam pela composição dos meses, aproximada';
+  const mapa = new Map((indice || []).filter((p) => p && Number.isFinite(p.valor)).map((p) => [p.data.slice(0, 7), p.valor]));
+  const fim = ind.data.slice(0, 7), [antes] = mesesAte(fim, 2);
+  if (!mapa.size) { lacunas.push({ bloco: 'indicadores', item, motivo: `o número-índice do IGP-M não veio${erro ? ` (${erro})` : ''}: ${depois}` }); return ind; }
+  const iu = mapa.get(fim), ia = mapa.get(antes);
+  if (iu == null || ia == null) { lacunas.push({ bloco: 'indicadores', item, motivo: `o número-índice do IGP-M ainda não tem ${iu == null ? fim : antes}: ${depois}` }); return ind; }
+  const doMes = arred((iu / ia - 1) * 100);
+  if (Math.abs(doMes - ind.valor) > 0.01 + 1e-9) { lacunas.push({ bloco: 'indicadores', item, motivo: `o número-índice dá ${pct(doMes)} em ${fim} e a série 189 dá ${pct(ind.valor)}: ${depois}` }); return ind; }
+  const r = { ...ind };
+  for (const [chave, base, meses] of [['acumulado12Meses', mesesAte(fim, 13)[0], 12], ['acumuladoNoAno', `${+fim.slice(0, 4) - 1}-12`, +fim.slice(5, 7)]]) {
+    const ib = mapa.get(base);
+    if (ib == null) { lacunas.push({ bloco: 'indicadores', item, motivo: `o número-índice não tem ${base}: o acumulado ${chave === 'acumuladoNoAno' ? 'no ano' : 'em 12 meses'} fica pela composição dos meses, aproximada` }); continue; }
+    const valor = arred((iu / ib - 1) * 100);
+    r[chave] = {
+      valor, meses, de: mesesAte(fim, meses)[0], ate: fim,
+      metodo: 'variação do número-índice do IGP-M entre o mês de referência e o mês-base, a conta da FGV',
+      fonte: `${INDICE_IGPM.nome}: ${INDICE_IGPM.fonte}`, ...(consulta ? { consulta } : {}),
+      conta: `${num3(iu)} ÷ ${num3(ib)} − 1 = ${pct(valor)} (índice de ${fim} sobre o de ${base})`,
+    };
+  }
+  return r;
 }
 
 // Juro real: (1 + Selic) ÷ (1 + inflação) − 1, com a conta escrita.
@@ -322,20 +423,41 @@ async function blocoAgenda(hoje, lacunas) {
   }
 }
 
-// Dólar: a série 1 do SGS é conferida no serviço PTAX (mesmo dia e mesmo valor). Se o PTAX já tiver um dia mais novo, ele entra.
+// Junta a série 1 com o serviço PTAX: todos os dias que o serviço já tem e a série ainda não (não só o último) entram com
+// o valor do serviço, para a variação "no dia" comparar dias seguidos; nos dias que os dois têm, o valor precisa ser igual.
+export function juntarPtax(pts, cotacoes) {
+  const porDia = new Map();
+  for (const c of [...(cotacoes || [])].sort((a, b) => String(a.dataHoraCotacao).localeCompare(String(b.dataHoraCotacao)))) {
+    const valor = Number(c.cotacaoVenda);
+    if (Number.isFinite(valor)) porDia.set(String(c.dataHoraCotacao).slice(0, 10), { valor, boletim: String(c.dataHoraCotacao).slice(11, 16) });
+  }
+  const naSerie = new Map(pts.map((p) => [p.data, p.valor])), ultimaDaSerie = pts.at(-1)?.data || '';
+  const novos = [], divergencias = [];
+  let conferidos = 0;
+  for (const [data, c] of porDia) {
+    if (naSerie.has(data)) {
+      conferidos++;
+      if (Math.abs(naSerie.get(data) - c.valor) > 0.00005) divergencias.push({ data, sgs: naSerie.get(data), ptax: c.valor });
+    } else if (data > ultimaDaSerie) novos.push(data);
+  }
+  const ud = [...porDia.keys()].at(-1);
+  return {
+    pts: [...pts, ...novos.map((data) => ({ data, valor: porDia.get(data).valor }))], novos, divergencias, conferidos,
+    ultimo: ud ? { data: ud, cotacaoVenda: porDia.get(ud).valor, boletim: porDia.get(ud).boletim } : null,
+  };
+}
+
+// Dólar: a série 1 do SGS é conferida no serviço PTAX (mesmo dia e mesmo valor). Os dias que só o PTAX já tem entram.
 async function conferirPtax(pts, hoje, lacunas) {
   const ptax = (de) => `${OLINDA}/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@dataInicial='${mdA(de)}'&@dataFinalCotacao='${mdA(hoje)}'&$format=json`;
   try {
     const r0 = recuoDaHora();
     const { url, v: j } = await obterUmDe([10, 11, 12].map((k) => ptax(somarDias(hoje, -(k + r0)))));
-    const v = [...(j?.value || [])].sort((a, b) => String(a.dataHoraCotacao).localeCompare(String(b.dataHoraCotacao)));
-    const ultimo = v.at(-1);
-    if (!ultimo) return { pts, conferencia: null };
-    const data = String(ultimo.dataHoraCotacao).slice(0, 10), valor = ultimo.cotacaoVenda;
-    const noSgs = pts.find((p) => p.data === data);
-    if (!noSgs && data > (pts.at(-1)?.data || '')) return { pts: [...pts, { data, valor }], conferencia: { consulta: url, data, cotacaoVenda: valor, boletim: String(ultimo.dataHoraCotacao).slice(11, 16), nota: 'dia ainda fora da série 1: valor do serviço PTAX' } };
-    if (noSgs && Math.abs(noSgs.valor - valor) > 0.00005) lacunas.push({ bloco: 'indicadores', item: 'dólar', motivo: `série 1 (${noSgs.valor}) e serviço PTAX (${valor}) diferem em ${br(data)}` });
-    return { pts, conferencia: { consulta: url, data, cotacaoVenda: valor, boletim: String(ultimo.dataHoraCotacao).slice(11, 16), bate: !!noSgs && Math.abs(noSgs.valor - valor) <= 0.00005 } };
+    const x = juntarPtax(pts, j?.value);
+    if (!x.ultimo) return { pts, conferencia: null };
+    for (const d of x.divergencias) lacunas.push({ bloco: 'indicadores', item: 'dólar', motivo: `série 1 (${d.sgs}) e serviço PTAX (${d.ptax}) diferem em ${br(d.data)}` });
+    const fora = x.novos.length ? { diasForaDaSerie1: x.novos, nota: `${x.novos.length > 1 ? 'dias' : 'dia'} ainda fora da série 1 (${x.novos.map(br).join(', ')}): valor do serviço PTAX` } : {};
+    return { pts: x.pts, conferencia: { consulta: url, data: x.ultimo.data, cotacaoVenda: x.ultimo.cotacaoVenda, boletim: x.ultimo.boletim, diasConferidos: x.conferidos, bate: x.conferidos > 0 && !x.divergencias.length, ...fora } };
   } catch (e) {
     lacunas.push({ bloco: 'indicadores', item: 'dólar no serviço PTAX', motivo: motivo(e) });
     return { pts, conferencia: null };
@@ -366,12 +488,20 @@ export async function painelMacro({ recorte, comparar } = {}, opcoes = {}) {
   const comJuroReal = rec !== 'Dólar e câmbio';
   const buscar = [...new Set([...ids, ...(comJuroReal ? ['selic', 'ipca12m'] : [])])];
   const de = `${+hoje.slice(0, 4) - 1}-01-01`; // o ano anterior inteiro: cobre o início do ano e os 12 meses
-  const [series, focus, copom, agenda, ibge] = await Promise.all([
+  // As contas oficiais dos acumulados: o CDI de cada dia (série 12) e o número-índice do IGP-M (FGV, pelo Ipeadata).
+  const indiceIgpm = async () => {
+    const j = await obter(INDICE_IGPM.url, { tempo: 30000 });
+    if (!Array.isArray(j?.value)) throw new Error('o Ipeadata não devolveu a lista de valores');
+    return { url: INDICE_IGPM.url, pontos: j.value.map((p) => ({ data: String(p.VALDATA).slice(0, 10), valor: Number(p.VALVALOR) })).filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.data) && Number.isFinite(p.valor)) };
+  };
+  const [series, focus, copom, agenda, ibge, cdiDia, igpmIndice] = await Promise.all([
     Promise.all(buscar.map(async (id) => { try { return [id, await serieSgs(SERIES[id].codigo, de, hoje)]; } catch (e) { lacunas.push({ bloco: 'indicadores', item: `${SERIES[id].nome} (SGS ${SERIES[id].codigo})`, motivo: motivo(e) }); return [id, null]; } })),
     blocoFocus(hoje, rec, lacunas),
     rec === 'Painel completo' || rec === 'Juros e Copom' ? blocoCopom(lacunas) : null,
     blocoAgenda(hoje, lacunas),
     ids.includes('ipcaMes') ? conferirIbge(lacunas) : null,
+    ids.includes('cdiMes') ? serieSgs(CDI_DIARIO.codigo, de, hoje).catch((e) => ({ erro: motivo(e) })) : null,
+    ids.includes('igpmMes') ? indiceIgpm().catch((e) => ({ erro: motivo(e) })) : null,
   ]);
   const porId = Object.fromEntries(series);
   const calc = {};
@@ -382,8 +512,10 @@ export async function painelMacro({ recorte, comparar } = {}, opcoes = {}) {
     if (id === 'dolar') { const c = await conferirPtax(pts, hoje, lacunas); pts = c.pts; if (c.conferencia) extra.servicoPtax = c.conferencia; }
     const ind = calcularIndicador({ id, ...SERIES[id] }, pts, ref, { hoje });
     if (!ind) { lacunas.push({ bloco: 'indicadores', item: SERIES[id].nome, motivo: 'a série não trouxe dado até hoje' }); continue; }
-    calc[id] = { ...ind, fonte: `Banco Central, SGS ${SERIES[id].codigo}: ${SERIES[id].oficial}`, consulta: s.url, ...extra };
+    calc[id] = { ...ind, fonte: `Banco Central, SGS ${SERIES[id].codigo}: ${SERIES[id].oficial}`, consulta: s.url, ...(SERIES[id].oQueE ? { oQueE: SERIES[id].oQueE } : {}), ...extra };
   }
+  if (calc.cdiMes) calc.cdiMes = acumuladosDoCdi(calc.cdiMes, cdiDia?.pontos, porId.cdiMes?.pontos, lacunas, { consulta: cdiDia?.url, erro: cdiDia?.erro });
+  if (calc.igpmMes) calc.igpmMes = acumuladosDoIgpm(calc.igpmMes, igpmIndice?.pontos, lacunas, { consulta: igpmIndice?.url, erro: igpmIndice?.erro });
   if (calc.ipcaMes && ibge) {
     const bate = ibge.periodo === calc.ipcaMes.data.slice(0, 7) && ibge.mensal === calc.ipcaMes.valor && (!calc.ipca12m || ibge.em12Meses === calc.ipca12m.valor);
     calc.ipcaMes.conferenciaIbge = { ...ibge, bate };
@@ -404,7 +536,7 @@ export async function painelMacro({ recorte, comparar } = {}, opcoes = {}) {
   }
   return {
     hoje, recorte: rec, comparar: ref,
-    legenda: 'Em cada indicador: valor e data do último dado; variacoes.dia contra o dado anterior, variacoes.mes contra o último dado do mês anterior (em série mensal, contra o mês anterior), variacoes.ano contra o último dado do ano anterior e referencia contra a referência escolhida. Em taxa a variação é a diferença em pontos percentuais (p.p.); em dólar e euro, em %. As contas já estão feitas: use os números como vieram.',
+    legenda: 'Em cada indicador: valor e data do último dado; variacoes.dia contra o dado anterior (rotulo diz as duas datas comparadas; com nota, há dia de semana sem dado no meio e a variação cobre o intervalo todo: diga as datas), variacoes.mes contra o último dado do mês anterior (em série mensal, contra o mês anterior), variacoes.ano contra o último dado do ano anterior e referencia contra a referência escolhida. Em taxa a variação é a diferença em pontos percentuais (p.p.); em dólar e euro, em %. Só o CDI do mês tem mesEmAndamento (o mês corrente, ainda aberto). Os acumulados do CDI e do IGP-M seguem a conta oficial (CDI pelos dias da série 12; IGP-M pelo número-índice da FGV); se vierem com aproximado: true, são a composição dos meses calculada pela Mesa: diga isso. As contas já estão feitas: use os números como vieram.',
     indicadores: ids.map((id) => calc[id]).filter(Boolean),
     juroReal: jr, copom, focus, agenda, lacunas,
   };
@@ -515,9 +647,10 @@ export function ehPdfCompleto(b) {
 }
 
 const cacheCvm = new Map();
+const HORAS_DE_CACHE_CVM = 6;
 async function baseCvm(ano) {
   const c = cacheCvm.get(ano);
-  if (c && Date.now() - c.em < 6 * 3600000) return c;
+  if (c && Date.now() - c.em < HORAS_DE_CACHE_CVM * 3600000) return c.v;
   const url = CVM_IPE(ano);
   const r = await fetch(url, { headers: { 'user-agent': AGENTE }, signal: AbortSignal.timeout(90000) });
   if (!r.ok) throw new Error(`a base da CVM respondeu HTTP ${r.status}`);
@@ -526,8 +659,8 @@ async function baseCvm(ano) {
   if (!csv) throw new Error('o arquivo da CVM veio sem a planilha');
   const docs = documentosDoCsv(new TextDecoder('windows-1252').decode(csv.dados));
   const lm = r.headers.get('last-modified');
-  const v = { em: Date.now(), url, docs, atualizadaEm: lm ? iso(new Date(lm)) : null, maisRecente: docs.reduce((m, d) => (d.data > m ? d.data : m), '') };
-  cacheCvm.set(ano, v);
+  const v = { url, docs, atualizadaEm: lm ? iso(new Date(lm)) : null, maisRecente: docs.reduce((m, d) => (d.data > m ? d.data : m), '') };
+  guardarNoCache(cacheCvm, ano, v, HORAS_DE_CACHE_CVM * 3600000);
   return v;
 }
 

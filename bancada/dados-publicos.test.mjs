@@ -21,7 +21,7 @@ test('dólar: variação no dia, no mês, no ano e contra o mês passado, em %',
   assert.equal(r.valor, 5.7851);
   assert.equal(r.data, '2026-11-17');
   assert.equal(r.unidadeDaVariacao, '%');
-  assert.deepEqual(r.variacoes.dia, { comparadoCom: { data: '2026-11-16', valor: 5.7324 }, variacao: 0.92 });
+  assert.deepEqual(r.variacoes.dia, { comparadoCom: { data: '2026-11-16', valor: 5.7324 }, variacao: 0.92, rotulo: 'de 16/11/2026 a 17/11/2026' });
   assert.deepEqual(r.variacoes.mes, { comparadoCom: { data: '2026-10-30', valor: 5.4212 }, variacao: 6.71 });
   assert.deepEqual(r.variacoes.ano, { comparadoCom: { data: '2025-12-31', valor: 5.5024 }, variacao: 5.14 });
   assert.deepEqual(r.referencia, { nome: 'Mês passado', comparadoCom: { data: '2026-10-16', valor: 5.0826 }, variacao: 13.82 });
