@@ -27,7 +27,7 @@ O assessor recebe o produto da mesa e precisa entender antes de levar ao cliente
 | CRI, CRA, debênture | Emissor ou devedor, garantia (real, fidejussória ou nenhuma), rating, amortização, resgate antecipado, se é incentivada | Sem FGC; preço de mercado antes do vencimento; concentração no devedor |
 | Fundo ou previdência | Use `leitura-de-lamina`: classe, taxas, mandato, resgate (cotização e liquidação), tributação | Custo sobre custo; histórico não determina retorno futuro |
 | COE ou estruturado | Cenários do material, capital protegido ou em risco, barreira, teto, prazo, emissor | Sem FGC; ganho limitado; saída antes do prazo pelo preço do emissor |
-| Oferta pública | Prospecto e lâmina da oferta: público-alvo, taxa teto e formação da taxa, período de reserva, liquidação, fatores de risco | Taxa final só depois do procedimento; ler os fatores de risco do prospecto |
+| Oferta pública | Prospecto e lâmina da oferta: público-alvo, taxa teto e formação da taxa, período de reserva, liquidação, fatores de risco | Taxa teto é o máximo que a oferta pode pagar: a taxa final sai no bookbuilding e pode ficar abaixo. Nunca diga que a lâmina garante uma taxa; nas contas, escreva "se a taxa final for igual ao teto" |
 | Título público | `taxas_tesouro`: taxa, preço, fluxo e data base | Venda antes do vencimento a preço de mercado; Renda+ e Educa+ pagam em parcelas mensais |
 
 ## Fatos com fonte (consulta em 18/11/2026)
@@ -60,7 +60,7 @@ Escreva na nota a convenção (dias corridos com ano de 365 dias, ou dias úteis
 - Equivale a % do CDI: taxa bruta (ou bruta equivalente) ao ano ÷ CDI de hoje ao ano, com a hipótese escrita.
 - Prêmio sobre o título público: diferença, em pontos percentuais, entre a taxa do produto e a do título de prazo parecido no mesmo indexador, já na mesma base de imposto.
 
-Mostre os fatores e o resultado com duas casas; refaça cada conta antes de escrever. Sem dado para uma conta, a célula fica "sem dado", com o motivo.
+Mostre os fatores e o resultado com duas casas; refaça cada conta antes de escrever. Diferença em pontos percentuais sai das taxas já escritas na tabela (15,07% − 13,76% = 1,31 p.p.), sem arredondar para cima nem usar "cerca de". Sem dado para uma conta, a célula fica "sem dado", com o motivo.
 
 ## Limites
 
