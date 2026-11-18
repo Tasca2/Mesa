@@ -33,6 +33,7 @@ Senão, pergunte com `AskUserQuestion` (uma pergunta por vez, no máximo 4 opç�
 2. **Grupo**, quando a área tiver mais de 4 tarefas:
    - Rotinas do dia: Reuniões com cliente (cliente novo, pré-reunião, pós-reunião) · Carteira e cliente (revisão de carteira, diagnóstico) · Prospecção (primeira abordagem, objeção, retomar lead parado).
    - Mercado hoje: Panorama (juros/inflação/câmbio, fato relevante, gráfico) · Estudo e ações (estudo de ativo, analisar ação, comparar setor) · Fundos e renda fixa (fundo imobiliário, renda fixa).
+   - Post para Instagram: Ideias e referências (estudar perfis de referência, ideias para postar hoje, como foram meus posts) · Criar posts (semana de posts pronta, criar um post).
 3. **Tarefa** dentro do grupo, com o nome e a linha da tabela abaixo como descrição.
 
 Se a pessoa responder "sem preferência" ou algo vago, mostre as tarefas da área numa lista curta e peça que escolha.
@@ -57,8 +58,11 @@ Se a pessoa responder "sem preferência" ou algo vago, mostre as tarefas da áre
 | Mercado | Comparar o setor | Empresas lado a lado, na mesma base | `comparativo-setorial` | Resultado |
 | Mercado | Fundo imobiliário | Imóveis, crédito, P/VP e origem dos rendimentos | `analise-fii` | Resultado |
 | Mercado | Renda fixa | Títulos comparados com imposto e liquidez | `comparacao-renda-fixa` | Resultado |
+| Instagram | Estudar perfis de referência | O que funciona nos perfis que você acompanha; vira a ficha "Minhas referências" | `pauta-de-conteudo` | - |
+| Instagram | Ideias para postar hoje | 5 ideias ranqueadas e a primeira já aberta, com gancho, roteiro e legenda | `pauta-de-conteudo` e `macro-brasil` | Objetivo do post |
+| Instagram | Semana de posts pronta | Os posts da semana criados numa pasta, com dia e hora para programar | `pauta-de-conteudo` e `calendario-de-conteudo` | Objetivo da semana · Posts · Programar |
 | Instagram | Criar um post | Tema, texto e revisão das regras | `conteudo-para-cliente` | Formato · Atuação |
-| Instagram | Post do mercado de hoje | Um indicador do dia vira conteúdo | `macro-brasil` e `conteudo-para-cliente` | Tema · Atuação |
+| Instagram | Como foram meus posts | O que repetir e o que mudar, a partir dos números dos seus posts | `pauta-de-conteudo` | - |
 
 ### Perguntas (faça as da tarefa, nesta ordem, com `AskUserQuestion`)
 
@@ -73,6 +77,10 @@ Pule a pergunta **Atuação** quando o perfil já trouxer a atuação.
 - **Parado há** (retomada) — Há quanto tempo o contato parou? Menos de 30 dias · De 1 a 3 meses · Mais de 3 meses.
 - **Formato do estudo** — O que você vai levar para o cliente? Apresentação em slides (até 8 slides) · Estudo em PDF (para ler e enviar) · Resumo de uma página (para a conversa).
 - **Formato do post** — Qual formato? Carrossel · Post único · Roteiro de Reels.
+- **Objetivo do post** — O que você quer com o post de hoje? Educar · Atrair conversas · Mostrar o mercado · Misto.
+- **Objetivo da semana** — Qual o objetivo da semana? Educar · Atrair conversas · Mostrar o mercado · Misto.
+- **Posts** — Quantos posts? 3 · 5 (padrão: de segunda a sexta) · 7.
+- **Programar** — Como você vai programar? Meta Business Suite (com o passo a passo da Central de Ajuda da Meta) · Conector ligado ao Claude (no Claude Desktop, com o conector já ligado) · Só quero a pasta (imagens e legendas prontas; você programa como quiser).
 - **Tema** — Qual assunto do dia? Juros · Inflação · Dólar · Os três juntos.
 - **Atuação** — Você atua como? Assessor de investimento (vinculado a um escritório) · Consultor de valores mobiliários (registro na CVM) · Planejador financeiro (certificação de planejamento). Define a identificação e os avisos que o material precisa trazer.
 - **Resultado** — Como você quer o resultado? PDF (arquivo para salvar ou imprimir) · Texto no chat (para ler e copiar aqui).
@@ -87,6 +95,8 @@ Pule a pergunta **Atuação** quando o perfil já trouxer a atuação.
 - Retomar lead parado e pré-reunião: peça no chat o histórico da conversa (últimas mensagens ou resumo dos contatos) e use-o; com ele, diga qual canal funciona melhor e entregue o texto de WhatsApp e o roteiro de ligação.
 - Analisar ação, fundo imobiliário, comparar setor e estudo: busque os dados com `analise_ativo` antes de pedir ao assessor.
 - Post para Instagram: depois do texto aprovado, gere as imagens com `mesa_carrossel` (carrossel de 5 a 8 slides, ou 1 slide para arte única) e informe a pasta e o PDF; no Reels, entregue o roteiro cena a cena e a capa pronta.
+- Estudar perfis de referência e Como foram meus posts: peça os prints, as legendas e links ou os números antes de analisar; sem esse material, não analise nem invente perfil ou número. A ficha "Minhas referências" só é gravada com `mesa_perfil` (`salvar.referencias`) depois do ok.
+- Semana de posts pronta: cada carrossel sai com `mesa_carrossel` na pasta da semana ("Semana de DD-MM/N-dia-tema", com a data da segunda-feira).
 - Estudo e apresentação: os números vêm da Análise de Ativo (`analise_ativo`); sem fonte, não entram. Veja "CaptaMais" abaixo.
 
 ## 3. Executar
