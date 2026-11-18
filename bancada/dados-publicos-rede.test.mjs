@@ -191,16 +191,26 @@ test('painel completo: cada número bate com a consulta direta ao Banco Central 
   // agenda: o calendário do IBGE dos próximos 30 dias, filtrado aqui pelos mesmos títulos
   const TITULOS = ['Índice Nacional de Preços ao Consumidor Amplo 15', 'Índice Nacional de Preços ao Consumidor Amplo', 'Índice Nacional de Preços ao Consumidor', 'Sistema de Contas Nacionais Trimestrais',
     'Pesquisa Nacional por Amostra de Domicílios Contínua Mensal', 'Pesquisa Mensal de Comércio', 'Pesquisa Mensal de Serviços', 'Pesquisa Industrial Mensal: Produção Física - Brasil'];
+  // a hora do calendário vem em UTC; a conversão para Brasília é conferida contra a hora das notícias do IBGE (abaixo)
+  const sp = (s) => { const [d, h] = s.split(' '); const t = new Date(`${deBr(d)}T${h}Z`); return { data: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(t), hora: new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(t) }; };
   const cal = await json([`https://servicodados.ibge.gov.br/api/v3/calendario/?qtd=250&de=${mda(hoje)}&ate=${mda(dias(hoje, 30))}`]);
-  const esperado = cal.items.filter((x) => TITULOS.includes(x.titulo)).map((x) => `${deBr(x.data_divulgacao.slice(0, 10))} ${x.titulo}`).filter((x) => x.slice(0, 10) >= hoje && x.slice(0, 10) <= dias(hoje, 30)).sort();
+  const esperado = cal.items.filter((x) => TITULOS.includes(x.titulo)).map((x) => `${sp(x.data_divulgacao).data} ${x.titulo}`).filter((x) => x.slice(0, 10) >= hoje && x.slice(0, 10) <= dias(hoje, 30)).sort();
   assert.deepEqual(painel.agenda.itens.map((x) => `${x.data} ${x.titulo}`).sort(), esperado);
   const dois = (n) => String(n).padStart(2, '0');
   for (const x of painel.agenda.itens) {
-    const c = cal.items.find((y) => y.titulo === x.titulo && deBr(y.data_divulgacao.slice(0, 10)) === x.data);
-    assert.equal(x.hora, c.data_divulgacao.slice(11, 16), `${x.divulgacao}: hora`);
+    const c = cal.items.find((y) => y.titulo === x.titulo && sp(y.data_divulgacao).data === x.data);
+    assert.equal(x.hora, sp(c.data_divulgacao).hora, `${x.divulgacao}: hora`);
     assert.ok(x.referencia.startsWith(c.mes_referencia_inicio ? `${c.ano_referencia_inicio}-${dois(c.mes_referencia_inicio)}` : String(c.ano_referencia_inicio)), `${x.divulgacao}: referência ${x.referencia}`);
     if (c.mes_referencia_fim && c.mes_referencia_fim !== c.mes_referencia_inicio) assert.ok(x.referencia.endsWith(`${c.ano_referencia_fim}-${dois(c.mes_referencia_fim)}`));
   }
+  // prova da conversão: nas divulgações dos últimos 15 dias, a hora de Brasília é a hora em que o IBGE publicou a notícia
+  const passado = await json([`https://servicodados.ibge.gov.br/api/v3/calendario/?qtd=250&de=${mda(dias(hoje, -15))}&ate=${mda(hoje)}`]);
+  const noticias = await json([`https://servicodados.ibge.gov.br/api/v3/noticias/?tipo=release&qtd=100&de=${mda(dias(hoje, -15))}&ate=${mda(hoje)}`]);
+  const horasDasNoticias = new Set(noticias.items.map((n) => `${deBr(n.data_publicacao.slice(0, 10))} ${n.data_publicacao.slice(11, 16)}`));
+  const diasComNoticia = new Set([...horasDasNoticias].map((x) => x.slice(0, 10)));
+  const conferidas = passado.items.filter((x) => TITULOS.includes(x.titulo)).map((x) => sp(x.data_divulgacao)).filter((q) => diasComNoticia.has(q.data));
+  assert.ok(conferidas.length > 0, 'nenhuma divulgação recente para conferir a hora contra a notícia do IBGE');
+  for (const q of conferidas) assert.ok(horasDasNoticias.has(`${q.data} ${q.hora}`), `divulgação de ${q.data} às ${q.hora} (Brasília) sem notícia do IBGE nessa hora`);
 });
 
 for (const [recorte, comparar, ids] of [['Dólar e câmbio', 'Semana passada', ['dolar', 'euro']], ['Inflação', 'Início do ano', ['ipcaMes', 'ipca12m', 'metaInflacao', 'igpmMes']], ['Juros e Copom', 'Semana passada', ['selic', 'cdiAno', 'cdiMes', 'poupanca']]]) {

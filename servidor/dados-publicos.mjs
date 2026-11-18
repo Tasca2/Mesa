@@ -213,18 +213,31 @@ const AGENDA = [
   ['Pesquisa Mensal de Serviços', 'Volume de serviços'],
   ['Pesquisa Industrial Mensal: Produção Física - Brasil', 'Produção industrial'],
 ].map(([t, n]) => [sem(t), n]);
-// Divulgações do IBGE que mexem com a conversa do assessor, de hoje até `dias` à frente, em ordem de data.
+// O calendário do IBGE publica "dd/mm/aaaa hh:mm:ss" em UTC: em 12/11/2026 ele dizia 12:00:00 para o IPCA, e a notícia
+// do IBGE sobre esse IPCA saiu às 09:00:00. Aqui a data e a hora passam para o horário de Brasília.
+const deUtc = (s) => {
+  const m = String(s || '').match(/^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?/);
+  if (!m) return null;
+  if (!m[4]) return { data: `${m[3]}-${m[2]}-${m[1]}`, hora: null };
+  const t = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]));
+  return {
+    data: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(t),
+    hora: new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(t),
+  };
+};
+// Divulgações do IBGE que mexem com a conversa do assessor, de hoje até `dias` à frente, em ordem de data (horário de Brasília).
 export function filtrarAgenda(itens, hoje, dias = 30) {
   const ate = somarDias(hoje, dias), dois = (n) => String(n).padStart(2, '0');
   return (itens || []).map((x) => {
     const nome = AGENDA.find(([t]) => t === sem(x.titulo))?.[1];
     if (!nome) return null;
-    const [d, h] = String(x.data_divulgacao || '').split(' ');
-    const data = deBr(d);
+    const quando = deUtc(x.data_divulgacao);
+    if (!quando) return null;
+    const { data, hora } = quando;
     if (!(data >= hoje && data <= ate)) return null;
     const ini = x.mes_referencia_inicio ? `${x.ano_referencia_inicio}-${dois(x.mes_referencia_inicio)}` : x.ano_referencia_inicio ? String(x.ano_referencia_inicio) : null;
     const fim = x.mes_referencia_fim ? `${x.ano_referencia_fim}-${dois(x.mes_referencia_fim)}` : null;
-    return { data, hora: h ? h.slice(0, 5) : null, divulgacao: nome, titulo: x.titulo, referencia: fim ? `${ini} a ${fim}` : ini };
+    return { data, hora, divulgacao: nome, titulo: x.titulo, referencia: fim ? `${ini} a ${fim}` : ini };
   }).filter(Boolean).sort((a, b) => a.data.localeCompare(b.data) || a.divulgacao.localeCompare(b.divulgacao));
 }
 
@@ -301,7 +314,7 @@ async function blocoCopom(lacunas) {
 async function blocoAgenda(hoje, lacunas) {
   try {
     const { url, v: j } = await obterUmDe(['300', '299', '298'].map((q) => `${IBGE}/calendario/?qtd=${q}&de=${mdA(hoje)}&ate=${mdA(somarDias(hoje, 30))}`));
-    return { fonte: 'IBGE, calendário de divulgações (servicodados.ibge.gov.br)', consulta: url, ate: somarDias(hoje, 30), itens: filtrarAgenda(j?.items || [], hoje),
+    return { fonte: 'IBGE, calendário de divulgações (servicodados.ibge.gov.br)', consulta: url, ate: somarDias(hoje, 30), horario: 'de Brasília (o calendário do IBGE publica a hora em UTC, três horas à frente; aqui ela já vem convertida)', itens: filtrarAgenda(j?.items || [], hoje),
       nota: 'Copom fora da agenda: a data da próxima reunião está nas lacunas' };
   } catch (e) {
     lacunas.push({ bloco: 'agenda', item: 'calendário do IBGE', motivo: motivo(e) });

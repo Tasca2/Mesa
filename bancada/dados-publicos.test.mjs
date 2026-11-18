@@ -121,6 +121,22 @@ test('agenda: só as divulgações que mexem com a conversa, nos próximos 30 di
   ]);
 });
 
+// Em 12/11/2026 o calendário do IBGE dizia "12/11/2026 12:00:00" para o IPCA, e a notícia do IBGE sobre o mesmo IPCA
+// saiu "12/11/2026 09:00:00": a hora do calendário vem em UTC, três horas à frente de Brasília.
+test('agenda: a hora do calendário do IBGE vem em UTC e a Mesa mostra a de Brasília, com a data que muda junto', () => {
+  const itens = [
+    { titulo: 'Índice Nacional de Preços ao Consumidor Amplo 15', data_divulgacao: '26/11/2026 12:00:00', ano_referencia_inicio: 2026, mes_referencia_inicio: 11 },
+    { titulo: 'Pesquisa Mensal de Serviços', data_divulgacao: '10/12/2026 01:30:00', ano_referencia_inicio: 2026, mes_referencia_inicio: 10 },
+    { titulo: 'Pesquisa Mensal de Comércio', data_divulgacao: '19/11/2026 02:00:00', ano_referencia_inicio: 2026, mes_referencia_inicio: 9 },
+    { titulo: 'Índice Nacional de Preços ao Consumidor', data_divulgacao: '18/11/2026 02:59:00', ano_referencia_inicio: 2026, mes_referencia_inicio: 10 },
+  ];
+  assert.deepEqual(D.filtrarAgenda(itens, '2026-11-18').map((x) => [x.data, x.hora, x.divulgacao]), [
+    ['2026-11-18', '23:00', 'Vendas do comércio'],
+    ['2026-11-26', '09:00', 'IPCA-15'],
+    ['2026-12-09', '22:30', 'Volume de serviços'],
+  ]);
+});
+
 // Arquivo compactado (zip) montado aqui, com um arquivo comprimido e outro guardado sem compressão.
 function zipDe(arquivos) {
   const partes = [], central = []; let pos = 0;
