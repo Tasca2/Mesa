@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
+import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +45,22 @@ async function enviarEEsperar(corpo) {
 const valor = (args, opcao) => { const i = args.indexOf(opcao); return i < 0 ? null : args[i + 1]; };
 const pastasDe = (args) => { const i = args.indexOf('--add-dir'); if (i < 0) return []; const r = []; for (let k = i + 1; k < args.length && !args[k].startsWith('--'); k++) r.push(args[k]); return r; };
 const arquivosEm = (pasta) => (existsSync(pasta) ? readdirSync(pasta) : []);
+const regraAbs = (p) => 'Read(//' + p.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, l) => l.toLowerCase()) + '/**)';
+const arquivoDeRegras = () => path.join(raiz, 'tmp', 'mesa-janela', 'regras-mesa.json');
+// Fora do vídeo: modo padrão, sem terminal e sem gravar, e sem ler o perfil da Mesa, o Claude Code e o cofre.
+function confereSemSegredos(args) {
+  assert.equal(valor(args, '--permission-mode'), 'default');
+  const negadas = valor(args, '--disallowedTools').split(',');
+  assert.deepEqual(negadas.slice(0, 5), ['Bash', 'PowerShell', 'Write', 'Edit', 'NotebookEdit']);
+  const proibidas = [path.join(raiz, 'perfil'), path.join(casa, '.claude'), path.join(casa, 'Desktop', 'AppCaptaMais', 'knowledge')];
+  for (const p of proibidas) assert.ok(negadas.includes(regraAbs(p)), `falta negar a leitura de ${p}: ${negadas.join(' | ')}`);
+  assert.ok(negadas.includes('Read(~/.claude/**)'));
+  assert.equal(path.resolve(valor(args, '--settings')), path.resolve(arquivoDeRegras()));
+  const regras = JSON.parse(readFileSync(arquivoDeRegras(), 'utf8'));
+  assert.equal(regras.permissions.blockReadsOutsideWorkingDirectories, true);
+  for (const p of proibidas) assert.ok(regras.permissions.deny.includes(regraAbs(p)), `o arquivo de regras não nega ${p}`);
+  assert.equal(regras.permissions.allow, undefined);
+}
 
 before(async () => {
   if (SO_WINDOWS) return;
@@ -123,7 +140,8 @@ test('enviar com anexos: o pedido diz onde está cada arquivo; o Claude lê só 
   const permitidas = valor(chamada.args, '--allowedTools').split(',');
   assert.ok(permitidas.includes(regra(anexos)) && permitidas.includes(regra(fontes)), permitidas.join(' | '));
   assert.ok(permitidas.includes('mcp__mesa') && permitidas.includes('WebSearch'));
-  assert.equal(valor(chamada.args, '--disallowedTools'), 'Bash,PowerShell');
+  confereSemSegredos(chamada.args);
+  assert.ok(chamada.entrada.includes('ARQUIVOS: aqui você só lê arquivos com a ferramenta Read'), 'o Claude não recebeu a regra de arquivos');
   const eu = estado.turnos.filter((t) => t.papel === 'assessor').at(-1);
   assert.match(eu.texto, /\nAnexos: Fato Relevante\.pdf, gráfico do dólar\.png$/);
   assert.ok(chamada.entrada.includes('gráfico do dólar.png'), 'o pedido mostra o nome que o assessor deu ao arquivo');
@@ -135,7 +153,8 @@ test('enviar com anexos: o pedido diz onde está cada arquivo; o Claude lê só 
 
 test('a mensagem seguinte da conversa continua sem terminal e com a leitura das duas pastas', { skip: SO_WINDOWS }, async () => {
   const { chamada } = await enviarEEsperar({ texto: 'Gere o PDF para o cliente.' });
-  assert.equal(valor(chamada.args, '--disallowedTools'), 'Bash,PowerShell');
+  confereSemSegredos(chamada.args);
+  assert.ok(chamada.entrada.includes('ARQUIVOS: aqui você só lê arquivos com a ferramenta Read'), 'a regra de arquivos vale em toda mensagem');
   assert.equal(pastasDe(chamada.args).length, 2);
   assert.ok(!chamada.entrada.includes('[Anexos'), 'sem anexo novo, sem aviso de anexo');
 });
@@ -145,7 +164,75 @@ test('melhorar o pedido também roda sem terminal', { skip: SO_WINDOWS }, async 
   const r = await api('/api/melhorar', { texto: '[Mesa] Pedido de teste', pedido: 'mais curto' });
   assert.equal(r.status, 200, JSON.stringify(r.json));
   const c = lerChamadas().slice(antes).at(-1);
-  assert.equal(valor(c.args, '--disallowedTools'), 'Bash,PowerShell');
+  assert.equal(valor(c.args, '--permission-mode'), 'default');
+  assert.equal(valor(c.args, '--disallowedTools'), 'Bash,PowerShell,Write,Edit,NotebookEdit,Read,Glob,Grep');
+  assert.ok(c.args.includes('--strict-mcp-config'), 'melhorar o pedido não usa os conectores do usuário');
+  assert.equal(path.resolve(valor(c.args, '--settings')), path.resolve(arquivoDeRegras()));
+});
+
+test('o sétimo arquivo esperando envio é recusado; tirar um libera a vaga', { skip: SO_WINDOWS }, async () => {
+  const ids = [];
+  for (let i = 1; i <= 6; i++) { const r = await subir(`print-${i}.png`, PNG); assert.equal(r.status, 200, JSON.stringify(r.json)); ids.push(r.json.anexo.id); }
+  const setimo = await subir('print-7.png', PNG);
+  assert.equal(setimo.status, 400);
+  assert.match(setimo.json.erro, /Até 6 arquivos/);
+  assert.equal((await api('/api/estado')).json.anexos.length, 6);
+  assert.equal((await api('/api/anexo/remover', { id: ids.pop() })).status, 200);
+  const de_novo = await subir('print-7.png', PNG);
+  assert.equal(de_novo.status, 200);
+  for (const id of [...ids, de_novo.json.anexo.id]) await api('/api/anexo/remover', { id });
+  assert.equal((await api('/api/estado')).json.anexos.length, 0);
+});
+
+test('arquivo que passa do limite durante o envio, sem tamanho declarado, é cortado sem deixar sobra', { skip: SO_WINDOWS }, async () => {
+  const pasta = path.join(mesa(), 'Anexos', hoje());
+  const antes = arquivosEm(pasta).length;
+  const u = new URL(`${base}/api/anexo?nome=${encodeURIComponent('grande sem tamanho.png')}`);
+  const resultado = await new Promise((ok) => {
+    const req = http.request({ hostname: u.hostname, port: u.port, path: u.pathname + u.search, method: 'POST', headers: { 'x-mesa-token': token, 'content-type': 'application/octet-stream', 'transfer-encoding': 'chunked' } }, (res) => { let b = ''; res.on('data', (d) => { b += d; }); res.on('end', () => ok({ status: res.statusCode, corpo: b })); res.on('error', () => ok({ status: res.statusCode, corpo: b })); });
+    req.on('error', () => ok({ status: 'conexão cortada' }));
+    const bloco = Buffer.alloc(1024 * 1024, 7); let n = 0;
+    req.write(PNG);
+    const mandar = () => { while (n < 13) { n++; if (!req.write(bloco)) return req.once('drain', mandar); } req.end(); };
+    mandar();
+  });
+  assert.ok(resultado.status === 413 || resultado.status === 'conexão cortada', JSON.stringify(resultado));
+  if (resultado.status === 413) assert.match(resultado.corpo, /10 MB/);
+  for (let i = 0; i < 30 && arquivosEm(pasta).length !== antes; i++) await espera(100);
+  assert.deepEqual(arquivosEm(pasta).filter((n) => /grande-sem-tamanho/.test(n)), [], 'sobrou o arquivo cortado (ou o .part)');
+  assert.ok(!(await api('/api/estado')).json.anexos.some((a) => a.original === 'grande sem tamanho.png'));
+});
+
+test('anexo que sumiu da pasta antes do envio: a Mesa diz qual foi e tira da caixa; o envio seguinte passa', { skip: SO_WINDOWS }, async () => {
+  const { json } = await subir('Relatório gerencial.pdf', PDF);
+  rmSync(path.join(mesa(), 'Anexos', hoje(), json.anexo.nome));
+  const antes = lerChamadas().length;
+  const r = await api('/api/send', { texto: 'Leia o relatório.', anexos: [json.anexo.id] });
+  assert.equal(r.status, 400);
+  assert.match(r.json.erro, /Relatório gerencial\.pdf/, 'o aviso não diz qual anexo sumiu');
+  assert.deepEqual(r.json.faltam, [json.anexo.id]);
+  assert.equal(lerChamadas().length, antes, 'o Claude foi chamado sem o anexo');
+  assert.ok(!(await api('/api/estado')).json.anexos.some((a) => a.id === json.anexo.id), 'o anexo que sumiu continua na caixa');
+  const { r: r2 } = await enviarEEsperar({ texto: 'Leia o relatório.' });
+  assert.equal(r2.status, 200);
+});
+
+test('se a Mesa não consegue preparar a chamada do Claude, mostra o erro e não fica presa em "respondendo"', { skip: SO_WINDOWS }, async () => {
+  const regras = arquivoDeRegras();
+  rmSync(regras, { force: true }); mkdirSync(regras); // uma pasta no lugar do arquivo de regras: gravar falha
+  try {
+    const antes = lerChamadas().length;
+    const r = await api('/api/send', { texto: 'Teste de falha ao preparar.' });
+    assert.ok(r.status === 200 || r.status === 500, JSON.stringify(r.json));
+    let e = {};
+    for (let i = 0; i < 40; i++) { e = (await api('/api/estado')).json; if (!e.rodando) break; await espera(100); }
+    assert.equal(e.rodando, false, 'a Mesa ficou presa em "respondendo"');
+    assert.match(e.erro, /Claude/);
+    await espera(300);
+    assert.equal(lerChamadas().length, antes, 'o Claude foi chamado sem o arquivo de regras');
+  } finally { rmSync(regras, { recursive: true, force: true }); }
+  const { r: r2 } = await enviarEEsperar({ texto: 'Agora vai.' });
+  assert.equal(r2.status, 200);
 });
 
 test('pedido de vídeo: mesmos argumentos da 1.13, com terminal liberado para o edvid e sem as pastas de anexo', { skip: SO_WINDOWS }, async () => {
@@ -162,5 +249,6 @@ test('pedido de vídeo: mesmos argumentos da 1.13, com terminal liberado para o 
   assert.equal(valor(chamada.args, '--allowedTools'), ['mcp__mesa', ...FERRAMENTAS_VIDEO_1_13].join(','));
   assert.equal(valor(chamada.args, '--disallowedTools'), NEGADAS_VIDEO_1_13.join(','));
   assert.equal(path.resolve(chamada.cwd), path.resolve(v.json.pasta));
+  assert.ok(!chamada.entrada.includes('ARQUIVOS: aqui você só lê arquivos'), 'no vídeo o Claude usa o terminal e a pasta do vídeo: a regra de arquivos não vale');
   await api('/api/limpar', { descartar: true });
 });

@@ -128,3 +128,64 @@ test('tirar um anexo antes de enviar apaga a cópia; arquivo de outro tipo é re
   await ate('(document.querySelector("#cvAnexoAviso") || {}).textContent?.includes("anexe PDF ou imagem")');
   assert.equal((await chips()).length, 0);
 });
+
+// Colar e soltar: eventos sintéticos com um DataTransfer de verdade, como o navegador entrega ao colar ou soltar.
+// Excel no Windows leva texto, HTML e uma imagem das células: isso tem de colar o texto, não virar anexo.
+const PNG_B64 = png().toString("base64"), PDF_B64 = PDF.toString("base64");
+const dt = (o) => `(() => { const d = new DataTransfer();${o.texto ? ` d.setData("text/plain", ${JSON.stringify(o.texto)});` : ""}${o.html ? ` d.setData("text/html", ${JSON.stringify(o.html)});` : ""} for (const a of ${JSON.stringify(o.arquivos || [])}) d.items.add(new File([Uint8Array.from(atob(a.b64), (c) => c.charCodeAt(0))], a.nome, { type: a.tipo })); return d; })()`;
+const colar = (o) => avaliar(`(() => { const ev = new ClipboardEvent("paste", { clipboardData: ${dt(o)}, bubbles: true, cancelable: true }); document.querySelector("#cvTxt").dispatchEvent(ev); return ev.defaultPrevented; })()`);
+const soltar = (o, tipo = "drop") => avaliar(`(() => { const ev = new DragEvent("${tipo}", { dataTransfer: ${dt(o)}, bubbles: true, cancelable: true }); document.querySelector("#cvTxt").dispatchEvent(ev); return ev.defaultPrevented; })()`);
+const tirarTodos = async () => { while ((await chips()).length) { await avaliar('document.querySelector("#cvAnexos .chip button").click(), true'); await espera(200); } };
+
+test("colar células do Excel (texto, HTML e imagem) cola o texto e não cria anexo", { skip: PULAR }, async () => {
+  await tirarTodos();
+  const impedido = await colar({ texto: "PETR4\t38,50\nVALE3\t61,20", html: "<table><tr><td>PETR4</td><td>38,50</td></tr></table>", arquivos: [{ nome: "image.png", tipo: "image/png", b64: PNG_B64 }] });
+  assert.equal(impedido, false, "o colar normal do texto foi impedido");
+  await espera(800);
+  assert.deepEqual(await chips(), [], "virou anexo");
+});
+
+test("colar só uma imagem (print da tela) vira anexo", { skip: PULAR }, async () => {
+  await tirarTodos();
+  assert.equal(await colar({ arquivos: [{ nome: "image.png", tipo: "image/png", b64: PNG_B64 }] }), true);
+  await ate('document.querySelectorAll("#cvAnexos .chip").length === 1 && !document.querySelector("#cvAnexos .chip.enviando")');
+  assert.match((await chips())[0], /^IMAGEMimage\.png\d+ KB×$/);
+  await tirarTodos();
+});
+
+test("colar um arquivo copiado no Explorador (PDF, sem texto) vira anexo", { skip: PULAR }, async () => {
+  await tirarTodos();
+  assert.equal(await colar({ arquivos: [{ nome: "Fato relevante.pdf", tipo: "application/pdf", b64: PDF_B64 }] }), true);
+  await ate('document.querySelectorAll("#cvAnexos .chip").length === 1 && !document.querySelector("#cvAnexos .chip.enviando")');
+  assert.match((await chips())[0], /^PDFFato relevante\.pdf\d+ KB×$/);
+  await tirarTodos();
+});
+
+test("soltar um arquivo na caixa vira anexo; arrastar texto não é tratado como arquivo", { skip: PULAR }, async () => {
+  await tirarTodos();
+  assert.equal(await soltar({ arquivos: [{ nome: "lamina.pdf", tipo: "application/pdf", b64: PDF_B64 }] }, "dragover"), true, "arrastar arquivo por cima da caixa precisa aceitar a cópia");
+  assert.equal(await soltar({ arquivos: [{ nome: "lamina.pdf", tipo: "application/pdf", b64: PDF_B64 }] }), true);
+  await ate('document.querySelectorAll("#cvAnexos .chip").length === 1 && !document.querySelector("#cvAnexos .chip.enviando")');
+  assert.match((await chips())[0], /^PDFlamina\.pdf\d+ KB×$/);
+  assert.equal(await soltar({ texto: "um trecho arrastado" }), false, "soltar texto deve seguir o comportamento normal da caixa");
+  await espera(400);
+  assert.equal((await chips()).length, 1);
+  await tirarTodos();
+});
+
+// Anexo cuja cópia sumiu da pasta Anexos antes do envio: o aviso diz qual é, o cartão sai e o texto volta para a caixa.
+test("anexo que sumiu da pasta: o envio diz qual arquivo foi, tira o cartão e devolve o texto", { skip: PULAR }, async () => {
+  await tirarTodos();
+  const arqs = globalThis.__arqs, pasta = path.join(casa, "Documents", "Mesa do Assessor", "Anexos", hoje());
+  const antes = new Set(readdirSync(pasta));
+  await escolherArquivos([path.join(arqs, "Lâmina do fundo.pdf")]);
+  await ate('document.querySelectorAll("#cvAnexos .chip").length === 1 && !document.querySelector("#cvAnexos .chip.enviando")');
+  const novo = readdirSync(pasta).find((n) => !antes.has(n));
+  rmSync(path.join(pasta, novo));
+  const chamadasAntes = lerChamadas().length;
+  await avaliar('(() => { const t = document.querySelector("#cvTxt"); t.value = "Resuma a lâmina."; t.dispatchEvent(new Event("input")); document.querySelector("#cvEnv").click(); return true; })()');
+  await ate('((document.querySelector("#cvAnexoAviso") || {}).textContent || "").includes("Lâmina do fundo.pdf")');
+  await ate('document.querySelectorAll("#cvAnexos .chip").length === 0');
+  assert.equal(await avaliar('document.querySelector("#cvTxt").value'), "Resuma a lâmina.");
+  assert.equal(lerChamadas().length, chamadasAntes, "o Claude foi chamado sem o anexo");
+});

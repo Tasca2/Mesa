@@ -674,11 +674,12 @@
       ],
       "insumos": [
         "Empresa (nome ou ticker)",
-        "Texto integral do comunicado ou link da página oficial",
+        "Qual comunicado (o mais recente, um da lista dos últimos 5, texto colado ou PDF anexado)",
+        "Texto ou link do comunicado, se já tenho",
         "Minha tese ou o motivo de acompanhar a empresa",
         "Se o cliente tem o papel"
       ],
-      "fonte": "Se colei o texto, esse é o documento. Se informei só a empresa, chame documentos_cvm pelo nome ou CNPJ (pelo ticker, a analise_ativo traz os dois), com as categorias Fato Relevante e Comunicado ao Mercado: use a lista para a ficha e a sequência e baixe pelo protocolo o documento escolhido para ler o texto integral. A base da CVM é atualizada uma vez por semana: se o comunicado for de hoje e não estiver na lista, diga isso e me peça o texto, o link ou o PDF. Se o texto integral não abrir, não resuma por notícia: diga isso na primeira linha, entregue só a ficha do que achou e me peça o texto colado. Para o tamanho e as premissas, chame analise_ativo com tipo acoes e pesquisa=true (balancosTrimestrais, multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias). Não complete trecho do comunicado de memória."
+      "fonte": "Se colei o texto ou anexei o PDF, esse é o documento. Se informei só a empresa, chame documentos_cvm pelo nome ou CNPJ (a analise_ativo traz os dois), com as categorias Fato Relevante e Comunicado ao Mercado: use a lista para a ficha e a sequência e baixe pelo protocolo o documento escolhido para ler o texto integral. A base da CVM é atualizada uma vez por semana: se o comunicado for de hoje e não estiver na lista, diga isso e me peça o texto, o link ou o PDF. Se o texto integral não abrir, não resuma por notícia: diga isso na primeira linha, entregue só a ficha e me peça o texto ou o PDF. Para o tamanho e as premissas, chame analise_ativo com tipo acoes e pesquisa=true (balancosTrimestrais, multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias). Não complete trecho do comunicado de memória."
     },
     "grafico": {
       "obj": "Descrever o gráfico com medidas: onde o preço está, o que fez no período, os níveis que o mercado respeitou e o que mudaria a leitura.",
@@ -700,9 +701,9 @@
         "Escala de tempo",
         "Índice de comparação",
         "Indicadores que quero ver (ex.: média móvel, IFR)",
-        "Imagem do gráfico, série de preços ou descrição"
+        "Imagem do gráfico, anexada na conversa (opcional)"
       ],
-      "fonte": "Se enviei a série de preços ou descrevi o gráfico, comece por aí e diga o que não dá para ler. Sem isso, chame analise_ativo com o ticker e o tipo certo e confira a periodicidade que veio. Com retornos mensais (sem preço em reais, máxima, mínima nem volume), monte a base 100 e calcule só o que a série mensal permite (retorno contra o índice, faixa e maior queda nos fechamentos de mês, volatilidade mensal) e diga isso na Base. Média móvel de dias, IFR de 14 dias, Bandas de Bollinger, volume e níveis em reais pedem série diária: ficam pendentes, com o pedido da série ou do print na escala certa. Proventos e eventos do período: documentos_cvm e RI da empresa. Não desenhe nível nem indicador que os dados não sustentam."
+      "fonte": "Se anexei a imagem do gráfico, leia a imagem primeiro e diga o que não dá para ler nela. Chame analise_ativo com o ticker e o tipo certo e confira a periodicidade que veio. Com retornos mensais (sem preço em reais, máxima, mínima nem volume), monte a base 100 e calcule só o que a série mensal permite (retorno contra o índice, faixa e maior queda nos fechamentos de mês, volatilidade mensal) e diga isso na Base. Média móvel de dias, IFR de 14 dias, Bandas de Bollinger, volume e níveis em reais pedem série diária: ficam pendentes, com o pedido da série ou do print na escala certa. Proventos e eventos do período: documentos_cvm e RI da empresa. Não desenhe nível nem indicador que os dados não sustentam."
     },
     "acao": {
       "obj": "Ler uma empresa pelos meus critérios, mostrando evidências e lacunas.",
@@ -978,7 +979,8 @@
     ],
     "fato": [
       { rotulo: "Empresa (nome ou ticker)", dica: "Ex.: PETR4" },
-      { rotulo: "Texto integral do comunicado ou link da página oficial", longo: true, dica: "Cole o texto do comunicado. Só com o link, o PDF da CVM nem sempre abre" },
+      { rotulo: "Qual comunicado", opcoes: ["O mais recente", "Quero escolher na lista dos últimos 5", "Vou colar o texto", "Vou anexar o PDF"], padrao: "O mais recente", dica: "Para o PDF, anexe o arquivo na conversa antes de enviar o pedido" },
+      { rotulo: "Texto ou link do comunicado", longo: true, opcional: true, dica: "Só se o comunicado é de hoje ou você já tem o texto. Em branco, busco na CVM" },
       { rotulo: "Minha tese ou motivo de acompanhar a empresa", opcional: true, dica: "Ex.: tese de dividendos" },
       { rotulo: "O cliente tem o papel?", opcoes: ["Tem, posição relevante", "Tem, posição pequena", "Não tem, está olhando", "Não sei"], opcional: true },
     ],
@@ -988,7 +990,7 @@
       { rotulo: "Escala", opcoes: ["Diário", "Semanal", "Mensal"], opcional: true, dica: "Em branco, uso a escala que os dados permitirem" },
       { rotulo: "Comparar com", opcoes: ["IBOV", "IFIX", "CDI", "Dólar"], opcional: true, dica: "Em branco: IBOV (ação) ou IFIX (FII)" },
       { rotulo: "Indicadores que quero ver", opcoes: ["Médias móveis", "IFR", "Volume", "Bandas de Bollinger"], opcional: true },
-      { rotulo: "Imagem do gráfico, série ou descrição", longo: true, opcional: true, dica: "Se você não enviar, busco o histórico na Análise de Ativo" },
+      { rotulo: "Imagem do gráfico", opcoes: ["Sem imagem", "Vou anexar a imagem"], padrao: "Sem imagem", dica: "Para o print, anexe a imagem na conversa antes de enviar o pedido. Sem imagem, busco o histórico na Análise de Ativo" },
     ],
     "acao": [
       { rotulo: "Empresa (ticker)", dica: "Ex.: WEGE3" },
@@ -1965,7 +1967,7 @@
     "Antes de cada pedido ao assessor, chame mesa_andamento com uma frase curta dizendo o que ele precisa responder ou anexar no chat, " +
     "e as etapas da tarefa. Ao entregar, chame com concluido=true. " +
     "Ao entregar, chame mesa_andamento com concluido=true e entrega {titulo, texto com o resultado final, arquivo com o caminho completo do PDF salvo na pasta Documentos do assessor}, " +
-    "para o painel mostrar os botões Baixar e Copiar. Se o Resultado for \"Texto no chat\", a sua resposta final traz o TEXTO COMPLETO da entrega, pronto para copiar (não só um resumo), e as dúvidas vêm depois, em poucas linhas. Se o Resultado for PDF, gere o arquivo com a ferramenta mesa_documento (titulo, secoes com o texto final e rodape); se a peça for uma apresentação (slides), use mesa_apresentacao, seguindo o método da skill e registre o caminho devolvido em entrega.arquivo; se for texto, entregue também na conversa.";
+    "para o painel mostrar os botões Baixar e Copiar. Se o Resultado for \"Texto no chat\", a sua resposta final traz o TEXTO COMPLETO da entrega, pronto para copiar (não só um resumo), e as dúvidas vêm depois, em poucas linhas. Se o Resultado for PDF, gere o arquivo com a ferramenta mesa_documento (titulo, secoes com o texto final e rodape); se a peça for uma apresentação (slides), use mesa_apresentacao, seguindo o método da skill e registre o caminho devolvido em entrega.arquivo; se for texto, entregue também na conversa. Se o uso for \"Material para o cliente\", gere também o PDF para o cliente com mesa_documento (sem o Conferir, o Próximo passo e a orientação para o assessor) e registre o caminho em entrega.arquivo.";
 
   let promptEdit = { base: "", texto: "" }, rascunhoChat = "", conversa = [];
   const INLINE_MD = /(\*\*[^*\n]+\*\*|__[^_\n]+__|`[^`\n]+`|\*[^*\s][^*\n]*?\*|_[^_\s][^_\n]*?_|\[[^\]\n]+\]\(https?:\/\/[^)\s]+\))/g;
