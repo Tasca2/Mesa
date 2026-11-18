@@ -128,6 +128,7 @@ const EPILOGO = `
   avisos: () => JSON.stringify(__avisos),
   chamadas: () => JSON.stringify(__chamadas),
   compat: () => JSON.stringify({ NOMES_ANTIGOS, SAIRAM_DO_MENU, TEXTO_ANTIGO }),
+  formatos: () => JSON.stringify({ desde113: CAMPOS_MUDARAM_DESDE_113, tarefas: Object.fromEntries(Object.keys(T).map((id) => [id, formatoDe(id)])) }),
 };`;
 
 function telaDe(arquivo, { status, imediato } = {}) {
@@ -152,7 +153,7 @@ function telaDe(arquivo, { status, imediato } = {}) {
     ligar: (p) => t.ligar(p), abrir: (id, r, c) => t.abrir(id, r, c), zerarPedido: () => t.zerarPedido(),
     restaurar: (p, auto) => t.restaurar(p, auto), restaurarAjuste: async (ref) => JSON.parse(await t.restaurarAjuste(ref)),
     perfil: () => JSON.parse(t.perfil()), pedidoAtual: () => JSON.parse(t.pedidoAtual()), avisos: () => JSON.parse(t.avisos()),
-    chamadas: () => JSON.parse(t.chamadas()), compat: () => JSON.parse(t.compat()),
+    chamadas: () => JSON.parse(t.chamadas()), compat: () => JSON.parse(t.compat()), formatos: () => JSON.parse(t.formatos()),
     // a caixa do pedido, o que está à vista (sem o que está escondido) e os botões e campos da tela
     pedido: () => naTela().find((n) => n.tag === 'textarea' && n.className === 'prompt')?.value,
     visivel: () => naTela().map((n) => n.html.replace(/<[^>]*>/g, '')).filter(Boolean).join(' '),
@@ -777,4 +778,112 @@ test('modo /mesa chat (app): as linhas de Rotinas são as 20 tarefas do menu, co
   assert.deepEqual(rot.map((c) => c[0]), NOMES_ROTINAS);
   for (const [tarefa, metodo] of rot) assert.deepEqual(metodos(metodo), cat[tarefa].skills, tarefa);
   for (const velho of DA_VERSAO_ANTERIOR) assert.ok(!s.includes(velho), `ainda cita ${velho}`);
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// Rascunho gravado antes desta versão (revisão independente de 18/11): os campos são guardados pela posição. Tarefa
+// cujos campos mudaram desde a 1.13, ou cujo formato (campos e opções) mudou desde que o rascunho foi gravado,
+// recomeça: os campos não voltam no campo errado, a resposta que não é mais opção sai e o texto do pedido montado
+// com o catálogo antigo não volta. A tela avisa uma vez. Tarefa que não mudou volta como antes.
+
+const AVISO_RECOMECOU = (nome) => `A tarefa «${nome}» mudou nesta versão e o rascunho dela recomeçou: confira as escolhas e preencha os dados de novo.`;
+// Campos como a 1.13 gravava (rótulos da 1.13, conferidos na 1.13 sem mudanças) e o que sairia no pedido de hoje se
+// voltassem pela posição.
+const CAMPOS_DA_113 = {
+  fato: { rotulos: ['Texto integral do comunicado ou link da página oficial', 'Minha tese ou motivo de acompanhar a empresa'],
+    campos: ['TEXTO INTEGRAL DO COMUNICADO da empresa', 'tese de dividendos'],
+    errados: ['- Empresa (nome ou ticker): TEXTO INTEGRAL', '- Qual comunicado: tese de dividendos'] },
+  grafico: { rotulos: ['Ativo, período e escala', 'Imagem do gráfico, série ou descrição', 'Indicadores que quero ver'],
+    campos: ['TESTE3, 12 meses, diário', 'descrição do gráfico: topo duplo', 'Médias móveis'],
+    errados: ['- Ativo (ticker): TESTE3, 12 meses', '- Período: descrição do gráfico', '- Escala: Médias móveis'] },
+  macro: { rotulos: ['Indicador ou período'], campos: ['Só Selic'], errados: ['- Recorte: Só Selic'] },
+};
+// Tarefas cujos campos mudaram desde a 1.13 (rótulos, ordem ou opções; conferido contra a 1.13 sem mudanças em 18/11).
+const MUDARAM_DESDE_113 = ['calendario', 'carteira', 'estudo', 'macro', 'fato', 'grafico', 'rf', 'pauta'];
+
+for (const { nome, arq, cat } of TELAS) {
+  const pedidoDeHoje = (id, respostas) => { const t = telaDe(arq); t.ligar({ ...PERFIL }); t.abrir(id, respostas); return t.pedido(); };
+
+  test(`${nome} · rascunho da 1.13 de Fato relevante, Leitura de gráfico e Juros, inflação e câmbio: os campos não voltam no campo errado e o pedido recomeça`, () => {
+    for (const [id, { rotulos, campos, errados }] of Object.entries(CAMPOS_DA_113)) {
+      const { area, nome: tarefa } = cat.montar(id), respostas = { uso: ['Conversa de WhatsApp'] };
+      const antigo = `[Mesa] Mercado › ${tarefa}\n\nDados que vou te passar:\n` + rotulos.map((r, i) => `- ${r}: ${campos[i]}`).join('\n') + MEU;
+      for (const tela of ['guia', 'fim']) {
+        const t = telaDe(arq);
+        const ok = t.restaurar({ ...PERFIL, rascunho: rascunho({ tela, area, tarefa: id, respostas, campos: { [id]: campos } }, tela === 'fim' ? { texto: antigo } : {}) }, true);
+        assert.equal(ok, true, `${id} (${tela})`);
+        const e = t.estado();
+        assert.deepEqual(resumo(e), { tela: 'guia', tarefa: id, passo: 0, respostas }, `${id} (${tela}): a tela não recomeçou na primeira pergunta`);
+        assert.equal(e.campos[id], undefined, `${id} (${tela}): os campos da 1.13 voltaram`);
+        assert.deepEqual(t.avisos(), [AVISO_RECOMECOU(tarefa)], `${id} (${tela})`);
+        // segue até o fim com o que voltou: o pedido é o de hoje, sem os campos no lugar errado e sem o texto antigo
+        t.abrir(id, e.respostas, e.campos);
+        const p = t.pedido();
+        for (const x of errados) assert.ok(!p.includes(x), `${id} (${tela}): ${x}`);
+        assert.equal(p, pedidoDeHoje(id, respostas), `${id} (${tela}): o pedido não é o de hoje`);
+        assert.ok(!t.visivel().includes('Você editou o pedido à mão'), `${id} (${tela}): o texto antigo voltou como editado`);
+      }
+    }
+  });
+
+  test(`${nome} · rascunho da 1.13: a resposta que não é mais opção sai também na tarefa que recomeça`, () => {
+    // Revisão de carteira: os campos mudaram e a pergunta Comparar com quê saiu; «Planilha» não é opção de Resultado
+    const { area, nome: tarefa } = cat.montar('carteira');
+    const t = telaDe(arq);
+    t.restaurar({ ...PERFIL, rascunho: rascunho({ tela: 'fim', area, tarefa: 'carteira', respostas: { base: ['Carteira modelo do escritório'], resultado: ['Planilha'] }, campos: { carteira: ['60% renda fixa', 'política antiga'] } }) }, true);
+    const e = t.estado();
+    assert.deepEqual(resumo(e), { tela: 'guia', tarefa: 'carteira', passo: 0, respostas: {} });
+    assert.equal(e.campos.carteira, undefined);
+    assert.deepEqual(t.avisos(), [AVISO_RECOMECOU(tarefa)]);
+  });
+
+  test(`${nome} · rascunho da 1.13: tarefa cujos campos não mudaram volta como antes; só saem os campos guardados das tarefas que mudaram`, () => {
+    const { area } = cat.montar('post'), campos = ['Selic e juros', 'Captar novos clientes', '', 'Fundo claro'], respostas = { formato: ['Carrossel'] };
+    const t = telaDe(arq);
+    t.restaurar({ ...PERFIL, rascunho: rascunho({ tela: 'guia', area, tarefa: 'post', respostas, campos: { post: campos, fato: CAMPOS_DA_113.fato.campos } }) }, true);
+    const e = t.estado();
+    assert.deepEqual(resumo(e), { tela: 'guia', tarefa: 'post', passo: 0, respostas });
+    assert.deepEqual(e.campos, { post: campos });
+    assert.deepEqual(t.avisos(), ['Voltei para onde você parou: Criar um post.']);
+    // no fim, com texto: o texto volta como estava
+    const u = telaDe(arq);
+    u.ligar({ ...PERFIL }); u.abrir('post', respostas, { post: campos });
+    const texto = u.pedido(), v = telaDe(arq);
+    v.restaurar({ ...PERFIL, rascunho: rascunho({ tela: 'fim', area, tarefa: 'post', respostas, campos: { post: campos } }, { texto }) }, true);
+    assert.deepEqual(resumo(v.estado()), { tela: 'fim', tarefa: 'post', passo: 0, respostas });
+    assert.deepEqual(v.estado().campos, { post: campos });
+    assert.equal(v.pedido(), texto);
+    assert.equal(v.pedidoAtual().editado, false);
+  });
+
+  test(`${nome} · rascunho gravado nesta versão leva o formato de cada tarefa; se o formato mudar depois, a tarefa recomeça`, () => {
+    const t = telaDe(arq, { imediato: true });
+    t.ligar({ ...PERFIL });
+    t.abrir('followup');
+    t.preencher(0, 'Proposta de carteira enviada');
+    const r = JSON.parse(t.perfil().rascunho);
+    assert.equal(typeof r.formato?.followup, 'string', 'o rascunho não guardou o formato da tarefa');
+    // mesma versão: volta tudo, também com opções pessoais do assessor (elas não mudam o formato do catálogo)
+    for (const ajustes of [null, JSON.stringify({ tarefas: { followup: { opcoes: { tempo: ['2 dias', '5 dias', '15 dias'] } } } })]) {
+      const u = telaDe(arq);
+      if (ajustes) u.carregarAjustes(ajustes);
+      u.restaurar({ ...PERFIL, rascunho: JSON.stringify(r) }, true);
+      assert.equal(u.estado().tela, 'fim');
+      assert.equal(u.estado().campos.followup?.[0], 'Proposta de carteira enviada');
+      assert.deepEqual(u.avisos(), ['Voltei para onde você parou: Follow-up da proposta.']);
+    }
+    // formato gravado por outra versão: os campos não voltam e o pedido recomeça
+    const w = telaDe(arq);
+    w.restaurar({ ...PERFIL, rascunho: JSON.stringify({ ...r, formato: { ...r.formato, followup: 'outra-versao' } }) }, true);
+    assert.equal(w.estado().campos.followup, undefined);
+    assert.deepEqual(resumo(w.estado()), { tela: 'guia', tarefa: 'followup', passo: 0, respostas: {} });
+    assert.deepEqual(w.avisos(), [AVISO_RECOMECOU('Follow-up da proposta')]);
+  });
+}
+
+test('formato das tarefas e lista das que mudaram desde a 1.13 são os mesmos nas duas telas', () => {
+  const [a, b] = TELAS.map(({ arq }) => telaDe(arq).formatos());
+  delete a.tarefas['editar-reels'];
+  assert.deepEqual(a, b);
+  assert.deepEqual(a.desde113, MUDARAM_DESDE_113);
 });

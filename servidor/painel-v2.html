@@ -1290,6 +1290,14 @@
   const oQueMudou = (tipos) => { const l = tipos.map((x) => MUDOU_NA_VERSAO[x]); return l.length > 1 ? `${l.slice(0, -1).join(", ")} e ${l[l.length - 1]}` : l[0] ?? ""; };
   // Marca curta de um texto, para lembrar qual modelo salvo o assessor decidiu manter como está.
   const assinatura = (s) => { let h = 5381; for (const c of String(s)) h = (Math.imul(h, 33) ^ c.codePointAt(0)) >>> 0; return String(s).length.toString(36) + "-" + h.toString(36); };
+  // Formato de uma tarefa, gravado com o rascunho: rótulos dos campos em ordem (com as opções de cada um) e opções das
+  // perguntas do catálogo, sem as opções pessoais do assessor. Os campos do rascunho são guardados pela posição: se o
+  // formato mudou desde que o rascunho foi gravado, eles cairiam no campo errado.
+  const formatoDe = (id) => assinatura(JSON.stringify([camposDe(id).map((f) => [f.rotulo, f.opcoes ?? []]),
+    (BASE_PERGUNTAS[id] ?? T[id]?.perguntas ?? [RESULTADO]).map((p) => [p.id, (p.opcoes || []).map((o) => o.t)])]));
+  // O rascunho da 1.13 não guarda o formato. Tarefas cujos campos mudaram desde a 1.13 (rótulos, ordem ou opções); as
+  // que só mudaram de nome, objetivo, lista ou opção de resposta voltam como antes, com o aviso do texto antigo.
+  const CAMPOS_MUDARAM_DESDE_113 = ["calendario", "carteira", "estudo", "macro", "fato", "grafico", "rf", "pauta"];
   // Bloco "Minhas regras pessoais" do pedido de agora no lugar do bloco do texto: põe, troca ou tira.
   const REGRAS_PESSOAIS_RE = /Minhas regras pessoais \(valem[^\n]*\n(?:- [^\n]*(?:\n|$))*/;
   function trocarRegras(texto, base) {
@@ -2170,7 +2178,8 @@
       const tela = estado.tela === "acompanhar" ? "fim" : estado.tela;
       if (!["guia", "fim"].includes(tela)) return;
       const salvo = JSON.stringify({ v: 1, em: Date.now(), estado: { tela, area: estado.area, tarefa: estado.tarefa, passo: estado.passo, respostas: estado.respostas, campos: estado.campos }, texto: tela === "fim" ? promptEdit.texto : "",
-        ...(tela === "fim" ? { editado: !!promptEdit.editado || (!promptEdit.modelo && promptEdit.texto !== promptEdit.base), modelo: !!promptEdit.modelo } : {}) });
+        ...(tela === "fim" ? { editado: !!promptEdit.editado || (!promptEdit.modelo && promptEdit.texto !== promptEdit.base), modelo: !!promptEdit.modelo } : {}),
+        formato: Object.fromEntries([...new Set([estado.tarefa, ...Object.keys(estado.campos || {})])].map((id) => [id, formatoDe(id)])) });
       if (perfil) perfil.rascunho = salvo;
       app.callServerTool({ name: "mesa_perfil", arguments: { rascunho: salvo } }).catch(() => {});
     }, 800);
@@ -2195,6 +2204,11 @@
     let s; try { s = JSON.parse(perfil?.rascunho || ""); } catch { return false; }
     const e = s?.estado;
     if (!e || !T[e.tarefa] || !AREAS.some((a) => a.id === e.area) || Date.now() - (s.em || 0) > 14 * 864e5) return false;
+    // Tarefa cujo formato mudou desde o rascunho (no da 1.13, que não guarda o formato: campos que mudaram desde então)
+    // recomeça na primeira pergunta: os campos dela não voltam, porque cairiam no campo errado, nem o texto do pedido
+    // montado com o catálogo antigo. As respostas que ainda são opção ficam.
+    const mudou = (id) => (s.formato && typeof s.formato === "object" ? s.formato[id] !== formatoDe(id) : CAMPOS_MUDARAM_DESDE_113.includes(id));
+    const recomeca = mudou(e.tarefa), campos = Object.fromEntries(Object.entries(e.campos && typeof e.campos === "object" ? e.campos : {}).filter(([id]) => !mudou(id)));
     // Resposta que deixou de ser opção (versão anterior, opção pessoal apagada) sai, com aviso, e a tela volta para a
     // pergunta dela. Resposta de pergunta que saiu da tarefa some sem aviso: ela não muda mais o pedido.
     const t = T[e.tarefa], ps = perguntasDe(t), respostas = {}, perdidas = [];
@@ -2206,8 +2220,9 @@
       if (ficam.length) respostas[pid] = ficam;
       if (ficam.length < dadas.length && ps.includes(p)) passo = Math.min(passo, ps.indexOf(p));
     }
-    const comTexto = e.tela === "fim" && !!s.texto;
-    Object.assign(estado, { tela: comTexto || (e.tela === "fim" && !perdidas.length) ? "fim" : "guia", area: e.area, tarefa: e.tarefa, passo, respostas, campos: e.campos && typeof e.campos === "object" ? e.campos : {} });
+    const comTexto = e.tela === "fim" && !!s.texto && !recomeca;
+    const tela = recomeca ? (ps.length ? "guia" : "fim") : comTexto || (e.tela === "fim" && !perdidas.length) ? "fim" : "guia";
+    Object.assign(estado, { tela, area: e.area, tarefa: e.tarefa, passo: recomeca ? 0 : passo, respostas, campos });
     if (comTexto) {
       // O texto volta como estava. Rascunho da versão anterior não diz se foi editado à mão: é editado o que não volta
       // ao pedido (ou ao modelo salvo) de hoje depois de trocar os trechos antigos.
@@ -2221,7 +2236,8 @@
     render();
     const perdeu = perdidas.length === 1 ? ` A opção «${perdidas[0].valor}», da pergunta ${perdidas[0].curto}, saiu desta tarefa: escolha outra.`
       : perdidas.length ? ` As opções ${perdidas.map((x) => `«${x.valor}» (${x.curto})`).join(", ")} saíram desta tarefa: escolha outras.` : "";
-    if (auto) avisar("Voltei para onde você parou: " + t.nome + "." + perdeu, "Começar do zero", descartarRascunho);
+    if (auto) avisar(recomeca ? `A tarefa «${t.nome}» mudou nesta versão e o rascunho dela recomeçou: confira as escolhas e preencha os dados de novo.`
+      : "Voltei para onde você parou: " + t.nome + "." + perdeu, "Começar do zero", descartarRascunho);
     return true;
   }
 
