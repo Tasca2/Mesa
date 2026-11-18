@@ -351,7 +351,7 @@
     "(Instruções da Mesa. Responda em português do Brasil, curto e direto. Busque na internet ou use analise_ativo (CaptaMais) quando o assessor pedir dados. " +
     "1) Para ATUALIZAR o pedido que está na tela: devolva o pedido completo novo dentro de <pedido> e </pedido>, sem preencher os campos que o assessor ainda não informou. " +
     "2) Para CRIAR uma tarefa nova na Mesa: devolva <tarefa>JSON</tarefa> com " +
-    '{"area":"rotinas|mercado|instagram","nome":"até 50 caracteres","linha":"uma frase do que a tarefa entrega","acao":"verbo no infinitivo, ex.: Montar o panorama",' +
+    '{"area":"rotinas|mercado|produtos|instagram","nome":"até 50 caracteres","linha":"uma frase do que a tarefa entrega","acao":"verbo no infinitivo, ex.: Montar o panorama",' +
     '"skills":["nomes da lista de skills, se ajudarem"],"obj":"objetivo em uma frase","entrega":["o que deve voltar"],' +
     '"campos":[{"rotulo":"o que o assessor informa","dica":"exemplo","padrao":"valor já sugerido ou vazio","longo":false,"opcoes":["atalhos"],"opcional":false}],' +
     '"perguntas":[{"curto":"até 12 letras","titulo":"pergunta","opcoes":["2 a 4 respostas"]}],"fonte":"se usar dados de ativo: Análise de Ativo do CaptaMais (analise_ativo)"}. ' +
@@ -886,8 +886,10 @@
     { id: "mercado", nome: "Mercado hoje", desc: "Juros, inflação, câmbio, fatos relevantes e ativos, sempre com fonte e data.", glifo: "relevo",
       grupos: [
         { nome: "Panorama", tarefas: ["macro", "fato", "grafico"] },
-        { nome: "Ativos", tarefas: ["estudo", "acao", "setor", "fii", "rf"] },
+        { nome: "Ativos", tarefas: ["estudo", "acao", "setor", "fii"] },
       ] },
+    { id: "produtos", nome: "Produtos", desc: "O produto que chegou da mesa, destrinchado: o que é, como paga, quanto custa e o que pode dar errado.", glifo: "lente",
+      grupos: [{ nome: "Analisar", tarefas: ["raio-x", "rf"] }] },
     { id: "instagram", nome: "Marketing Profissional", desc: "Posts, vídeos e páginas para atrair clientes, com a revisão das regras feita antes de publicar.", glifo: "quadros",
       grupos: [
         { nome: "Post para Instagram", pasta: true, desc: "Do tema ao texto pronto, com a revisão das regras feita antes de publicar.", tarefas: ["post", "pauta", "calendario"] },
@@ -968,7 +970,11 @@
     "acao": { nome: "Analisar uma ação", linha: "Uma empresa pelo método: números, critérios e lacunas.", ref: "skill fundamentalista-metodo", acao: "Analisar a ação", perguntas: [USO_MERCADO] },
     "setor": { nome: "Comparar o setor", linha: "Empresas lado a lado, na mesma base.", ref: "skill comparativo-setorial", acao: "Comparar", perguntas: [USO_MERCADO] },
     "fii": { nome: "Fundo imobiliário", linha: "Imóveis, crédito, P/VP e origem dos rendimentos.", ref: "skill analise-fii", acao: "Analisar o fundo", perguntas: [USO_MERCADO] },
-    "rf": { nome: "Renda fixa", linha: "Títulos comparados com imposto e liquidez.", ref: "skill comparacao-renda-fixa", acao: "Comparar os títulos", perguntas: [USO_MERCADO] },
+    "raio-x": { nome: "Raio-X de produto", linha: "O que é, como paga, quanto custa e o que pode dar errado, a partir do material.", ref: "skills produto-raio-x e leitura-de-lamina", acao: "Fazer o raio-X", perguntas: [
+      { id: "produto", curto: "Produto", titulo: "Que produto é?", ajuda: "Muda o que a análise procura no material: garantia, cenários de pagamento, custos ou regras da oferta.",
+        opcoes: [{ t: "CDB, LCI ou LCA", d: "Banco emissor, com ou sem FGC" }, { t: "Crédito privado (CRI, CRA, debênture)", d: "Empresa emissora, sem FGC" }, { t: "Fundo ou previdência", d: "Gestor, taxas e regras de resgate" }, { t: "COE ou estruturado", d: "Cenários, barreira e teto" }, { t: "Oferta pública", d: "Prospecto, lâmina e calendário" }, { t: "Outro", d: "Título público, poupança, câmbio" }] },
+      USO_MERCADO] },
+    "rf": { nome: "Comparar produtos", linha: "Renda fixa, fundos e títulos lado a lado, líquidos de imposto.", antes: "Renda fixa", ref: "skill comparacao-renda-fixa", acao: "Comparar os produtos", perguntas: [USO_MERCADO] },
     "pauta": { nome: "Ideias para postar hoje", linha: "O que seu público procura e o que está em alta hoje, com nota de impacto.", ref: "skill pauta-de-conteudo", acao: "Montar a pauta", perguntas: [
       { id: "objetivo", curto: "Objetivo", titulo: "O que você quer com o conteúdo desta semana?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] } ] },
     "post": { nome: "Criar um post", linha: "Tema, texto e revisão das regras.", ref: "skills pauta-de-conteudo e conteudo-para-cliente", acao: "Criar o post",
@@ -1414,25 +1420,44 @@
       ],
       "fonte": "Busque os dados do ativo na Análise de Ativo do CaptaMais (analise_ativo; em ações e FIIs use pesquisa=true para trazer também múltiplos, preço-alvo das casas, relatórios resumidos e balanços) e complete com fontes oficiais. Chame analise_ativo com tipo fii e pesquisa=true e use todos os blocos que voltarem: multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias, declaradoNosRelatorios, ultimosRelatorios (aFavor e riscos), resumoPorIA e lacunas; chame também com tipo indice e IFIX na mesma janela. Composição, vacância, inadimplência e origem das distribuições vêm do relatório gerencial: se eu não colei, diga onde achar e siga com o resto. Se um bloco vier vazio, diga qual, sem inventar."
     },
-    "rf": {
-      "obj": "Comparar títulos de renda fixa na mesma base, com imposto e liquidez.",
+    "raio-x": {
+      "obj": "Destrinchar um produto antes de levar ao cliente.",
       "entrega": [
-        "Em uma frase (negrito): o que mais separa os títulos para o prazo e o perfil informados",
-        "Base em 1 linha: data da cotação, prazo do cliente, pessoa física ou jurídica",
-        "UMA tabela comparável (Título | Taxa | Prazo e carência | Liquidez | Garantia | Risco de crédito | Equivalente líquido), com a fórmula, os fatores acumulados no mesmo intervalo e as convenções em uma nota curta abaixo (use o script de cálculos da skill nos casos simples)",
+        "Em uma frase (negrito): o que é o produto, quem emite ou gere, quanto paga e por quanto tempo",
+        "Ficha em UMA tabela (Condição | O que diz o material | Onde está): emissor ou gestor, indexador e taxa, prazo e vencimento, carência e liquidez, garantia, tributação, aplicação mínima, público-alvo, custos, classificação de risco e data do material",
+        "Como paga em UMA tabela (Cenário | Condição | O que o cliente recebe), com os cenários que o próprio material define; em renda fixa simples, o fluxo de juros e amortização",
+        "Na mesma base em UMA tabela (Produto | Taxa do material | Bruto ao ano | Líquido de imposto no prazo | Equivale a % do CDI | Título público de prazo parecido), com a conta numa nota curta e a data das taxas; CDI e IPCA futuros são hipótese rotulada",
+        "Quem está por trás em UMA tabela de até 5 linhas (Indicador | Valor | Data | Fonte): números públicos do emissor ou do gestor",
+        "Encaixe em UMA tabela (Situação do cliente | Encaixe ▲ ● ▼ | Motivo), para as situações que marquei",
+        "Atenção em UMA tabela (Sinal | Status | Dado): taxa acima do mercado para o risco, liquidez só no vencimento, concentração no emissor, valor acima da cobertura do FGC, barreira ou teto de ganho, subordinação, marcação a mercado, custo sobre custo; só o encontrado ou parcial, o resto numa linha",
+        "Custos e remuneração em 2 linhas: o que o cliente paga e, se eu informei, quanto a distribuição recebe",
+        "Como apresentar: explicação em 4 frases simples e as 5 perguntas mais prováveis, com resposta de uma frase",
+        "Peças: WhatsApp de apresentação (tipo whatsapp) e, se eu pedir ou o uso for material para o cliente, folha de uma página com mesa_documento (tipo mercado: destaques, ficha e gráfico de barras da comparação)",
+        "Monitorar em UMA tabela de até 4 linhas (O que acompanhar | Hoje | Muda a leitura se | Quando sai)",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens. Em arquivo para o cliente ficam de fora o Conferir, o Próximo passo e o que é orientação para mim (vale no lugar da regra geral do PDF)"
+      ],
+      "fonte": "O material que anexei ou colei é a fonte das condições: cite a página ou o trecho. Emissor de capital aberto: analise_ativo (tipo acoes, pesquisa=true) e documentos_cvm. Fundo: analise_ativo (tipo fundo, CNPJ). Comparação: painel_macro (CDI, Selic, IPCA esperado) e taxas_tesouro (título público de prazo parecido, com a data base). Imposto, IOF e FGC: fonte primária, com a data da consulta. O que não está no material entra como sem dado, sem preencher de memória."
+    },
+    "rf": {
+      "obj": "Comparar produtos de renda fixa, fundos e títulos públicos na mesma base, com imposto e liquidez.",
+      "entrega": [
+        "Em uma frase (negrito): o que mais separa os produtos para o prazo e o perfil informados",
+        "Base em 1 linha: data das taxas, prazo do cliente, pessoa física ou jurídica",
+        "UMA tabela comparável (Produto | Taxa | Prazo e carência | Liquidez | Garantia | Risco de crédito | Equivalente líquido), com o título público de prazo parecido numa linha de referência e, numa nota curta abaixo, a fórmula, os fatores acumulados no mesmo intervalo e as convenções",
         "Sensibilidade ao prazo só nos prazos que eu informei, com hipóteses rotuladas, numa tabela curta",
-        "Atenção em UMA tabela (Sinal | Status | Título): taxa muito acima do mercado para o risco, emissor sem histórico, liquidez só no vencimento, concentração acima do limite do FGC, percentual do CDI comparado com outro indexador sem converter; só o que foi encontrado ou parcial, o resto numa linha",
+        "Atenção em UMA tabela (Sinal | Status | Produto): taxa muito acima do mercado para o risco, emissor sem histórico, liquidez só no vencimento, concentração acima do limite do FGC, percentual do CDI comparado com outro indexador sem converter; só o que foi encontrado ou parcial, o resto numa linha",
         "O que a cobertura do FGC e a saída antes do vencimento não resolvem, em 2 linhas",
         "Monitorar em UMA tabela de até 4 linhas (Indicador | Hoje | Muda a leitura se | Quando sai o dado)",
-        "Cliente: o que muda entre os títulos, sem escolher por ele, e as 3 perguntas mais difíceis com a resposta em uma frase cada",
-        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (imposto, FGC e dados que faltam, com a data da consulta), sem repetir o que já aparece acima"
+        "Cliente: o que muda entre os produtos, sem escolher por ele, e as 3 perguntas mais difíceis com a resposta em uma frase cada",
+        "Folha de uma página, se eu pedir ou se o uso for material para o cliente: mesa_documento (tipo mercado) com a tabela e o gráfico de barras do rendimento líquido no prazo (grafico tipo barras, unidade %)",
+        "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (imposto, FGC e dados que faltam, com a data da consulta), sem repetir o que já aparece acima. Em arquivo para o cliente ficam de fora o Conferir, o Próximo passo e o que é orientação para mim (vale no lugar da regra geral do PDF)"
       ],
       "insumos": [
-        "Os títulos: emissor, indexador, taxa, vencimento e liquidez",
+        "Os produtos: emissor, indexador, taxa, vencimento e liquidez",
         "Prazo do cliente e data da cotação",
         "Cliente pessoa física ou jurídica"
       ],
-      "fonte": "Taxas do dia: Tesouro Direto e ANBIMA. CDI, Selic e IPCA do período, se precisar: analise_ativo com tipo indice (CDI, IPCA). Imposto, IOF e limite do FGC: confira nas fontes primárias e cite a data da consulta; sem acesso, entregue o bruto e deixe o líquido pendente. Não projete indexador."
+      "fonte": "Condições de cada produto: o que eu colei ou anexei (lâmina, termo ou e-mail da mesa), com a página. Título público de prazo parecido: taxas_tesouro, com a data base. CDI, Selic e IPCA esperado: painel_macro; CDI e IPCA futuros entram como hipótese rotulada, não como previsão. Imposto, IOF e limite do FGC: confira nas fontes primárias e cite a data da consulta; sem acesso, entregue o bruto e deixe o líquido pendente."
     },
     "post": {
       "obj": "Criar um conteúdo educativo para o meu público, com a revisão das regras já feita.",
@@ -1464,13 +1489,16 @@
     acao: "Demonstrações (ITR, DFP) e fatos relevantes: CVM (dados.cvm.gov.br, rad.cvm.gov.br) e RI da empresa; preço, rentabilidade e, conectado, múltiplos e pesquisa das casas: Análise de Ativo do CaptaMais (analise_ativo); setor e regulação: agências e ministérios em gov.br.",
     setor: "Mesma data-base para todas as empresas: CVM (dados.cvm.gov.br) e RI de cada empresa; rentabilidade: Análise de Ativo do CaptaMais (analise_ativo); dados do setor: IBGE e a agência reguladora em gov.br.",
     fii: "Composição e distribuições: relatório gerencial e fatos relevantes do fundo (site do gestor e Fundos.NET da B3; o Claude não abre o Fundos.NET, então diga o caminho para eu abrir); regulamento e dados cadastrais: CVM; preço, P/VP e histórico: Análise de Ativo do CaptaMais (analise_ativo).",
-    rf: "Tesouro Direto: tesourodireto.com.br (taxas e preços do dia); debêntures e curvas de juros: data.anbima.com.br; limite e cobertura do FGC: fgc.org.br; tabela de imposto de renda: gov.br (Receita Federal); CDI e Selic: api.bcb.gov.br.",
+    rf: "taxas_tesouro (título público de prazo parecido, com a data base) e painel_macro (CDI, Selic, IPCA esperado); de reserva, o Tesouro Transparente (tesourotransparente.gov.br) e o SGS do Banco Central (api.bcb.gov.br); limite e cobertura do FGC: fgc.org.br; imposto de renda e IOF: a lei em planalto.gov.br.",
+    "raio-x": "fundo e oferta pública: lâmina, regulamento e prospecto na CVM (gov.br/cvm); emissor: o RI; FGC: fgc.org.br; imposto e IOF: a lei em planalto.gov.br.",
   };
   // Na opção "Conversa de WhatsApp" a lista de entrega é trocada pelas mensagens: esta linha diz o que a mensagem de cada tarefa precisa trazer.
   const NA_MENSAGEM = {
     macro: "Na mensagem não pode faltar: o número de hoje, quanto mudou desde a referência e o que isso mexe para a situação do cliente",
     fato: "Na mensagem não pode faltar: o que a empresa comunicou, o número principal e o que ainda depende de aprovação",
     grafico: "Na mensagem não pode faltar: onde o preço está na faixa do período e o nível que o mercado respeitou, com as datas",
+    "raio-x": "Na mensagem não pode faltar: o que é o produto, quanto paga e por quanto tempo, a liquidez e se tem ou não FGC",
+    rf: "Na mensagem não pode faltar: a diferença entre os produtos no mesmo prazo, já líquida de imposto, e a liquidez de cada um",
   };
   const USO_ENTREGA = (base, naMensagem) => () => {
     const uso = (estado.respostas.uso ?? [])[0] ?? "";
@@ -1490,7 +1518,7 @@
     ];
     return base;
   };
-  ["macro", "fato", "grafico", "estudo", "acao", "setor", "fii", "rf"].forEach((id) => {
+  ["macro", "fato", "grafico", "estudo", "acao", "setor", "fii", "rf", "raio-x"].forEach((id) => {
     const p = PEDIDO[id]; if (!p) return;
     if (id !== "estudo") p.entrega = USO_ENTREGA(Array.isArray(p.entrega) ? p.entrega : [], NA_MENSAGEM[id]); // o Estudo é sempre material para o cliente: não tem a pergunta de uso
     p.fonte = (p.fonte ? p.fonte + " " : "") + "Onde pesquisar, nesta ordem: " + ONDE_PESQUISAR[id] + " Cite a fonte e a data de cada número.";
@@ -1647,8 +1675,15 @@
       { rotulo: "Relatório gerencial mais recente", longo: true, opcional: true, dica: "Cole o texto ou anexe na conversa. Sem ele, uso a Análise de Ativo" },
       { rotulo: "Para que cliente ou pergunta estou olhando", opcional: true, dica: "Ex.: cliente quer renda mensal" },
     ],
+    "raio-x": [
+      { rotulo: "Produto (nome e, se tiver, ticker, código ou CNPJ)", dica: "Ex.: Tesouro IPCA+ 2032; debênture AXIA 15ª emissão; fundo e CNPJ" },
+      { rotulo: "Material do produto (lâmina, termo ou e-mail da mesa)", longo: true, opcional: true, dica: "Cole o texto aqui ou anexe o PDF pelo clipe. Sem material, uso as fontes públicas e marco o que faltar" },
+      { rotulo: "Situações de cliente que quero cobrir", padrao: "Reserva de emergência; objetivo com data marcada; renda mensal", dica: "Ex.: aposentadoria em 10 anos; caixa da empresa" },
+      { rotulo: "Argumento que a casa passou (opcional)", opcional: true, longo: true, dica: "Ex.: taxa acima dos CDBs do mesmo prazo" },
+      { rotulo: "Remuneração da distribuição (opcional)", opcional: true, dica: "Ex.: 1,5% sobre o valor aplicado; deixe vazio se não puder informar" },
+    ],
     "rf": [
-      { rotulo: "Os títulos (emissor, indexador, taxa, vencimento e liquidez)", longo: true, dica: "Ex.: CDB Banco X, 112% do CDI, 2 anos, liquidez no vencimento" },
+      { rotulo: "Os produtos (emissor, indexador, taxa, vencimento e liquidez)", longo: true, dica: "Ex.: CDB Banco X, 112% do CDI, 2 anos. Fundo ou oferta: anexe a lâmina pelo clipe" },
       { rotulo: "Prazo do cliente", opcional: true, dica: "Ex.: 2 anos" },
       { rotulo: "Cliente é", opcoes: ["Pessoa física", "Pessoa jurídica"], padrao: "Pessoa física" },
     ],
@@ -1681,7 +1716,7 @@
   ];
   const DADOS_RE = /Dados que vou te passar[^\n]*\n(?:(?:- |  )[^\n]*(?:\n|$))*/;
 
-  const SKILLS_CONHECIDAS = ["comparador-de-carteira", "primeira-reuniao", "segunda-reuniao", "relacionamento-e-indicacao", "explicar-ao-cliente", "planejamento-sucessorio", "roteiro-comercial", "relatorio-e-proposta", "calendario-de-conteudo", "pauta-de-conteudo", "landing-page-captacao", "analise-fii", "comparacao-renda-fixa", "comparativo-setorial", "conteudo-para-cliente", "diagnostico-financeiro", "estudo-de-ativo", "fundamentalista-metodo", "leitura-grafica", "macro-brasil", "objecoes", "prospeccao-abordagem", "resumo-de-fato-relevante", "retomada-lead-frio", "prospect-intake", "pre-meeting", "post-meeting", "portfolio-rebalance-review"];
+  const SKILLS_CONHECIDAS = ["comparador-de-carteira", "primeira-reuniao", "segunda-reuniao", "relacionamento-e-indicacao", "explicar-ao-cliente", "planejamento-sucessorio", "roteiro-comercial", "relatorio-e-proposta", "calendario-de-conteudo", "pauta-de-conteudo", "landing-page-captacao", "analise-fii", "comparacao-renda-fixa", "produto-raio-x", "leitura-de-lamina", "comparativo-setorial", "conteudo-para-cliente", "diagnostico-financeiro", "estudo-de-ativo", "fundamentalista-metodo", "leitura-grafica", "macro-brasil", "objecoes", "prospeccao-abordagem", "resumo-de-fato-relevante", "retomada-lead-frio", "prospect-intake", "pre-meeting", "post-meeting", "portfolio-rebalance-review"];
   let tarefasUsuario = [], tarefasQuebradas = [];
   const textoDe = (x) => (x && typeof x === "object" ? (x.t ?? x.texto ?? x.nome ?? x.rotulo ?? x.titulo ?? x.label ?? "") : x);
   const limpa = (x, n) => { const v = textoDe(x); return (typeof v === "object" ? "" : String(v ?? "")).replace(/[<>\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, n); };
@@ -1690,7 +1725,7 @@
   function validarTarefa(sp, idFixo) {
     if (!sp || typeof sp !== "object") return { erro: "O formato da tarefa veio vazio." };
     const area = AREAS.find((a) => a.id === limpa(sp.area, 20).toLowerCase());
-    if (!area) return { erro: "Escolha a área: rotinas, mercado ou instagram." };
+    if (!area) return { erro: "Escolha a área: rotinas, mercado, produtos ou instagram." };
     const nome = limpa(sp.nome, 50), linha = limpa(sp.linha, 130), acao = limpa(sp.acao, 32) || "Começar";
     if (nome.length < 3) return { erro: "A tarefa precisa de um nome." };
     const skills = lista(sp.skills, 3, 40).filter((x) => SKILLS_CONHECIDAS.includes(x));
@@ -1775,7 +1810,7 @@
   }
   const achaTarefa = (ref) => {
     const r = String(ref ?? "").trim().toLowerCase();
-    return Object.keys(T).find((id) => id.toLowerCase() === r || String(T[id].nome).toLowerCase() === r) ?? null;
+    return Object.keys(T).find((id) => id.toLowerCase() === r || String(T[id].nome).toLowerCase() === r || (!!r && String(T[id].antes ?? "").toLowerCase() === r)) ?? null; // antes: nome antigo de tarefa renomeada
   };
   // Tarefas que saíram do menu. Ficam aqui só para o histórico antigo e para quem ainda chamar pelo nome antigo:
   // a Mesa diz onde está agora o que a tarefa fazia.
@@ -1896,6 +1931,8 @@
       return `<svg viewBox="0 0 180 180" fill="none"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F6DFB2" stop-opacity=".9"/><stop offset="1" stop-color="#E8C88E" stop-opacity=".05"/></linearGradient></defs>${[78, 62, 46, 30].map((r, i) => `<circle cx="96" cy="84" r="${r}" stroke="url(#g1)" stroke-width="1" stroke-dasharray="${(i + s) % 2 ? "2 6" : "none"}"/>`).join("")}<circle cx="${x}" cy="${y}" r="4" fill="#F6DFB2"/><circle cx="96" cy="84" r="2.5" fill="#F6DFB2"/></svg>`; },
     relevo: (s) => { const px = 100 + ((s * 29) % 50) - (s ? 25 : 0), k = 1 + (s % 3) * 0.15;
       return `<svg viewBox="0 0 180 180" fill="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#F6DFB2" stop-opacity=".9"/><stop offset="1" stop-color="#E8C88E" stop-opacity=".05"/></linearGradient></defs>${Array.from({ length: 9 }, (_, i) => { const y = 40 + i * 13; return `<path d="M10 ${y} C 50 ${y - 4}, ${px - 30} ${y - (26 + i) * k}, ${px} ${y - (30 + i * 1.5) * k} S 150 ${y - 6}, 175 ${y - 2}" stroke="url(#g2)" stroke-width="1" opacity="${1 - i * 0.09}"/>`; }).join("")}</svg>`; },
+    lente: (s) => { const h = [34, 52, 26, 44].map((v, i) => v + ((s + i) % 3) * 6);
+      return `<svg viewBox="0 0 180 180" fill="none"><defs><linearGradient id="g7lente" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F6DFB2" stop-opacity=".9"/><stop offset="1" stop-color="#E8C88E" stop-opacity=".05"/></linearGradient></defs><circle cx="88" cy="80" r="52" stroke="url(#g7lente)" stroke-width="1"/><circle cx="88" cy="80" r="40" stroke="rgba(246,223,178,.18)" stroke-width="1" stroke-dasharray="2 6"/>${h.map((v, i) => `<rect x="${62 + i * 14}" y="${104 - v}" width="8" height="${v}" rx="2" fill="rgba(246,223,178,${(0.12 + i * 0.12).toFixed(2)})"/>`).join("")}<path d="M126 118 L160 152" stroke="url(#g7lente)" stroke-width="3" stroke-linecap="round"/><circle cx="134" cy="44" r="3.5" fill="#F6DFB2"/></svg>`; },
     quadros: (s) => `<svg viewBox="0 0 180 180" fill="none">${[0, 1, 2].map((i) => `<rect x="${40 + i * 14}" y="${28 + i * 14}" width="86" height="106" rx="14" fill="rgba(246,223,178,${0.015 + i * 0.02})" stroke="rgba(246,223,178,${0.22 + i * 0.28})" stroke-width="1" transform="rotate(${-10 + i * 7 + s * 6} 100 90)"/>`).join("")}<circle cx="134" cy="60" r="3.5" fill="#F6DFB2"/></svg>`,
   };
 
@@ -2129,7 +2166,7 @@
       });
       v.append(ini);
     }
-    const portas = el("div", "portas");
+    const portas = el("div", "portas grade"); portas.style.setProperty("--cols", AREAS.length);
     AREAS.forEach((a, i) => {
       const n = AREAS[i].grupos.reduce((s, g) => s + g.tarefas.length, 0);
       portas.append(porta("porta", `${GLIFOS[a.glifo](0)}<div class="n">0${i + 1} · ${n} tarefas</div><h3>${esc(a.nome)}</h3><p>${esc(a.desc)}</p><div class="ir"><b></b>Entrar</div>`,

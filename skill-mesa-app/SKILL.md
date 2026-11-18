@@ -41,7 +41,7 @@ Chame `mesa_perfil` uma vez antes da primeira pergunta. Com `configurado: true`,
 
 ### Área e tarefa
 
-Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta por vez e no máximo 4 opções: área (Rotinas do dia · Mercado hoje · Marketing Profissional), grupo e tarefa.
+Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta por vez e no máximo 4 opções: área (Rotinas do dia · Mercado hoje · Produtos · Marketing Profissional), grupo e tarefa.
 
 | Tarefa | Carregar com `carregar_metodo` |
 |---|---|
@@ -60,7 +60,8 @@ Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta 
 | Analisar uma ação | `fundamentalista-metodo` |
 | Comparar o setor | `comparativo-setorial` |
 | Fundo imobiliário | `analise-fii` |
-| Renda fixa | `comparacao-renda-fixa` |
+| Raio-X de produto | `produto-raio-x` e `leitura-de-lamina` |
+| Comparar produtos (antiga Renda fixa) | `comparacao-renda-fixa` |
 | Criar um post / post do mercado | `conteudo-para-cliente` (e `macro-brasil` no post do dia) |
 
 Peça no chat o que faltar (histórico da conversa, código do ativo, documento, tema), siga as instruções devolvidas por `carregar_metodo`, entregue como texto ou PDF (`mesa_documento`) e, no Instagram, gere as imagens com `mesa_carrossel`. Registre a tarefa com `mesa_perfil` (campo `registrar`).
