@@ -132,6 +132,56 @@ const FERRAMENTAS_VIDEO = ['Skill', 'Read', 'Write', 'Edit', 'Glob', 'Grep',
   ...['ffmpeg', 'ffprobe', 'python', 'python3', 'py', 'uv', 'node', 'npm', 'npx', 'mkdir', 'ls'].map((c) => `Bash(${c}:*)`),
   `Bash(${venv.replace(/\\/g, '/')}:*)`, `Bash(${venv}:*)`];
 const NEGADAS_VIDEO = ['Read(**/.env)', 'Write(**/.env)', 'Edit(**/.env)', 'Read(~/.claude/skills/edvid/.env)', 'Write(~/.claude/skills/edvid/.env)', 'Edit(~/.claude/skills/edvid/.env)'];
+const ARQ_STATUS_VIDEO = path.join(PASTA_DADOS, 'instalacao-video.json');
+let instalacaoVideo = null;
+const temComando = (cmd, args) => new Promise((ok) => { try { const p = spawn(cmd, args, { windowsHide: true, stdio: 'ignore' }); p.on('error', () => ok(false)); p.on('close', (c) => ok(c === 0)); } catch { ok(false); } });
+const chaveGroqGravada = () => { try { return /^[ \t]*GROQ_API_KEY[ \t]*=[ \t]*\S+/m.test(readFileSync(path.join(EDVID_DIR, '.env'), 'utf8')); } catch { return false; } };
+const lerStatusVideo = () => { try { return JSON.parse(readFileSync(ARQ_STATUS_VIDEO, 'utf8').replace(/^﻿/, '')); } catch { return null; } };
+function atualizarPathWindows() {
+  if (process.platform !== 'win32') return Promise.resolve();
+  return new Promise((ok) => {
+    execFile('powershell.exe', ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')"], { windowsHide: true, timeout: 15000 }, (e, saida) => {
+      const novo = String(saida || '').trim();
+      if (!e && novo) process.env.Path = novo;
+      ok();
+    });
+  });
+}
+async function preparoVideo() {
+  let [ffmpeg, node] = await Promise.all([temComando('ffmpeg', ['-version']), temComando('node', ['-v'])]);
+  if (!(ffmpeg && node)) { await atualizarPathWindows(); [ffmpeg, node] = await Promise.all([temComando('ffmpeg', ['-version']), temComando('node', ['-v'])]); }
+  const edvid = existsSync(path.join(EDVID_DIR, 'SKILL.md'));
+  const python = existsSync(venv);
+  const modelo = existsSync(path.join(EDVID_DIR, 'assets', 'shortform', 'node_modules'));
+  const chaveGroq = chaveGroqGravada();
+  const pronto = edvid && python && ffmpeg && node && modelo;
+  return { edvid, python, ffmpeg, node, modelo, chaveGroq, pronto, prontoParaEditar: pronto && chaveGroq, instalando: !!instalacaoVideo, status: lerStatusVideo() };
+}
+function instalarVideo() {
+  if (instalacaoVideo) return { ok: true, jaRodando: true };
+  const win = process.platform === 'win32';
+  const script = path.join(AQUI, win ? 'instalar-video.ps1' : 'instalar-video.sh');
+  if (!existsSync(script)) return { erro: 'O instalador do editor de vídeo não está nesta instalação da Mesa.' };
+  try { rmSync(ARQ_STATUS_VIDEO, { force: true }); } catch {   }
+  let p;
+  try { p = win ? spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { windowsHide: true, stdio: 'ignore' }) : spawn('bash', [script], { stdio: 'ignore' }); }
+  catch (e) { return { erro: 'Não consegui começar a instalação: ' + String(e?.message || e).slice(0, 200) }; }
+  instalacaoVideo = p;
+  const fim = async () => { await atualizarPathWindows(); instalacaoVideo = null; };
+  p.on('error', fim); p.on('close', fim);
+  return { ok: true };
+}
+function gravarChaveGroq(chave) {
+  const c = String(chave || '').trim();
+  if (!/^[A-Za-z0-9_-]{20,200}$/.test(c)) return { erro: 'Essa chave não parece certa. Copie a chave inteira, que começa com gsk_.' };
+  if (!existsSync(path.join(EDVID_DIR, 'SKILL.md'))) return { erro: 'Instale o editor de vídeo antes de salvar a chave.' };
+  const arq = path.join(EDVID_DIR, '.env');
+  let linhas = [];
+  try { linhas = readFileSync(arq, 'utf8').split(/\r?\n/).filter((l) => l && !/^\s*GROQ_API_KEY\s*=/.test(l)); } catch {   }
+  linhas.push('GROQ_API_KEY=' + c);
+  try { writeFileSync(arq, linhas.join('\n') + '\n', { mode: 0o600 }); } catch { return { erro: 'Não consegui salvar a chave neste computador.' }; }
+  return { ok: true };
+}
 function escolherArquivoDeVideo() {
   return new Promise((ok) => {
     let cmd, args;
@@ -693,11 +743,14 @@ const servidor = http.createServer(async (req, res) => {
         estado.video = { ativo: true, dir, nome: arq, usado: false }; guardarConversa();
         return json(res, 200, { ok: true, caminho: path.join(dir, arq), nome: arq, edvid: existsSync(EDVID_DIR) });
       }
+      case '/api/video/preparo': return json(res, 200, await preparoVideo());
+      case '/api/video/instalar': { const r = instalarVideo(); return json(res, r.erro ? 409 : 200, r); }
+      case '/api/video/chave': { const r = gravarChaveGroq(corpo.chave); return json(res, r.erro ? 400 : 200, r); }
       case '/api/editor': { const r = await abrirEditorEdvid(); return json(res, r.erro ? 409 : 200, r); }
       case '/api/parar': matar(filho); terminar('Interrompido.'); return json(res, 200, { ok: true });
       case '/api/open': {
         let u; try { u = new URL(String(corpo.url)); } catch { return json(res, 400, { erro: 'link inválido' }); }
-        const permitido = u.origin === new URL(CAPTAMAIS_URL).origin || u.origin === 'https://wa.me' || u.protocol === 'mailto:';
+        const permitido = u.origin === new URL(CAPTAMAIS_URL).origin || u.origin === 'https://wa.me' || u.origin === 'https://console.groq.com' || u.protocol === 'mailto:';
         if (!permitido || u.href.length > 6000) return json(res, 400, { erro: 'link não permitido' });
         const cmd = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', u.href]] : process.platform === 'darwin' ? ['open', [u.href]] : ['xdg-open', [u.href]];
         spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore', windowsHide: true }).unref();

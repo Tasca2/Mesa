@@ -262,6 +262,9 @@
     async escolherVideo() { return api("/api/escolher-video"); }
     async listarVideos() { return api("/api/videos"); }
     async usarVideo(pasta) { return api("/api/usar-video", { pasta }); }
+    async preparoVideo() { return api("/api/video/preparo"); }
+    async instalarVideo() { return api("/api/video/instalar"); }
+    async salvarChaveGroq(chave) { return api("/api/video/chave", { chave }); }
   }
   globalThis.ExtApps = { App };
 
@@ -3077,7 +3080,76 @@
 
   let app = null, conectado = false, enviando = false;
 
-  function perguntarVideo() {
+  function prepararEditor() {
+    return new Promise(async (resolve) => {
+      if (typeof app === "undefined" || !app || typeof app.preparoVideo !== "function") { resolve(true); return; }
+      let p; try { p = await app.preparoVideo(); } catch { resolve(true); return; }
+      if (p && p.prontoParaEditar) { resolve(true); return; }
+      const fundo = document.createElement("div");
+      fundo.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px";
+      const caixa = document.createElement("div");
+      caixa.setAttribute("role", "dialog"); caixa.setAttribute("aria-label", "Preparar o editor de vídeo");
+      caixa.style.cssText = "background:#17171a;color:#f3eee6;border:1px solid rgba(232,200,142,.45);border-radius:18px;padding:26px 28px;max-width:580px;width:100%;max-height:88vh;overflow:auto";
+      const h = document.createElement("h3"); h.style.cssText = "margin:0 0 8px;font-size:22px";
+      const t = document.createElement("p"); t.style.cssText = "margin:0 0 16px;font-size:14px;line-height:1.5;opacity:.85";
+      const est = document.createElement("div"); est.style.cssText = "min-height:20px;font-size:14px;margin:12px 0 0;color:#e8c88e;white-space:pre-line";
+      const campo = document.createElement("input"); campo.type = "text"; campo.autocomplete = "off"; campo.spellcheck = false; campo.placeholder = "Cole aqui a chave (começa com gsk_)";
+      campo.style.cssText = "display:none;width:100%;box-sizing:border-box;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(232,200,142,.45);background:#0f0f11;color:#f3eee6;font-size:14px";
+      const acoes = document.createElement("div"); acoes.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;margin-top:6px";
+      const mini = (rot, cls, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = rot; b.onclick = fn; return b; };
+      let relogio = null;
+      const fechar = (v) => { clearInterval(relogio); fundo.remove(); resolve(!!v); };
+      const mostrar = (...x) => { acoes.replaceChildren(...x); };
+      const cancelar = () => mini("Agora não", "mini", () => fechar(false));
+      const pedirChave = () => {
+        h.textContent = "Falta só a chave de transcrição";
+        t.textContent = "O editor ouve o seu vídeo para cortar os silêncios e criar as legendas. Só o áudio vai ao serviço Groq, que é gratuito. Abra o site, crie uma chave (Create API Key), copie e cole aqui. Ela fica guardada só neste computador.";
+        campo.style.display = ""; est.textContent = "";
+        const abrir = mini("Abrir o site da Groq", "mini", async () => { try { await app.openLink({ url: "https://console.groq.com/keys" }); } catch { est.textContent = "Abra console.groq.com/keys no navegador."; } });
+        const salvar = mini("Salvar e continuar", "mini ouro", async () => {
+          salvar.disabled = true; est.textContent = "Salvando…";
+          try { await app.salvarChaveGroq(campo.value); fechar(true); }
+          catch (e) { est.textContent = e && e.message && !/^motor /.test(e.message) ? e.message : "Não consegui salvar a chave."; salvar.disabled = false; }
+        });
+        mostrar(abrir, salvar, cancelar()); campo.focus();
+      };
+      const instalacaoFalhou = (r) => {
+        h.textContent = "A instalação terminou com pendências";
+        const erros = (r && r.status && r.status.erros) || [];
+        t.textContent = "O que não deu certo:"; est.textContent = erros.length ? "• " + erros.join("\n• ") : "Veja o arquivo instalacao-video.log na pasta .mesa-do-assessor, no seu usuário.";
+        mostrar(mini("Tentar de novo", "mini ouro", instalar), cancelar());
+      };
+      const depoisDeInstalar = (r) => { if (r && r.prontoParaEditar) { fechar(true); return; } if (r && r.pronto) { pedirChave(); return; } instalacaoFalhou(r); };
+      const instalar = async () => {
+        h.textContent = "Instalando o editor de vídeo";
+        t.textContent = "Pode levar alguns minutos e o computador pode pedir uma confirmação do Windows. Não feche esta janela.";
+        est.textContent = "Começando…"; mostrar();
+        try { await app.instalarVideo(); } catch (e) { est.textContent = e && e.message ? e.message : "Não consegui começar a instalação."; mostrar(mini("Tentar de novo", "mini ouro", instalar), cancelar()); return; }
+        relogio = setInterval(async () => {
+          let r; try { r = await app.preparoVideo(); } catch { return; }
+          const s = r && r.status;
+          if (s && s.estado === "rodando") est.textContent = "Passo " + Math.max(1, s.passo) + " de " + s.total + ": " + s.texto;
+          if (r && !r.instalando && s && (s.estado === "ok" || s.estado === "erro")) { clearInterval(relogio); relogio = null; depoisDeInstalar(r); }
+        }, 2000);
+      };
+      if (p && p.pronto) pedirChave();
+      else {
+        h.textContent = "Preparar o editor de vídeo";
+        const faltam = [!p.python && "Python", !p.ffmpeg && "ffmpeg", !p.node && "Node.js", !p.edvid && "o editor Edvid"].filter(Boolean);
+        t.textContent = "Para editar vídeo, a Mesa instala no seu computador" + (faltam.length ? ": " + faltam.join(", ") : " os programas que faltam") + ", mais o modelo de legendas. Leva alguns minutos, uma vez só.";
+        mostrar(mini("Instalar e continuar", "mini ouro", instalar), cancelar());
+      }
+      caixa.append(h, t, campo, acoes, est); fundo.append(caixa);
+      fundo.addEventListener("keydown", (e) => { if (e.key === "Escape" && !relogio) fechar(false); });
+      document.body.append(fundo);
+    });
+  }
+  async function perguntarVideo() {
+    if (!(await prepararEditor())) return "";
+    return escolherVideoModal();
+  }
+
+  function escolherVideoModal() {
     return new Promise((resolve) => {
       const fundo = document.createElement("div");
       fundo.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px";
