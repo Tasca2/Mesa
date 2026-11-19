@@ -884,7 +884,6 @@
     rf: "taxas_tesouro (título público de prazo parecido, com a data base) e painel_macro (CDI, Selic, IPCA esperado); de reserva, o Tesouro Transparente (tesourotransparente.gov.br) e o SGS do Banco Central (api.bcb.gov.br); limite e cobertura do FGC: fgc.org.br; imposto de renda e IOF: a lei em planalto.gov.br.",
     "raio-x": "fundo e oferta pública: lâmina, regulamento e prospecto na CVM (gov.br/cvm); emissor: o RI; FGC: fgc.org.br; imposto e IOF: a lei em planalto.gov.br.",
   };
-  // Na opção "Conversa de WhatsApp" a lista de entrega é trocada pelas mensagens: esta linha diz o que a mensagem de cada tarefa precisa trazer.
   const NA_MENSAGEM = {
     macro: [
       "Na mensagem não pode faltar: o número de hoje, quanto mudou desde a referência e o que isso mexe para a situação do cliente",
@@ -1111,7 +1110,6 @@
     ],
   };
   const camposDe = (id) => CAMPOS[id] ?? (PEDIDO[id]?.insumos ?? []).map((rotulo) => ({ rotulo }));
-  // "@referencias": os perfis (@nome) guardados em Minhas referências, no perfil da Mesa; sem @, a primeira linha da ficha.
   const perfisDasReferencias = () => {
     const r = String(perfil?.referencias ?? "").trim();
     const arrobas = [...new Set((r.match(/@[A-Za-z0-9._]{1,30}/g) ?? []).map((x) => x.replace(/\.+$/, "")))].slice(0, 10);
@@ -1223,9 +1221,6 @@
     }
     t.perguntas = base;
   }
-  // Tarefas que mudaram de nome, objetivo ou entrega no passo 3, com o texto que tinham na 1.13. Servem para achar a
-  // tarefa pelo nome antigo e para reconhecer, em modelo salvo e rascunho, o texto da versão anterior: a tela avisa e
-  // só troca quando o assessor pede. nome: título antigo; obj: objetivo antigo; itens: [antes, agora]; novos: [depois de, item novo].
   const TEXTO_ANTIGO = {
     "cliente-novo": { itens: [["Se ainda não houve a primeira conversa: roteiro da primeira reunião de 30 minutos, em peça separada", "Se ainda não houve a primeira conversa: diga em uma linha que a tarefa Primeira reunião monta o roteiro e a apresentação com esta ficha"]] },
     carteira: { obj: "Ver onde a carteira se afasta da referência escolhida, sem ordem de compra, venda nem imposto." },
@@ -1237,17 +1232,13 @@
     "pre-reuniao": { nome: "Pré-reunião" },
   };
   const NOMES_ANTIGOS = Object.fromEntries(Object.entries(TEXTO_ANTIGO).filter(([, a]) => a.nome).map(([id, a]) => [a.nome, id]));
-  // Nomes antigos de tarefas de Marketing que continuam no menu com outro nome (passo 6).
   const OUTROS_NOMES_ANTIGOS = { "calendário de post": "calendario" };
   const achaTarefa = (ref) => {
     const r = String(ref ?? "").trim().toLowerCase();
-    // Acha pelo id, pelo nome, pelo nome antigo guardado em "antes" (passo 7), por NOMES_ANTIGOS (passo 3) e por OUTROS_NOMES_ANTIGOS (passo 6).
     return Object.keys(T).find((id) => id.toLowerCase() === r || String(T[id].nome).toLowerCase() === r || (!!r && String(T[id].antes ?? "").toLowerCase() === r))
       ?? Object.entries(NOMES_ANTIGOS).find(([nome, id]) => nome.toLowerCase() === r && T[id])?.[1]
       ?? (T[OUTROS_NOMES_ANTIGOS[r]] ? OUTROS_NOMES_ANTIGOS[r] : null);
   };
-  // Tarefas que saíram do menu. Ficam aqui só para o histórico antigo e para quem ainda chamar pelo nome antigo:
-  // a Mesa diz onde está agora o que a tarefa fazia.
   const SAIRAM_DO_MENU = {
     "roteiro-reuniao": { nome: "Roteiro de reunião", agora: ["primeira-reuniao", "segunda-reuniao", "pre-reuniao"] },
     "post-mercado": { nome: "Post do mercado de hoje", agora: ["macro"] },
@@ -1263,8 +1254,6 @@
     const onde = agora.length > 1 ? `${agora.slice(0, -1).join(", ")} e ${agora[agora.length - 1]}` : agora[0];
     return `A tarefa «${SAIRAM_DO_MENU[id].nome}» saiu do menu da Mesa.` + (onde ? ` O que ela fazia está em ${onde}.` : "");
   };
-  // Trechos da versão anterior num texto desta tarefa (modelo salvo ou rascunho), e o texto com eles trocados pelos de
-  // hoje (título e objetivo vêm do pedido montado agora).
   const escRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const linhaRe = (l) => new RegExp(`^${escRe(l)}$`, "m");
   const tituloAntigoRe = (nome) => new RegExp(`^\\[Mesa\\] [^\\n]* › ${escRe(nome)}$`, "m");
@@ -1288,17 +1277,10 @@
   }
   const MUDOU_NA_VERSAO = { nome: "o nome da tarefa", obj: "o objetivo", itens: "a lista do que receber", opcao: "uma opção de resposta" };
   const oQueMudou = (tipos) => { const l = tipos.map((x) => MUDOU_NA_VERSAO[x]); return l.length > 1 ? `${l.slice(0, -1).join(", ")} e ${l[l.length - 1]}` : l[0] ?? ""; };
-  // Marca curta de um texto, para lembrar qual modelo salvo o assessor decidiu manter como está.
   const assinatura = (s) => { let h = 5381; for (const c of String(s)) h = (Math.imul(h, 33) ^ c.codePointAt(0)) >>> 0; return String(s).length.toString(36) + "-" + h.toString(36); };
-  // Formato de uma tarefa, gravado com o rascunho: rótulos dos campos em ordem (com as opções de cada um) e opções das
-  // perguntas do catálogo, sem as opções pessoais do assessor. Os campos do rascunho são guardados pela posição: se o
-  // formato mudou desde que o rascunho foi gravado, eles cairiam no campo errado.
   const formatoDe = (id) => assinatura(JSON.stringify([camposDe(id).map((f) => [f.rotulo, f.opcoes ?? []]),
     (BASE_PERGUNTAS[id] ?? T[id]?.perguntas ?? [RESULTADO]).map((p) => [p.id, (p.opcoes || []).map((o) => o.t)])]));
-  // O rascunho da 1.13 não guarda o formato. Tarefas cujos campos mudaram desde a 1.13 (rótulos, ordem ou opções); as
-  // que só mudaram de nome, objetivo, lista ou opção de resposta voltam como antes, com o aviso do texto antigo.
   const CAMPOS_MUDARAM_DESDE_113 = ["calendario", "carteira", "estudo", "macro", "fato", "grafico", "rf", "pauta"];
-  // Bloco "Minhas regras pessoais" do pedido de agora no lugar do bloco do texto: põe, troca ou tira.
   const REGRAS_PESSOAIS_RE = /Minhas regras pessoais \(valem[^\n]*\n(?:- [^\n]*(?:\n|$))*/;
   function trocarRegras(texto, base) {
     const novo = base.match(REGRAS_PESSOAIS_RE)?.[0];
@@ -1334,8 +1316,6 @@
     for (const [s, r] of Object.entries(o.skills ?? {}).slice(0, 20)) if (SKILLS_CONHECIDAS.includes(s)) ajustes.skills[s] = regrasLimpas(r);
     for (const [id, a] of Object.entries(o.modelosMantidos ?? {})) if (TEXTO_ANTIGO[id] && typeof a === "string") ajustes.modelosMantidos[id] = a.slice(0, 40);
   }
-  // Regras pessoais de tarefa que saiu do menu: ficam guardadas como vieram, sem valer sozinhas, e são oferecidas nas
-  // tarefas que fazem agora o papel dela até o assessor usar ou dispensar. Restaurar a tarefa antiga as apaga.
   function guardarRegrasQueSairam(id, aj) {
     const regras = SAIRAM_DO_MENU[id] ? regrasLimpas(aj?.regras) : [];
     if (regras.length) regrasGuardadas[id] = { regras, ...(aj?.avisado === true ? { avisado: true } : {}) };
@@ -1712,8 +1692,6 @@
     }
     meio.append(det, acoes, tamanho); medir();
     if (pr.modelo) meio.append(el("p", "ajuda", "Este pedido começou do seu modelo salvo. As respostas e os campos acima foram atualizados nele."));
-    // Modelo salvo ou rascunho com o texto da versão anterior, e regras guardadas de tarefa que saiu do menu: a tela
-    // avisa e só muda o texto, o modelo ou as regras quando o assessor pede.
     const avisoVersao = (texto, botoes) => {
       const d = el("div", "aviso-versao"); d.style.cssText = "margin-top:12px;padding:10px 14px;border:1px solid rgba(232,200,142,.45);border-radius:12px";
       const linha = el("div", "linha-acoes");
@@ -1984,7 +1962,6 @@
   btnHist.onclick = (ev) => { ev.stopPropagation(); abrirHistorico(); };
   function abrirDoHistorico(r) {
     if (!r?.tarefa) { alert("Essa rotina não existe mais, mas a conversa foi recuperada. Abra uma rotina para continuar."); ir("inicio"); return; }
-    // Tarefa que saiu do menu (ou tarefa própria apagada) também abre: a tela do histórico mostra a conversa e diz onde a tarefa foi parar.
     const area = [r.area, AREAS.find((a) => a.grupos.some((g) => g.tarefas.includes(r.tarefa)))?.id, estado.area].find((x) => AREAS.some((a) => a.id === x)) ?? AREAS[0].id;
     ir("acompanhar", { area, tarefa: r.tarefa, passo: 0, respostas: {}, campos: {}, historico: { nome: r.nome || SAIRAM_DO_MENU[r.tarefa]?.nome || "", em: r.em } });
     window.__mesaHistorico.fixar();
@@ -2162,9 +2139,6 @@
   window.__mesaMd = { html: mdHtml, plano: (t) => mdTexto(t, "plano"), whatsapp: (t) => mdTexto(t, "wa") };
 
   let rascunhoTimer = null;
-  // Corte do pedido ao enviar pelo painel (8.000 caracteres desde a 1.0.2, sem motivo registrado). O que passa do corte
-  // chega ao Claude sem o fim do pedido, onde ficam as regras: a tela avisa enquanto o assessor monta o pedido, sugere
-  // copiar e colar na conversa e, ao enviar, pede um segundo clique antes de mandar cortado.
   const CORTE_PEDIDO = 8000;
   let medirPedido = null, corteAvisado = "";
   const milhar = (n) => n.toLocaleString("pt-BR");
@@ -2204,13 +2178,8 @@
     let s; try { s = JSON.parse(perfil?.rascunho || ""); } catch { return false; }
     const e = s?.estado;
     if (!e || !T[e.tarefa] || !AREAS.some((a) => a.id === e.area) || Date.now() - (s.em || 0) > 14 * 864e5) return false;
-    // Tarefa cujo formato mudou desde o rascunho (no da 1.13, que não guarda o formato: campos que mudaram desde então)
-    // recomeça na primeira pergunta: os campos dela não voltam, porque cairiam no campo errado, nem o texto do pedido
-    // montado com o catálogo antigo. As respostas que ainda são opção ficam.
     const mudou = (id) => (s.formato && typeof s.formato === "object" ? s.formato[id] !== formatoDe(id) : CAMPOS_MUDARAM_DESDE_113.includes(id));
     const recomeca = mudou(e.tarefa), campos = Object.fromEntries(Object.entries(e.campos && typeof e.campos === "object" ? e.campos : {}).filter(([id]) => !mudou(id)));
-    // Resposta que deixou de ser opção (versão anterior, opção pessoal apagada) sai, com aviso, e a tela volta para a
-    // pergunta dela. Resposta de pergunta que saiu da tarefa some sem aviso: ela não muda mais o pedido.
     const t = T[e.tarefa], ps = perguntasDe(t), respostas = {}, perdidas = [];
     let passo = Math.min(Number(e.passo) || 0, Math.max(0, ps.length - 1));
     for (const [pid, v] of Object.entries(e.respostas && typeof e.respostas === "object" ? e.respostas : {})) {
@@ -2224,8 +2193,6 @@
     const tela = recomeca ? (ps.length ? "guia" : "fim") : comTexto || (e.tela === "fim" && !perdidas.length) ? "fim" : "guia";
     Object.assign(estado, { tela, area: e.area, tarefa: e.tarefa, passo: recomeca ? 0 : passo, respostas, campos });
     if (comTexto) {
-      // O texto volta como estava. Rascunho da versão anterior não diz se foi editado à mão: é editado o que não volta
-      // ao pedido (ou ao modelo salvo) de hoje depois de trocar os trechos antigos.
       const base = montarPedido(t, perguntasDe(t)), texto = String(s.texto), m = perfil?.modelos?.[e.tarefa];
       const hoje = (x) => aplicarModelo(trocarTrechos(x, e.tarefa, base), base);
       const marcas = typeof s.editado === "boolean" ? { modelo: !!s.modelo && !!m, editado: s.editado }
@@ -2276,7 +2243,6 @@
     setTimeout(() => { btn.textContent = rotulo; }, 2200);
   }
 
-  // A caixa de continuar a conversa envia até LIMITE_CAIXA caracteres. Acima disso não corta: avisa e não envia.
   const LIMITE_CAIXA = 4000;
   async function enviarMensagem(texto, st) {
     texto = texto.trim(); if (!texto) return false;

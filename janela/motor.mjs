@@ -12,8 +12,6 @@ import { acharClaude, precisaShell, ARQUIVO_MOTOR, FERRAMENTAS_WEB, PASTA_DADOS 
 import { openSync, readSync, closeSync } from 'node:fs';
 import { MAX_ANEXOS, PASTA_ANEXOS, PASTA_FONTES, tipoDoAnexo, assinaturaConfere, erroDeTamanho, dentroDe, destinoDoAnexo, argsDeFerramentas, blocoDeAnexos, pastaCofre, regrasDaMesa, argsDeMelhorar, AVISO_ARQUIVOS, ANEXO_NO_VIDEO, ANEXO_NO_VIDEO_ENVIO } from './anexos.mjs';
 import { cortarMensagem, cortarFim, paraExibir } from './corte.mjs';
-// Limites do /api/send (os mesmos de antes; agora nenhum é calado: veja corte.mjs). A mensagem vai até 40.000 caracteres;
-// as instruções da tarefa (contexto) e o texto que aparece na conversa, até 4.000.
 const LIMITE_MENSAGEM = 40000, LIMITE_CONTEXTO = 4000, LIMITE_EXIBIR = 4000;
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -93,7 +91,7 @@ const PROTOCOLO = 'Você é o assistente dentro da janela da Mesa do Assessor. A
   'Quando o Resultado for "Texto no chat", a resposta final traz o TEXTO COMPLETO da entrega, pronto para copiar, e não só um resumo; as dúvidas e o que conferir vêm depois, em poucas linhas. ' +
   'ENTREGA COMPLETA: nunca entregue só a lista ou a descrição do que cada peça contém ("3 peças entregues: roteiro, resumo..."). O texto integral e pronto de cada peça vai na resposta final, cada um em sua marca <peca>; o cartão da entrega leva o mesmo conteúdo. ' +
   'REVISÃO: antes de entregar texto para cliente ou público, confira sem promessa nem projeção de retorno, sem "compre/venda/indico", com a identificação do profissional, e com [CONFERIR] em todo número sem fonte; corrija antes de entregar.';
-const VERSAO = '1.13';
+const VERSAO = '1.14';
 const MODELOS = [['', 'Padrão do Claude Code'], ['claude-fable-5-2', 'Fable 5.2'], ['claude-opus-5-5', 'Opus 5.5'], ['claude-sonnet-5-5', 'Sonnet 5.5'], ['claude-haiku-5-5', 'Haiku 5.5']];
 const ARQ_MODELO = path.join(PASTA_DADOS, 'modelo.json');
 let modeloEscolhido = ''; let modeloUsado = '';
@@ -227,26 +225,18 @@ setInterval(() => {
 }, 2000);
 process.on('exit', () => { try { editorProc?.kill(); } catch {   } });
 
-// Anexos (PDF e imagem): a tela sobe o arquivo, o motor guarda uma cópia em Documentos › Mesa do Assessor ›
-// Anexos › dia e o pedido seguinte diz ao Claude onde ela está. Fora do vídeo, o Claude só lê as pastas
-// Anexos e Fontes da Mesa (além da própria pasta de trabalho) e não vê o terminal.
 const pastaAnexos = () => path.join(pastaBase(), PASTA_ANEXOS);
 let anexosPendentes = [];
 const anexoParaTela = (a) => ({ id: a.id, nome: a.nome, original: a.original, tipo: a.tipo, kb: a.kb });
 function pastasDeLeitura() {
   return [PASTA_ANEXOS, PASTA_FONTES].map((n) => path.join(pastaBase(), n)).filter((d) => { try { mkdirSync(d, { recursive: true }); return true; } catch { return false; } });
 }
-// Pastas que o Claude da Mesa nunca lê fora do vídeo, nem com as configurações do usuário liberando tudo: o perfil
-// da Mesa (chave do CaptaMais e segredo do motor), a pasta do Claude Code (login e conversas) e o cofre de notas.
 const PASTAS_PROIBIDAS = [PASTA_DADOS, path.join(os.homedir(), '.claude'), pastaCofre()];
 const ARQ_REGRAS = path.join(TRABALHO, 'regras-mesa.json');
-// Gravado antes de cada chamada (a pasta temporária pode ter sido limpa); se não der para gravar, a chamada não sai.
 function gravarRegras() {
   mkdirSync(TRABALHO, { recursive: true });
   writeFileSync(ARQ_REGRAS, JSON.stringify(regrasDaMesa({ pastasProibidas: PASTAS_PROIBIDAS }), null, 2));
 }
-// Modo vídeo: um vídeo escolhido e a pasta dele no disco. Nele o Claude roda como na 1.13 (terminal e leitura livre),
-// por isso não entra anexo, nem ao anexar nem ao enviar.
 const modoVideo = () => !!estado.video?.ativo && !!estado.video.dir && existsSync(estado.video.dir);
 function receberAnexo(req, res) {
   const nomeOrig = String(new URL(req.url, 'http://x').searchParams.get('nome') || '').slice(0, 200);
@@ -283,8 +273,6 @@ function receberAnexo(req, res) {
   });
   req.pipe(out);
 }
-// Tira da caixa os anexos pedidos para esta mensagem: { lista }. Se algum não está mais esperando envio ou o arquivo
-// sumiu da pasta, devolve { faltam, nomes } e já tira esses da caixa, para o próximo envio não travar no mesmo anexo.
 function separarAnexos(ids) {
   if (!Array.isArray(ids) || !ids.length) return { lista: [] };
   const unicos = [...new Set(ids.map(String))];
@@ -299,18 +287,16 @@ function separarAnexos(ids) {
   return { lista };
 }
 
-// Devolve '' quando a chamada saiu (ou virou erro na tela) e a frase da recusa quando nem começou.
 function rodarClaude(texto, contexto, exibir, anexos = []) {
   if (anexos.length && modoVideo()) return ANEXO_NO_VIDEO_ENVIO;
   estado.rodando = true; estado.inicio = Date.now(); estado.erro = '';
   estado.turnos.push({ papel: 'assessor', texto: (exibir || texto) + (anexos.length ? '\nAnexos: ' + anexos.map((a) => a.original).join(', ') : '') }); guardarConversa();
-  // Qualquer falha ao preparar a chamada vira erro na tela: a Mesa não pode ficar presa em "respondendo".
   let limite = null;
   try {
   const primeiro = !estado.sessao;
   const video = modoVideo();
   if (video) estado.video.usado = true;
-  const sistema = video ? PROTOCOLO : `${PROTOCOLO} ${AVISO_ARQUIVOS}`; // no vídeo o Claude usa o terminal e a pasta do vídeo
+  const sistema = video ? PROTOCOLO : `${PROTOCOLO} ${AVISO_ARQUIVOS}`;
   const viaShell0 = !!CLAUDE && precisaShell(CLAUDE);
   const prompt = (viaShell0 ? `${sistema}\n\n` : '') + (primeiro ? `${AVISO_JANELA}\n${contexto || ''}\n\n` : '') + blocoDeAnexos(anexos) + texto;
   if (!video) gravarRegras();
@@ -584,8 +570,6 @@ const servidor = http.createServer(async (req, res) => {
       case '/api/novo':
         if (!estado.rodando) {
           estado.sessao = null; estado.erro = '';
-          // Nova tarefa sai do modo vídeo. Fica só o vídeo escolhido para ela e ainda não usado: a janela escolhe o
-          // vídeo e só depois chama /api/novo e envia o pedido de vídeo.
           if (estado.video && estado.video.usado !== false) estado.video = null;
           if (estado.turnos.length && estado.turnos[estado.turnos.length - 1].papel !== 'sistema') estado.turnos.push({ papel: 'sistema', texto: 'Nova tarefa' });
           guardarConversa();
@@ -623,7 +607,6 @@ const servidor = http.createServer(async (req, res) => {
       }
       case '/api/send': {
         if (estado.rodando) return json(res, 409, { erro: 'O Claude ainda está respondendo.' });
-        // Acima do limite sai o miolo, nunca o fim protegido (a mensagem do assessor e as instruções); o que sair volta em "aviso".
         const msg = cortarMensagem(String(corpo.texto || '').trim(), LIMITE_MENSAGEM, corpo.fimProtegido);
         if (msg.erro) return json(res, 413, { erro: msg.erro });
         if (!msg.texto) return json(res, 400, { erro: 'vazio' });
@@ -646,7 +629,6 @@ const servidor = http.createServer(async (req, res) => {
       }
       case '/api/estado': return json(res, 200, { videos: videosAtuais(), videoAtivo: !!estado.video?.ativo, geracao: geracaoAtual(), rodando: estado.rodando, segundos: estado.rodando ? Math.round((Date.now() - estado.inicio) / 1000) : 0, turnos: estado.turnos, erro: estado.erro, anexos: anexosPendentes.map(anexoParaTela) });
       case '/api/melhorar': {
-        // Mesmo corte do /api/send (40.000). O que for cortado volta dito em "aviso", para a tela mostrar.
         const bruto = String(corpo.texto || ''), pedidoBruto = String(corpo.pedido || '');
         const texto = bruto.slice(0, 40000), pedido = pedidoBruto.slice(0, 1000);
         if (!texto || !pedido) return json(res, 400, { erro: 'vazio' });

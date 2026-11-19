@@ -25,7 +25,6 @@ const lim = (s, quebra = false) => {
 };
 const num = (i) => String(i + 1).padStart(2, '0');
 
-// ---------- Números no padrão brasileiro: os mesmos para o gráfico, a legenda e a tabela ----------
 const MULTIPLICADOR = { mil: 1e3, mi: 1e6, milhao: 1e6, milhoes: 1e6, bi: 1e9, bilhao: 1e9, bilhoes: 1e9 };
 export const casasDe = (v) => {
   if (!Number.isFinite(v)) return 0;
@@ -33,8 +32,6 @@ export const casasDe = (v) => {
   if (s.includes('e')) { const [b, e] = s.split('e'); return Math.max(0, (b.split('.')[1] || '').length - Number(e)); }
   return (s.split('.')[1] || '').length;
 };
-// "70%", "R$ 1.234,56", "-0,5 p.p.", "1,2 mi", "0,5% a.a.", "110% do CDI", 12.5 -> { v, unidade, casas, base, escala, escritas };
-// texto que não é número -> null. base: "aa", "am" ou "cdi" depois do %; escala: mil, mi ou bi; escritas: casas como escritas.
 export function lerNumero(x) {
   if (typeof x === 'number') return Number.isFinite(x) ? { v: x, unidade: '', casas: casasDe(x), base: '', escala: '', escritas: casasDe(x) } : null;
   const s = String(x ?? '').replace(/ /g, ' ').trim();
@@ -68,8 +65,6 @@ export function formatador(unidade = '', casas = 0) {
     return u ? `${sinal}${n} ${u}` : `${sinal}${n}`;
   };
 }
-// Diferença B − A, calculada pelo código. Valores que não são número (ex.: "D+0") usam o texto do item.
-// Percentual vira p.p. (também "% a.a." e "% do CDI", quando A e B têm a mesma base); "mil", "mi" e "bi" ficam na escala escrita.
 function diferenca(a, b, texto) {
   const A = lerNumero(a), B = lerNumero(b);
   if (A && B && (!A.unidade || !B.unidade)) A.unidade = B.unidade = A.unidade || B.unidade;
@@ -81,7 +76,6 @@ function diferenca(a, b, texto) {
   return { txt: (d > 0 ? '+' : '') + f(d) + e, num: true };
 }
 const passoBonito = (bruto) => { const p = 10 ** Math.floor(Math.log10(bruto || 1)), f = bruto / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
-// Tamanho conforme a quantidade de itens: menos itens, letra maior.
 const porQtd = (n, ...faixas) => (faixas.find(([ate]) => n <= ate) ?? faixas[faixas.length - 1])[1];
 
 export function imagemEmbutida(caminho, avisos, nome) {
@@ -184,15 +178,12 @@ th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .agenda{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:0 96px;margin-top:28px}.ag{display:flex;gap:30px;padding:var(--py,26px) 0;border-top:1px solid ${t.linha};align-items:center}.ag i{font-style:normal;font-family:${NUMS};font-size:40px;color:${cor};width:64px;flex:none}.ag h3{font-family:${est.titulo};font-weight:${est.peso};font-size:35px;line-height:1.2}.ag p{font-size:28px;line-height:1.45;color:${t.suave};margin-top:8px}
 .secao .corpo{justify-content:center;padding-left:60px;border-left:3px solid ${cor}}.secao .gn{font-family:${NUMS};font-size:150px;line-height:1;color:${cor};margin-bottom:18px}
 .ponte{position:absolute;left:140px;right:140px;bottom:106px;z-index:3;font-size:28px;color:${cor};letter-spacing:.01em;display:flex;gap:14px;align-items:center}.ponte::before{content:"→";font-size:32px;line-height:1}.c>.ponte{position:relative;left:auto;right:auto;bottom:auto;margin-top:20px;flex:none}
-/* rosca */
 .ros{display:flex;align-items:center;gap:110px;margin-top:20px}.ros svg{flex:none;display:block}.ros .lgs{flex:1;min-width:0}
 .ros .li{display:grid;grid-template-columns:28px 1fr auto;gap:0 28px;align-items:baseline;padding:var(--py,18px) 0;border-top:1px solid ${t.linha}}.ros .li:last-child{border-bottom:1px solid ${t.linha}}
 .ros .li i{width:26px;height:26px;border-radius:7px;align-self:center}.ros .lr{font-size:34px;line-height:1.25}.ros .lv{font-family:${NUMS};font-size:44px;line-height:1.1;text-align:right;white-space:nowrap}
 .ros .lp{font-size:28px;color:${t.suave};margin-left:16px;font-family:${CORPO}}.ros .lt{grid-column:2/4;font-size:28px;line-height:1.4;color:${t.suave};margin-top:6px}
-/* linha */
 .lin{margin-top:16px}.lin svg{display:block;overflow:visible}.lin .lg{display:flex;flex-wrap:wrap;gap:12px 48px;font-size:30px;margin-bottom:26px}.lin .lg i{display:inline-block;width:40px;height:7px;border-radius:4px;margin-right:16px;vertical-align:middle}
 .eixo{font-size:22px;fill:${t.suave};font-family:${CORPO}}.fim{font-size:34px;font-family:${NUMS}}
-/* comparativo */
 .cmp{display:grid;grid-template-columns:1fr 290px 300px 290px;grid-template-rows:auto;grid-auto-rows:1fr;align-items:stretch;margin-top:24px}.cmp>div{display:flex;flex-direction:column;justify-content:center;padding:var(--py,24px) 0;border-bottom:1px solid ${t.linha}}
 .cmp .h{font-size:24px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:${cor};padding:0 0 20px;border-bottom:2px solid ${cor};text-align:center}.cmp .h:first-child{text-align:left}
 .cmp .r{font-size:36px;line-height:1.25;padding-right:24px}.cmp .r .nt{display:block;font-size:28px;color:${t.suave};margin-top:6px}
@@ -216,7 +207,6 @@ function galeriaCss(t, est, cor) {
 
 function pvCss(t, est, cor) {
   const c2 = mixar(cor, '#ffffff', 0.42);
-  // Número grande em cor sólida: o texto com gradiente recortado deixa um fio em volta do número em leitores de PDF (MuPDF e Poppler).
   const c3 = mixar(cor, '#ffffff', 0.2);
   const tom = mixar(t.fundo, cor, 0.09);
   const cartao = `linear-gradient(165deg,${cor}33 0%,rgba(255,255,255,.025) 52%,rgba(255,255,255,0) 100%),${t.painel}`;
@@ -263,7 +253,6 @@ span.cf{background:${cor}33}
 .fatos{border:0;display:grid;gap:14px;margin-top:36px}.fato{border:1px solid ${t.linha};border-radius:18px;padding:22px 30px;background:${cartao}}.fato .r{width:230px}`;
 }
 
-// Rodapé: o cliente (quando há) e a identificação do profissional; número da página à direita.
 const rodapePagina = (m, i, n) => `<div class="pe"><div class="a">${[m.cliente, m.rodape || m.escritorio].filter(Boolean).map((x) => lim(x)).join(' · ')}</div><div class="n">${num(i)} / ${String(n).padStart(2, '0')}</div></div>`;
 const etiqueta = (s) => (s.etiqueta ? `<div class="et">${lim(s.etiqueta)}</div>` : '');
 const titulo = (s, g) => `<h2 style="font-size:${tamTitulo(s.titulo, g)}px">${lim(s.titulo)}</h2>`;
@@ -329,11 +318,9 @@ const ILUSTRACOES = {
 export const NOMES_ILUSTRACAO = Object.keys(ILUSTRACOES);
 const svgIlustracao = (nome, m) => `<svg viewBox="0 0 600 600" fill="none" stroke="${m.cor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${ILUSTRACOES[nome](m.cor, m.suave)}</svg>`;
 
-// Cores das fatias e das linhas, a partir da cor de destaque e do tema.
 const paleta = (m) => [m.cor, mixar(m.cor, m.tinta, 0.5), m.suave, mixar(m.cor, m.fundo, 0.45), mixar(m.tinta, m.fundo, 0.35), mixar(m.cor, m.tinta, 0.82), mixar(m.suave, m.fundo, 0.4), mixar(m.cor, m.fundo, 0.7)];
 const CEL_NUMERO = /^([▲▼●✓]\s*)?[+\-−–]?\s*(R\$|US\$|€)?\s*[+\-−–]?\d[\d.,]*\s*(%|p\.p\.|x|bi|mi|mil|pts?)?$|^[–—-]$/i;
 
-// Base 100 feita pelo código: a partir de níveis (preço, cota, patrimônio) ou de retornos do período (retornos: true).
 function serieLinha(s) {
   const rot = (Array.isArray(s.rotulos) ? s.rotulos : []).map((r) => String(r ?? ''));
   const ser = (Array.isArray(s.series) ? s.series : []).slice(0, 3).map((x, k) => ({ nome: String(x?.nome || `Série ${k + 1}`), valores: (Array.isArray(x?.valores) ? x.valores : []).map(numeroDe) }));
@@ -344,10 +331,8 @@ function serieLinha(s) {
   return { rotulos: rot, series: ser.map((x) => ({ ...x, valores: x.valores.map((v) => (v / x.valores[0]) * 100) })) };
 }
 
-// Rosca em % mostra a parte de cada fatia no total: se a soma não fecha 100 (folga de 1 p.p. de arredondamento), o anel mentiria.
 export const somaRuim = (soma) => `a rosca em % soma ${formatador('%', 1)(soma).replace(',0%', '%')}, e precisa somar 100%: acrescente a fatia que falta (ex.: "Outros") ou mande os valores em R$`;
 const temValor = (v) => v !== undefined && v !== null && String(v).trim() !== '';
-// Gráficos com número que não é número viram erro antes do PDF, com o motivo.
 export function problemasDosSlides(slides) {
   const out = [];
   (slides || []).forEach((s, k) => {
@@ -489,8 +474,6 @@ const LAYOUTS = {
     const fr = porQtd(k, [4, 40], [6, 34], [8, 30]), fv = porQtd(k, [4, 50], [6, 42], [8, duplo ? 32 : 34]), alt = porQtd(k, [4, duplo ? 40 : 64], [6, duplo ? 30 : 48], [8, duplo ? 22 : 36]);
     const gap = porQtd(k, [4, 44], [6, 30], [8, duplo ? 14 : 22]);
     const cores = [m.cor, m.suave], negs = [m.neg || '#E07A62', mixar(m.neg || '#E07A62', m.fundo, 0.35)];
-    // O número escrito é o enviado (com sinal e as casas dele, até 2). A trilha vai de min(0, valores) a max(100, valores):
-    // negativo sai à esquerda da linha do zero, em outra cor; acima de 100 a escala cresce e a barra nunca sai da trilha.
     const vals = its.flatMap((x) => [numeroDe(x.valor), ...(duplo ? [numeroDe(x.valor2)] : [])]).filter(Number.isFinite);
     const lo = Math.min(0, ...vals), hi = Math.max(100, ...vals), pos = (v) => Math.max(0, Math.min(100, ((v - lo) / (hi - lo || 1)) * 100)), zero = pos(0);
     const casas = Math.min(2, Math.max(0, ...its.flatMap((x) => [x.valor, x.valor2]).map((v) => lerNumero(v)?.casas ?? 0)));
@@ -619,7 +602,6 @@ export function montarPaginas(slides, marca, deslocamento = 0, total = slides.le
   const html = slides.map((s, i) => {
     const h = (LAYOUTS[s.layout] ?? LAYOUTS.frase)(s, m, i + deslocamento, total);
     if (!s.ponte) return h;
-    // A frase-ponte fecha a área de conteúdo, para nunca encostar no rodapé (que pode ter duas linhas com o nome do cliente).
     const ponte = `<div class="ponte">${lim(s.ponte)}</div>`;
     return h.includes('</div><div class="pe">') ? h.replace('</div><div class="pe">', `${ponte}</div><div class="pe">`) : h.replace(/<\/section>\s*$/, `${ponte}</section>`);
   }).join('\n');

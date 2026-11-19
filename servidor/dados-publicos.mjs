@@ -1,8 +1,3 @@
-// Dados públicos da Mesa do Assessor: Banco Central, IBGE, CVM e Tesouro Nacional consultados direto, por código, sem leitura de página.
-// painelMacro: juros, inflação, câmbio, Focus, Copom e agenda, com as variações já calculadas.
-// documentosCvm: fatos relevantes e comunicados das companhias abertas (base aberta da CVM) e o PDF de um deles.
-// taxasTesouro: taxa e preço dos títulos do Tesouro Direto na última data base (arquivo oficial do Tesouro Transparente).
-// Só módulos do Node (fetch, zlib, fs, path). Toda falha vira uma lacuna com o motivo: nenhum número é estimado.
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, renameSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -15,28 +10,20 @@ const IBGE = 'https://servicodados.ibge.gov.br/api/v3';
 const CVM_IPE = (ano) => `https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/IPE/DADOS/ipe_cia_aberta_${ano}.zip`;
 const AGENTE = 'Mozilla/5.0 (compatible; MesaDoAssessor/1.0; dados publicos)';
 
-// Séries do painel. Nome oficial e unidade conferidos no serviço de séries do Banco Central (SGS) em 18/11/2026.
-// tipo "preco": a variação é em %; tipo "taxa": a variação é a diferença em pontos percentuais.
 export const SERIES = {
   selic: { codigo: 432, nome: 'Selic (meta do Copom)', unidade: '% ao ano', tipo: 'taxa', freq: 'D', oficial: 'Taxa de juros - Meta Selic definida pelo Copom' },
   cdiAno: { codigo: 4389, nome: 'CDI ao ano', unidade: '% ao ano', tipo: 'taxa', freq: 'D', oficial: 'Taxa de juros - CDI anualizada base 252' },
-  // parcialNoMes: só a 4391 publica o mês corrente antes de ele fechar (acumulado até o último dia útil). As outras
-  // séries mensais publicam o mês fechado, às vezes dentro do próprio mês (o IGP-M sai no fim do mês de referência).
   cdiMes: { codigo: 4391, nome: 'CDI no mês', unidade: '% no mês', tipo: 'taxa', freq: 'M', acumula: true, parcialNoMes: true, oficial: 'Taxa de juros - CDI acumulada no mês' },
   ipcaMes: { codigo: 433, nome: 'IPCA do mês', unidade: '% no mês', tipo: 'taxa', freq: 'M', oficial: 'Índice nacional de preços ao consumidor-amplo (IPCA), variação % mensal' },
   ipca12m: { codigo: 13522, nome: 'IPCA em 12 meses', unidade: '% em 12 meses', tipo: 'taxa', freq: 'M', oficial: 'Índice nacional de preços ao consumidor - amplo (IPCA) - em 12 meses' },
   metaInflacao: { codigo: 13521, nome: 'Meta de inflação', unidade: '% ao ano', tipo: 'taxa', freq: 'A', oficial: 'Meta para a inflação' },
   igpmMes: { codigo: 189, nome: 'IGP-M do mês', unidade: '% no mês', tipo: 'taxa', freq: 'M', acumula: true, oficial: 'Índice geral de preços do mercado (IGP-M), variação % mensal' },
-  // Cadastro do SGS (consultado em 18/11/2026): série 1, "Taxa de câmbio - Livre - Dólar americano (venda) - diário", fonte
-  // Sisbacen PTAX800; o catálogo de dados abertos do Banco Central diz que essa taxa se chama taxa PTAX (fechamento).
   dolar: { codigo: 1, nome: 'Dólar (PTAX de fechamento, venda)', unidade: 'R$ por US$', tipo: 'preco', freq: 'D', oficial: 'Taxa de câmbio - Livre - Dólar americano (venda) - diário',
     oQueE: 'A série 1 do SGS é a taxa PTAX de fechamento, de venda, do Banco Central (fonte no cadastro: Sisbacen PTAX800): um valor por dia útil. Não é a cotação de agora nem o câmbio de varejo.' },
   euro: { codigo: 21619, nome: 'Euro (venda)', unidade: 'R$ por euro', tipo: 'preco', freq: 'D', oficial: 'Taxa de câmbio - Livre - Euro (venda)' },
   poupanca: { codigo: 195, nome: 'Poupança (rendimento no período de um mês)', unidade: '% no período', tipo: 'taxa', freq: 'D', oficial: 'Depósitos de poupança a partir de 04.05.2012 - Rentabilidade no período' },
   desemprego: { codigo: 24369, nome: 'Desemprego (PNAD Contínua, trimestre móvel)', unidade: '% da força de trabalho', tipo: 'taxa', freq: 'M', oficial: 'Taxa de desocupação - PNADC' },
 };
-// Séries usadas só nas contas dos acumulados (cadastro do SGS e do Ipeadata consultado em 18/11/2026). A 4391 é derivada
-// da 12: a fórmula do cadastro acumula, por multiplicação, os fatores diários (1 + CDI do dia) de cada mês.
 export const CDI_DIARIO = { codigo: 12, oficial: 'Taxa de juros - CDI', unidade: '% ao dia' };
 export const INDICE_IGPM = {
   url: "https://www.ipeadata.gov.br/api/odata4/ValoresSerie(SERCODIGO='IGP12_IGPM12')",
@@ -53,12 +40,11 @@ const FOCUS_DO_RECORTE = {
   'Painel completo': ['IPCA', 'Selic', 'PIB Total', 'Câmbio'], 'Juros e Copom': ['Selic', 'IPCA'], 'Inflação': ['IPCA'], 'Dólar e câmbio': ['Câmbio'],
 };
 
-// ---------- datas e números ----------
 const iso = (d) => d.toISOString().slice(0, 10);
 const utc = (s) => new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10) || 1));
 export const hojeSP = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 const br = (s) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
-const mdA = (s) => `${s.slice(5, 7)}-${s.slice(8, 10)}-${s.slice(0, 4)}`; // formato mês-dia-ano dos serviços olinda e IBGE
+const mdA = (s) => `${s.slice(5, 7)}-${s.slice(8, 10)}-${s.slice(0, 4)}`;
 const deBr = (s) => { const [d, m, a] = String(s).split('/'); return `${a}-${m}-${d}`; };
 export const somarDias = (s, n) => { const d = utc(s); d.setUTCDate(d.getUTCDate() + n); return iso(d); };
 const fimDoMesAnterior = (s) => iso(new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, 0)));
@@ -69,7 +55,6 @@ const mesAntes = (s) => {
   return iso(new Date(Date.UTC(a, m - 2, Math.min(d, ultimo))));
 };
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
-// Arredonda "para longe do zero" na casa pedida (como a conta à mão), sem o erro de ponto flutuante.
 export const arred = (x, n = 2) => {
   if (x == null || !Number.isFinite(x)) return null;
   const f = 10 ** n, r = Math.sign(x) * Math.round(Math.abs(x) * f + 1e-9) / f;
@@ -80,16 +65,11 @@ const variacao = (tipo, atual, base) => (base == null || !Number.isFinite(base) 
 const ultimoAte = (pts, limite) => { let r = null; for (const p of pts) { if (p.data <= limite) r = p; else break; } return r; };
 const sem = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 const num3 = (x) => x.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-// Os n meses (AAAA-MM) que terminam em "ate", em ordem.
 const mesesAte = (ate, n) => Array.from({ length: n }, (_, k) => iso(new Date(Date.UTC(+ate.slice(0, 4), +ate.slice(5, 7) - n + k, 1))).slice(0, 7));
-// Dias de segunda a sexta entre duas datas (sem contar as duas).
 const diasDeSemanaEntre = (a, b) => { let n = 0; for (let d = somarDias(a, 1); d < b; d = somarDias(d, 1)) { const w = utc(d).getUTCDay(); if (w > 0 && w < 6) n++; } return n; };
 
-// ---------- busca ----------
 const cache = new Map();
 const MINUTOS_DE_CACHE = 10;
-// Grava no cache e tira as entradas vencidas. Sem a limpeza o mapa cresce enquanto o servidor estiver aberto: o endereço
-// das consultas ao SGS muda a cada 10 minutos (veja recuoDaHora).
 export function guardarNoCache(mapa, chave, valor, validadeMs, agora = Date.now()) {
   for (const [k, e] of mapa) if (agora - e.em >= validadeMs) mapa.delete(k);
   mapa.set(chave, { em: agora, v: valor });
@@ -106,8 +86,6 @@ async function obter(url, { tipo = 'json', tempo = 25000, cabecalhos = {}, semCa
   return v;
 }
 const motivo = (e) => (e?.name === 'TimeoutError' ? 'o endereço não respondeu a tempo' : String(e?.message || e));
-// Tenta, em ordem, endereços equivalentes da mesma consulta. O servidor do Banco Central às vezes responde a um endereço
-// exato com HTTP 304 sem conteúdo ou com lista vazia (visto em 18/11/2026 na série 432) e responde certo ao vizinho.
 async function obterUmDe(urls, opcoes = {}) {
   let erro = '';
   for (let t = 0; t < urls.length; t++) {
@@ -123,10 +101,6 @@ async function obterUmDe(urls, opcoes = {}) {
 }
 
 const urlSgs = (codigo, de, ate) => `${SGS}.${codigo}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(ate)}`;
-// O SGS guarda a resposta de cada consulta (série, início e fim) por horas: em 18/11/2026 a mesma consulta voltou sem o
-// dado do dia anterior, e outra voltou com HTTP 304 vazio. Por isso o início recua um dia a cada 10 minutos do dia
-// (a consulta é nova a cada 10 minutos) e, se falhar, recua mais 144 dias. Recuar o início não muda as contas, que só
-// usam do ano anterior em diante.
 export const recuoDaHora = (agora = new Date()) => {
   const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(agora).split(':').map(Number);
   return Math.floor((h * 60 + m) / 10);
@@ -139,11 +113,6 @@ async function serieSgs(codigo, de, ate) {
 }
 const urlOlinda = (recurso, filtro, extra = {}) => `${OLINDA}/${recurso}?` + new URLSearchParams({ $filter: filtro, $format: 'json', $top: '5000', ...extra }).toString().replace(/\+/g, '%20');
 
-// ---------- contas ----------
-// Um indicador com o último valor e as variações já calculadas: no dia (contra o dado anterior), no mês (contra o
-// último dado do mês anterior; em série mensal, contra o mês anterior), no ano (contra o último dado do ano anterior)
-// e contra a referência escolhida. Só na série que publica o mês antes de ele fechar (parcialNoMes: o CDI do mês, 4391),
-// o mês corrente fica à parte (mesEmAndamento); nas outras, o dado do mês corrente já é o mês fechado e é o último dado.
 export function calcularIndicador(def, pontosBrutos, comparar = 'Mês passado', { hoje = hojeSP() } = {}) {
   const ref = REFERENCIAS.includes(comparar) ? comparar : 'Mês passado';
   let pts = (pontosBrutos || []).filter((p) => p && Number.isFinite(p.valor) && p.data <= hoje).sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
@@ -160,7 +129,6 @@ export function calcularIndicador(def, pontosBrutos, comparar = 'Mês passado', 
   if (def.freq === 'D') {
     dia = contra(anterior);
     if (dia) {
-      // "No dia" é contra o dado anterior, que pode não ser o dia útil anterior: o rótulo diz as duas datas.
       dia.rotulo = `de ${br(anterior.data)} a ${br(u.data)}`;
       const n = diasDeSemanaEntre(anterior.data, u.data);
       if (n) dia.nota = `entre as duas datas há ${n} ${n > 1 ? 'dias' : 'dia'} de semana sem dado (feriado ou dado ainda não publicado): a variação cobre todo esse intervalo`;
@@ -194,9 +162,6 @@ export function calcularIndicador(def, pontosBrutos, comparar = 'Mês passado', 
   }
   return r;
 }
-// Composição dos meses publicados. As séries mensais vêm arredondadas em 2 casas, e a conta com elas pode diferir em
-// alguns centésimos do número oficial (em 18/11/2026: IGP-M em 12 meses 5,25% aqui contra 5,24% da FGV; CDI 14,23%
-// contra 14,24%). Por isso fica marcada como aproximada e só vale quando a conta oficial (abaixo) não puder ser feita.
 function composicao(lista) {
   if (!lista.length) return null;
   const f = lista.reduce((a, p) => a * (1 + p.valor / 100), 1);
@@ -205,10 +170,6 @@ function composicao(lista) {
     conta: `composição das ${lista.length} variações mensais (de ${lista[0].data.slice(0, 7)} a ${lista.at(-1).data.slice(0, 7)}): (1 + mês 1) × (1 + mês 2) × … − 1` };
 }
 
-// CDI acumulado no ano e em 12 meses pela composição dos fatores diários da série 12 (Taxa de juros - CDI, % ao dia): é
-// a conta da própria série 4391 (fórmula do cadastro do SGS) e a da Calculadora do Cidadão do Banco Central (em
-// 18/11/2026, de nov/2025 a out/2026: 14,243757% nas duas). Cada mês da janela é conferido com a 4391; se faltar dia ou
-// um mês não bater, aquele acumulado fica pela composição dos meses, marcada como aproximada, e a lacuna diz o motivo.
 export function acumuladosDoCdi(ind, dias, meses, lacunas, { consulta, erro } = {}) {
   if (!ind) return ind;
   if (!Array.isArray(dias) || !dias.length) {
@@ -244,9 +205,6 @@ export function acumuladosDoCdi(ind, dias, meses, lacunas, { consulta, erro } = 
   return r;
 }
 
-// IGP-M acumulado no ano e em 12 meses pelo número-índice da FGV (IGP-M geral, ago. 1994 = 100), como a FGV divulga: em
-// 18/11/2026 o índice dá 4,97% no ano e 5,24% em 12 meses, os números do release de 29/10/2026. O mês do índice é
-// conferido com a série 189 antes de usar; se faltar o mês ou não bater, ficam os meses compostos, marcados como aproximados.
 export function acumuladosDoIgpm(ind, indice, lacunas, { consulta, erro } = {}) {
   if (!ind) return ind;
   const item = 'IGP-M acumulado (número-índice da FGV)', depois = 'os acumulados ficam pela composição dos meses, aproximada';
@@ -272,14 +230,12 @@ export function acumuladosDoIgpm(ind, indice, lacunas, { consulta, erro } = {}) 
   return r;
 }
 
-// Juro real: (1 + Selic) ÷ (1 + inflação) − 1, com a conta escrita.
 export function juroReal(selic, inflacao) {
   if (!Number.isFinite(selic) || !Number.isFinite(inflacao)) return null;
   const valor = arred(((1 + selic / 100) / (1 + inflacao / 100) - 1) * 100);
   return { valor, conta: `(1 + ${pct(selic)}) ÷ (1 + ${pct(inflacao)}) − 1 = ${pct(valor)}` };
 }
 
-// Focus: a data mais recente com estatística e a última data até 28 dias antes dela (a coluna "há 4 semanas").
 export function escolherDatasFocus(datas) {
   const ds = [...new Set((datas || []).filter(Boolean))].sort();
   if (!ds.length) return { atual: null, quatroSemanas: null };
@@ -295,7 +251,6 @@ export function limparHtml(s) {
     .replace(/[\u200b\u00a0]/g, ' ').replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{2,}/g, '\n').trim();
 }
 
-// Decisão (a frase "O Copom decidiu ...") e placar (nomes listados depois de "Votaram ..." ou "Votou ...").
 export function lerComunicado(texto) {
   const t = String(texto || '').replace(/\s+/g, ' ');
   const decisao = (t.match(/O Copom decidiu[\s\S]*?\.(?=\s+[A-ZÀ-Ú]|\s*$)/) || [])[0] ?? null;
@@ -315,8 +270,6 @@ const AGENDA = [
   ['Pesquisa Mensal de Serviços', 'Volume de serviços'],
   ['Pesquisa Industrial Mensal: Produção Física - Brasil', 'Produção industrial'],
 ].map(([t, n]) => [sem(t), n]);
-// O calendário do IBGE publica "dd/mm/aaaa hh:mm:ss" em UTC: em 12/11/2026 ele dizia 12:00:00 para o IPCA, e a notícia
-// do IBGE sobre esse IPCA saiu às 09:00:00. Aqui a data e a hora passam para o horário de Brasília.
 const deUtc = (s) => {
   const m = String(s || '').match(/^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?/);
   if (!m) return null;
@@ -327,7 +280,6 @@ const deUtc = (s) => {
     hora: new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(t),
   };
 };
-// Divulgações do IBGE que mexem com a conversa do assessor, de hoje até `dias` à frente, em ordem de data (horário de Brasília).
 export function filtrarAgenda(itens, hoje, dias = 30) {
   const ate = somarDias(hoje, dias), dois = (n) => String(n).padStart(2, '0');
   return (itens || []).map((x) => {
@@ -343,7 +295,6 @@ export function filtrarAgenda(itens, hoje, dias = 30) {
   }).filter(Boolean).sort((a, b) => a.data.localeCompare(b.data) || a.divulgacao.localeCompare(b.divulgacao));
 }
 
-// ---------- painel ----------
 async function blocoFocus(hoje, recorte, lacunas) {
   const ano = +hoje.slice(0, 4), desde = somarDias(hoje, -60 - recuoDaHora()), quais = FOCUS_DO_RECORTE[recorte];
   try {
@@ -424,8 +375,6 @@ async function blocoAgenda(hoje, lacunas) {
   }
 }
 
-// Junta a série 1 com o serviço PTAX: todos os dias que o serviço já tem e a série ainda não (não só o último) entram com
-// o valor do serviço, para a variação "no dia" comparar dias seguidos; nos dias que os dois têm, o valor precisa ser igual.
 export function juntarPtax(pts, cotacoes) {
   const porDia = new Map();
   for (const c of [...(cotacoes || [])].sort((a, b) => String(a.dataHoraCotacao).localeCompare(String(b.dataHoraCotacao)))) {
@@ -448,7 +397,6 @@ export function juntarPtax(pts, cotacoes) {
   };
 }
 
-// Dólar: a série 1 do SGS é conferida no serviço PTAX (mesmo dia e mesmo valor). Os dias que só o PTAX já tem entram.
 async function conferirPtax(pts, hoje, lacunas) {
   const ptax = (de) => `${OLINDA}/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@dataInicial='${mdA(de)}'&@dataFinalCotacao='${mdA(hoje)}'&$format=json`;
   try {
@@ -465,7 +413,6 @@ async function conferirPtax(pts, hoje, lacunas) {
   }
 }
 
-// IPCA de conferência no IBGE (tabela 1737): variação do mês, acumulada no ano e em 12 meses.
 async function conferirIbge(lacunas) {
   try {
     const { url, v: j } = await obterUmDe(['-2', '-3'].map((p) => `${IBGE}/agregados/1737/periodos/${p}/variaveis/63%7C69%7C2265?localidades=N1%5Ball%5D`));
@@ -488,8 +435,7 @@ export async function painelMacro({ recorte, comparar } = {}, opcoes = {}) {
   const ids = RECORTES[rec];
   const comJuroReal = rec !== 'Dólar e câmbio';
   const buscar = [...new Set([...ids, ...(comJuroReal ? ['selic', 'ipca12m'] : [])])];
-  const de = `${+hoje.slice(0, 4) - 1}-01-01`; // o ano anterior inteiro: cobre o início do ano e os 12 meses
-  // As contas oficiais dos acumulados: o CDI de cada dia (série 12) e o número-índice do IGP-M (FGV, pelo Ipeadata).
+  const de = `${+hoje.slice(0, 4) - 1}-01-01`;
   const indiceIgpm = async () => {
     const j = await obter(INDICE_IGPM.url, { tempo: 30000 });
     if (!Array.isArray(j?.value)) throw new Error('o Ipeadata não devolveu a lista de valores');
@@ -543,8 +489,6 @@ export async function painelMacro({ recorte, comparar } = {}, opcoes = {}) {
   };
 }
 
-// ---------- CVM ----------
-// Lê um arquivo compactado (zip) pelo diretório central e abre cada arquivo com zlib (sem dependência).
 export function lerZip(buf) {
   let fim = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 65535); i--) if (buf.readUInt32LE(i) === 0x06054b50) { fim = i; break; }
@@ -570,7 +514,6 @@ export function lerZip(buf) {
   return arquivos;
 }
 
-// CSV com separador ";" (o da CVM). Aspas só valem quando abrem o campo.
 export function lerCsv(texto, sep = ';') {
   const linhas = []; let linha = [], campo = '', aspas = false;
   for (let i = 0; i < texto.length; i++) {
@@ -609,8 +552,6 @@ export function documentosDoCsv(texto) {
 
 const SUFIXOS = /\b(S A|SA|S A EM RECUPERACAO JUDICIAL|EM RECUPERACAO JUDICIAL|CIA|COMPANHIA)\b/g;
 const semSufixo = (s) => sem(s).replace(/\bS A\b|\bSA\b|\bS\/A\b/g, ' ').replace(/\s+/g, ' ').trim();
-// Escolhe a companhia: pelo CNPJ (inteiro ou raiz) ou pelo nome. Pelo nome, só escolhe sozinho quando há um nome igual ao
-// pedido ou uma única companhia que tem todas as palavras; senão devolve as candidatas para chamar de novo com o CNPJ.
 export function filtrarDocumentos(docs, { empresa, tipos, quantidade } = {}) {
   const q = String(empresa ?? '').trim(), digitos = q.replace(/\D/g, '');
   const empresas = new Map();
@@ -639,7 +580,6 @@ export function filtrarDocumentos(docs, { empresa, tipos, quantidade } = {}) {
   };
 }
 
-// PDF inteiro: começa com %PDF-, termina com %%EOF e, se for linearizado, tem o tamanho que ele mesmo declara.
 export function ehPdfCompleto(b) {
   if (!Buffer.isBuffer(b) || b.length < 16 || b.subarray(0, 5).toString('latin1') !== '%PDF-') return false;
   if (!b.subarray(Math.max(0, b.length - 1024)).toString('latin1').includes('%%EOF')) return false;
@@ -666,9 +606,6 @@ async function baseCvm(ano) {
 }
 
 const nomeArquivo = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'documento';
-// O link do sistema Rad da CVM devolve o PDF com etiqueta de página (text/html) e, em boa parte dos pedidos, devolve a
-// casca da página em vez do documento (em 18/11/2026, de 14 pedidos espaçados, 4 trouxeram o PDF; repetir com o cookie
-// da sessão não ajudou). Tenta até 8 vezes, em cerca de 30 segundos, e só grava quando o arquivo chega inteiro.
 const TENTATIVAS_RAD = 8;
 const linkDaCvm = (u) => { try { const x = new URL(u); return x.protocol === 'https:' && /(^|\.)cvm\.gov\.br$/.test(x.hostname); } catch { return false; } };
 async function baixarPdf(doc, pasta) {
@@ -686,7 +623,7 @@ async function baixarPdf(doc, pasta) {
       }
       erro = !r.ok ? `HTTP ${r.status}` : b.subarray(0, 5).toString('latin1') === '%PDF-' ? 'o PDF chegou cortado' : 'a CVM devolveu uma página em vez do documento';
     } catch (e) { erro = motivo(e); }
-    if (t < TENTATIVAS_RAD) await espera(1000 * t); // espera crescente: as falhas vêm em sequência
+    if (t < TENTATIVAS_RAD) await espera(1000 * t);
   }
   throw new Error(`${erro} (${TENTATIVAS_RAD} tentativas)`);
 }
@@ -699,7 +636,7 @@ export async function documentosCvm({ empresa, tipos, quantidade, protocolo } = 
   let base, docs = [];
   try { base = await baseCvm(ano); docs = base.docs; } catch (e) {
     lacunas.push({ item: `base de documentos da CVM de ${ano}`, motivo: motivo(e) });
-    if (!inicioDoAno) return vazio(lacunas); // em janeiro e fevereiro a base do ano novo pode não ter saído: segue com a do ano anterior
+    if (!inicioDoAno) return vazio(lacunas);
   }
   if (inicioDoAno) {
     try { const ant = await baseCvm(ano - 1); docs = [...docs, ...ant.docs]; base = base || ant; } catch (e) { lacunas.push({ item: `base de documentos da CVM de ${ano - 1}`, motivo: motivo(e) }); }
@@ -728,19 +665,12 @@ export async function documentosCvm({ empresa, tipos, quantidade, protocolo } = 
   return { ...info, empresa: r.empresa, candidatas: r.candidatas, categorias: Array.isArray(tipos) && tipos.length ? tipos : ['Fato Relevante', 'Comunicado ao Mercado'], documentos: r.documentos, lacunas };
 }
 
-// ---------- Tesouro Direto: taxas e preços do dia ----------
-// Arquivo oficial "Preço e taxa dos títulos do Tesouro Direto" do Tesouro Transparente (licença aberta ODbL): o histórico
-// inteiro num CSV de 14,7 MB, com uma data base por dia útil. O JSON do site do Tesouro Direto fica em /o/, que o robots.txt
-// do site fecha para robôs; por isso a ferramenta lê este arquivo. Formato conferido em 18/11/2026: ";" entre colunas,
-// vírgula decimal, datas DD/MM/AAAA, a data mais nova primeiro (a ordem não é documentada, então a leitura não depende dela).
-// Definições das colunas: PDF de metadados do mesmo conjunto (taxa.pdf).
 export const TESOURO_CSV = process.env.MESA_TESOURO_URL ||
   'https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/PrecoTaxaTesouroDireto.csv';
 const FONTE_TESOURO = 'Tesouro Transparente (Tesouro Nacional), arquivo PrecoTaxaTesouroDireto';
 const MINUTOS_TESOURO = 30;
 const COLUNAS_TESOURO = { tipo: 'Tipo Titulo', vencimento: 'Data Vencimento', dataBase: 'Data Base', taxaCompra: 'Taxa Compra Manha',
   taxaVenda: 'Taxa Venda Manha', puCompra: 'PU Compra Manha', puVenda: 'PU Venda Manha', puBase: 'PU Base Manha' };
-// Ordem dos tipos na lista e nos títulos de prazo parecido. Renda+ e Educa+ ficam fora dos parecidos: pagam renda mensal.
 const TIPOS_TESOURO = ['Tesouro Prefixado', 'Tesouro Prefixado com Juros Semestrais', 'Tesouro IPCA+', 'Tesouro IPCA+ com Juros Semestrais',
   'Tesouro Selic', 'Tesouro IGPM+ com Juros Semestrais', 'Tesouro Renda+ Aposentadoria Extra', 'Tesouro Educa+'];
 const PARECIDOS_TESOURO = TIPOS_TESOURO.slice(0, 6);
@@ -755,8 +685,6 @@ const numBr = (s) => {
 };
 const diasEntre = (a, b) => Math.round((utc(a) - utc(b)) / 86400000);
 const diaEmSP = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(ms));
-// O Renda+ paga 240 parcelas mensais e o Educa+ 60, de janeiro do ano do nome até o vencimento em dezembro
-// (documentos "Tesouro RendA+" e "Tesouro Educa+" do Tesouro Direto, conferidos em 18/11/2026). O ano do nome não é o do vencimento.
 const RENDA_MENSAL = { RENDA: { anos: 20, parcelas: 240 }, EDUCA: { anos: 5, parcelas: 60 } };
 const rendaMensal = (tipo) => (/\bRENDA\b/.test(sem(tipo)) ? RENDA_MENSAL.RENDA : /\bEDUCA\b/.test(sem(tipo)) ? RENDA_MENSAL.EDUCA : null);
 
@@ -798,7 +726,6 @@ const completarTitulo = (t) => ({
 });
 const ordemTipo = (tipo) => { const i = TIPOS_TESOURO.findIndex((x) => chaveTipo(x) === chaveTipo(tipo)); return i < 0 ? 99 : i; };
 
-// Lê o CSV e devolve só a data base mais recente. Coluna que mudou de nome vira erro com o nome dela: nada é adivinhado.
 export function lerTesouro(texto) {
   const linhas = String(texto ?? '').replace(/^﻿/, '').split(/\r?\n/);
   const cab = (linhas[0] || '').split(';').map(sem);
@@ -824,7 +751,6 @@ export function lerTesouro(texto) {
   return { dataBase: maior, titulos };
 }
 
-// Nomes do site e nomes antigos. "NTN-B" sozinho é o com juros semestrais; "NTN-B Principal" é o IPCA+ sem cupom.
 const NOMES_ANTIGOS = [
   [/\bNTN ?B ?PRINCIPAL\b|\bNTNB ?P\b/, 'Tesouro IPCA+'], [/\bNTN ?B\b|\bNTNB\b/, 'Tesouro IPCA+ com Juros Semestrais'],
   [/\bNTN ?F\b|\bNTNF\b/, 'Tesouro Prefixado com Juros Semestrais'], [/\bNTN ?C\b|\bNTNC\b/, 'Tesouro IGPM+ com Juros Semestrais'],
@@ -887,7 +813,6 @@ export function acharTitulo(titulos, consulta, { vencimento } = {}) {
   return nada(tipo ? 'diga o ano ou a data de vencimento do título' : 'diga o tipo e o ano do título, por exemplo "Tesouro IPCA+ 2035"', tipo ? doTipo : []);
 }
 
-// O título de vencimento mais perto do alvo em cada tipo (empate: o que vence antes).
 export function parecidos(titulos, alvo, { indexador, excluir } = {}) {
   const r = [];
   for (const tipo of PARECIDOS_TESOURO) {
@@ -907,9 +832,6 @@ export function parecidos(titulos, alvo, { indexador, excluir } = {}) {
   return r;
 }
 
-// Cópia do dia: um arquivo tesouro-AAAA-MM-DD.json na pasta de cache da Mesa, com os títulos da última data base, o ETag e a
-// data de alteração do arquivo. Dentro de 30 minutos a cópia vale sem ir à rede; depois a Mesa pergunta ao servidor se o
-// arquivo mudou (If-None-Match e If-Modified-Since) e só baixa os 14,7 MB de novo se mudou. Gravar a cópia apaga as de outros dias.
 let memoriaTesouro = null;
 export const limparMemoriaTesouro = () => { memoriaTesouro = null; };
 const ARQUIVO_TESOURO = /^tesouro-(\d{4}-\d{2}-\d{2})\.json$/;

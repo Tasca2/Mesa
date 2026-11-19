@@ -67,13 +67,9 @@ async function renderizar(html, saida, tipo, [w, h]) {
   } finally { try { rmSync(tmp, { recursive: true, force: true }); } catch {   } }
 }
 
-// ---------- Carrossel e arte de Instagram (mesa_carrossel) ----------
 
-// Tipos de slide. capa e fechamento levam a foto, o nome e o cargo do assessor (do perfil); os outros variam o ritmo.
 const TIPOS_SLIDE = ['capa', 'conteudo', 'numero', 'lista', 'comparacao', 'passos', 'citacao', 'fechamento'];
 
-// Maior tamanho de letra (de base até min, de 2 em 2) em que os textos cabem na altura dada, um embaixo do outro.
-// Estimativa: largura média de um caractere em "em" e 10% a mais de linha pela quebra de palavra.
 const linhasDe = (t, f, largura, em) => String(t ?? '').split('\n')
   .reduce((n, p) => n + Math.max(1, Math.ceil((p.length * 1.1) / Math.max(1, Math.floor(largura / (f * em))))), 0);
 const caberLista = (textos, base, min, largura, altura, lh = 1.2, em = 0.55, gap = 0) => {
@@ -86,7 +82,6 @@ const caberLista = (textos, base, min, largura, altura, lh = 1.2, em = 0.55, gap
 };
 const caber = (t, base, min, largura, altura, lh, em) => caberLista([t], base, min, largura, altura, lh, em);
 
-// Contraste entre duas cores (fórmula do WCAG); abaixo de 3, a cor da marca não serve para texto sobre o fundo.
 const luminancia = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
   .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)).reduce((s, c, k) => s + c * [0.2126, 0.7152, 0.0722][k], 0);
 const contraste = (a, b) => { const [x, y] = [luminancia(a), luminancia(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
@@ -98,8 +93,6 @@ function autorHtml(ctx, grande = false) {
   return `<div class="autor${grande ? ' grande' : ''}">${rosto}<div class="quem">${ctx.nome ? `<b>${esc(ctx.nome)}</b>` : ''}${ctx.cargo ? `<span>${esc(ctx.cargo)}</span>` : ''}</div></div>`;
 }
 
-// Rede de segurança: no navegador, se o texto passar da área do slide, todas as letras com tamanho calculado diminuem
-// juntas até caber (o cálculo acima é estimativa). Vai no HTML de cada imagem e do PDF.
 const AJUSTAR = '<script>for (const c of document.querySelectorAll(".corpo")) { const el = [...c.querySelectorAll("[style*=font-size]")]; ' +
   'for (let k = 0; k < 24 && c.scrollHeight > c.clientHeight + 2; k++) for (const e of el) e.style.fontSize = Math.max(16, parseFloat(e.style.fontSize) * 0.94) + "px"; }</script>';
 
@@ -195,7 +188,6 @@ blockquote{font-weight:600;line-height:1.3;word-break:break-word}.autoria{font-s
 .seta{font-size:54px;color:${corTexto};line-height:1}`;
 }
 
-// Monta o HTML de cada slide, sem gerar arquivo. marcaBase: a marca do perfil (tema, cor, foto) com nome, cargo e escritório.
 export function montarCarrossel(a, marcaBase = {}) {
   const slides = Array.isArray(a.slides) ? a.slides.slice(0, 10) : [];
   if (!slides.length) throw new Error('Envie pelo menos um slide.');
@@ -217,9 +209,6 @@ export function montarCarrossel(a, marcaBase = {}) {
   return { W, H, css: cssCarrossel(ctx), slides: slides.map((s, i) => slideHtml(s, i, slides.length, ctx)), avisos };
 }
 
-// Trava de palavras do carrossel: a imagem vai direto ao público, então todo texto do slide passa pela lista do material
-// de mercado (promessa, risco zero, superlativo) e rentabilidade ou retorno pede o período no mesmo slide. A fonte e o
-// rodapé também saem na imagem: passam pela lista, mas não contam como afirmação de retorno. [CONFERIR] não libera.
 const textosDoSlide = (s) => [s.titulo, s.texto, s.destaque, s.autor,
   ...(s.itens || []).flatMap((x) => (typeof x === 'string' ? [x] : [x?.titulo, x?.texto])),
   ...(s.colunas || []).flatMap((c) => [c?.titulo, c?.texto, ...(c?.itens || [])]),
@@ -246,9 +235,6 @@ export function revisarCarrossel(slides, termosConfirmados = [], rodape = '') {
   return achados;
 }
 
-// Pasta pedida pelo Claude (ex.: "Semana de 23-11/1-seg-tema"), sempre dentro de base: cada parte só com letras, números,
-// espaço, ponto, hífen e sublinhado; até 3 partes de 60 caracteres; nome reservado do Windows ganha "_" na frente.
-// Pasta que já tem arquivo não é sobrescrita: ganha " (2)", " (3)"... Sem nada que sobre, devolve null.
 const RESERVADOS = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 export function resolverPasta(base, pedido) {
   const partes = String(pedido ?? '').split(/[\\/]+/)
@@ -292,11 +278,9 @@ export async function gerarCarrossel(a, marcaBase = {}) {
   return r;
 }
 
-// Tipos de material: decidem a trava de palavras dos slides e o aviso da folha A4.
 export const TIPOS_MATERIAL = ['reuniao', 'carteira', 'relatorio', 'proposta', 'diagnostico', 'estudo', 'mercado', 'geral'];
 
 const SEMACENTO = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-// Lista completa: material de reunião e institucional, em que a frase pode afirmar algo que o assessor não disse.
 const TERMOS_RISCO = [
   ['independên', /independen/], ['sem custo / gratuito', /sem custo|custo zero|gratuit|sem cobranca|sem taxa/], ['sem surpresa', /sem surpresa/],
   ['custo embutido / como o cliente é informado', /embutid|voce sabe|sabe como|desde o (primeiro dia|inicio|comeco)|direito de perguntar|informado antes|declarado antes|totalmente transparente|transparencia total|transparentes?\b|sem letras miudas/],
@@ -306,19 +290,12 @@ const TERMOS_RISCO = [
   ['superlativo', /\b(o|a|os|as) melhor(es)?\b|\bmelhor (assessor|escritorio|opcao|carteira|solucao|do mercado)|visibilidade total|boas maos|equipe completa|multidisciplinar|\bunic[oa]s?\b|exclusiv|\blider|premiad|referencia (do|no) mercado/],
   ['risco', /sem risco|risco zero|seguranca total/], ['retorno', /rentabilidade|retorno (de|acima)|\brende\b|\brendimento (de|acima)/],
 ];
-// Lista menor do material de mercado (estudo, juros, fato relevante): fonte, órgão e rentabilidade com período passam;
-// promessa, risco zero e superlativo continuam barrados.
 const TERMOS_RISCO_MERCADO = [
   ['promessa de retorno', /garantia de (retorno|rentabilidade|resultado|lucro|ganho|rendimento)|(retorno|rentabilidade|resultado|lucro|ganho|rendimento)s? (garantid|cert[oa]s?\b|assegurad)|garantimos|\bgarante (o |a )?(retorno|rentabilidade|resultado|lucro|ganho)|\bvai render\b|\brendera\b|\b(acao|acoes|papel|papeis|ativo|ativos|fundo|fundos|cota|cotas|carteira|bolsa|ibovespa|investimento|investimentos|aplicacao|aplicacoes|titulo|titulos|preco|precos|patrimonio|dinheiro|[a-z]{4}\d{1,2})\b[^.;:!?]{0,40}?\b(vai (subir|disparar|valorizar|dobrar)|subira|valorizara|disparara|dobrara)\b|valorizacao (garantida|certa)|nao tem como perder|dinheiro facil|ganho facil/],
   ['risco', /sem risco|risco zero|zero risco|seguranca total|100% segur/],
-  // "o/a melhor" barra antes de produto, de "do/da" (a melhor do ano, da bolsa) e no fim da frase; o resultado da
-  // própria empresa contra o próprio histórico ("o melhor resultado trimestral desde 2019") passa.
   ['superlativo', /\b(o|a|os|as) melhor(es)?(?= (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|carteiras|momento|hora|oportunidade|escolha|escolhas|relacao|alternativa|alternativas|papel|papeis|empresa|empresas|aposta|apostas|compra|entrada|produto|produtos|titulo|titulos)\b| (do|da|dos|das|de)\b|\s*[.,;:!?)]|\s*$)|melhor do mercado|imperdivel|oportunidade unica|unica chance|\bimbativel|retorno extraordinario|(^|[.!?:;]\s*)melhor(es)? (acao|acoes|investimento|investimentos|opcao|opcoes|fundo|fundos|aplicacao|aplicacoes|ativo|ativos|carteira|carteiras|escolha|alternativa|alternativas|produto|produtos|titulo|titulos)\b/],
 ];
 const RETORNO = /\b(rentabilidade|retorno|rendimento|rende)\b/;
-// Lista menor: termo negado logo antes, na mesma oração ("não constitui garantia de retorno", "nenhuma aplicação tem retorno
-// garantido", "não existe investimento sem risco"), é o aviso de compliance, não a promessa; superlativo em pergunta
-// ("qual é a melhor") também passa. Olha até 4 palavras antes do termo, sem passar de vírgula nem de fim de frase.
 const NEGACAO = /\b(nao|nem|nenhum|nenhuma|sem|jamais|nunca)\b/;
 const PERGUNTA = /\b(qual|quais)\b/;
 function ocorrencia(n, nome, re) {
@@ -336,8 +313,6 @@ const PERIODO = new RegExp([
   String.raw`\b(${MESES})[a-z]*\.?\/?\s?(de\s)?((19|20)?\d{2})\b`, String.raw`\bjanela\b`, String.raw`\bytd\b`, String.raw`\bdata-base\b`,
 ].join('|'));
 
-// Textos que a trava lê: tudo o que a página afirma. A linha de fonte, a fonte do item, os valores e os rótulos do gráfico
-// são referência: ficam fora das regras de regulação e de retorno, mas passam pela de promessa, risco zero e superlativo.
 function textosDaPagina(s) {
   const out = [];
   const add = (t) => { if (typeof t === 'string' && t.trim()) out.push(t); };
@@ -354,7 +329,6 @@ const liberador = (termosConfirmados) => {
   const ok = (Array.isArray(termosConfirmados) ? termosConfirmados : []).map(SEMACENTO);
   return (m) => ok.some((c) => c && (m.includes(c) || c.includes(m)));
 };
-// Promessa, risco zero e superlativo (a lista menor) num conjunto de textos; linha com [CONFERIR] fica de fora.
 function travaMenor(onde, textos, liberado, achados) {
   for (const t of textos) {
     if (typeof t !== 'string' || !t.trim() || /\[CONFERIR/i.test(t)) continue;
@@ -369,7 +343,6 @@ const mensagemDaTrava = (risco, onde = 'página') => 'o PDF não foi gerado porq
   '. Reescreva cada uma só com o que o assessor informou, ou acrescente [CONFERIR] no texto; se o assessor realmente afirmou o termo, repita a chamada com termosConfirmados (a lista dos termos).' +
   (risco.some((x) => x.endsWith('(retorno sem período)')) ? ` Rentabilidade e retorno precisam do período na mesma ${onde} (ex.: "em 12 meses até out/2026").` : '');
 
-// geral: textos da apresentação fora das páginas (titulo, rodape, cliente), conferidos com a lista menor.
 export function revisarApresentacao(slides, termosConfirmados = [], tipo, geral = {}) {
   const mercado = tipo === 'mercado' || tipo === 'estudo';
   const lista = mercado ? TERMOS_RISCO_MERCADO : TERMOS_RISCO;
@@ -396,10 +369,6 @@ export function revisarApresentacao(slides, termosConfirmados = [], tipo, geral 
   return achados;
 }
 
-// Folha A4: a lista menor (promessa, risco zero e superlativo) vale para todo texto que vai ao cliente: cabeçalho, destaques,
-// seções, gráficos e rodapé, linha por linha. Estudo e mercado também pedem o período junto de rentabilidade e retorno,
-// na mesma seção (texto, gráfico e a fonte dele). A lista completa da reunião não entra: a folha cita órgão, FGC e
-// rentabilidade do período o tempo todo.
 export function revisarDocumento(a, termosConfirmados = a?.termosConfirmados) {
   const mercado = a?.tipo === 'mercado' || a?.tipo === 'estudo';
   const liberado = liberador(termosConfirmados);
@@ -465,9 +434,7 @@ export async function gerarApresentacao(a, marcaBase = {}) {
   return r;
 }
 
-// ---------- Folha A4 (mesa_documento) ----------
 
-// Célula de tabela que é número: "70%", "R$ 1.234,56", "▲ 5 p.p.", "-0,34x", "–" (sem dado).
 const CELULA_NUMERO = /^([▲▼●✓]\s*)?[+\-−–]?\s*(R\$|US\$|€)?\s*[+\-−–]?\d[\d.,]*\s*(%|p\.p\.|x|bi|mi|mil|pts?)?$|^[–—-]$/i;
 const textoPuro = (h) => h.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
 
@@ -525,7 +492,6 @@ const logoCaptaMais = () => {
   } catch { return ''; }
 };
 const AVISO_CURTO = 'Material informativo e educacional. Não é recomendação de compra, venda ou alocação de ativos, nem promessa de retorno.';
-// Aviso de fim de documento, por tipo de material. Não repete o rodapé, que já vai em toda página.
 const AVISO_TIPO = {
   geral: 'Não constitui oferta nem solicitação de investimento. Rentabilidade passada não garante resultado futuro. Confira os dados nas fontes citadas e avalie qualquer decisão à luz do perfil, dos objetivos e do prazo de cada pessoa.',
   carteira: 'As carteiras comparadas foram informadas pelo assessor, na data-base indicada. A comparação não considera impostos nem custos de uma troca; a adequação ao perfil, aos objetivos e ao prazo do cliente é avaliada à parte.',
@@ -546,7 +512,6 @@ const TEMAS_A4 = {
 const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const mix = (a, b, p) => { const A = hexRgb(a), B = hexRgb(b); return '#' + A.map((v, k) => Math.round(v + (B[k] - v) * p).toString(16).padStart(2, '0')).join(''); };
 
-// Números do gráfico: valida, aplica base 100 quando pedido e devolve o formatador que o gráfico e a tabela usam juntos.
 function dadosDoGrafico(g, onde) {
   const tipo = g?.tipo;
   if (!['barras', 'barras-duplas', 'rosca', 'linha'].includes(tipo)) throw new Error(`${onde}: tipo de gráfico desconhecido (use barras, barras-duplas, rosca ou linha).`);
@@ -561,7 +526,6 @@ function dadosDoGrafico(g, onde) {
   if (tipo === 'rosca' && series.some((s) => s.valores.some((v) => v < 0))) throw new Error(`${onde}: a rosca só aceita valores positivos.`);
   let unidade = String(g.unidade ?? '').trim(), casas;
   if (tipo === 'rosca' && series.length === 2 && unidade !== '%') throw new Error(`${onde}: a rosca com duas séries (ex.: política × atual) compara participações: mande as duas séries em %, cada uma somando 100%.`);
-  // Bandas de tolerância (ex.: política × atual): uma por rótulo, na unidade do gráfico (em %, pontos percentuais).
   let bandas = null;
   if (g.bandas !== undefined && g.bandas !== null) {
     if (tipo === 'linha' || series.length !== 2) throw new Error(`${onde}: bandas só valem com duas séries (alvo e atual), em barras-duplas ou rosca.`);
@@ -637,7 +601,6 @@ function svgRosca(d, cores) {
   return `<svg viewBox="0 0 ${LARG} ${alto}" width="100%" role="img">${o}</svg>`;
 }
 
-// Fatias de uma rosca centrada em (cx, cy).
 function fatiasRosca(vals, cores, cx, cy, R, r) {
   const total = vals.reduce((a, v) => a + v, 0) || 1, ponto = (ang, raio) => [cx + raio * Math.cos(ang), cy + raio * Math.sin(ang)];
   let o = '', ang = -Math.PI / 2;
@@ -710,7 +673,6 @@ function blocoGrafico(g, t, onde) {
   if (g.tabela === false) return `<div class="bloco-graf">${figura}</div>`;
   const dois = d.tipo !== 'linha' && d.series.length === 2;
   const cab = [esc(g.categoria || (d.tipo === 'linha' ? 'Período' : 'Item')), ...d.series.map((s) => esc(s.nome)), ...(dois ? ['Diferença'] : []), ...(d.bandas ? ['Banda', 'Situação'] : []), ...(d.tipo === 'rosca' && d.unidade !== '%' ? ['Participação'] : [])];
-  // Situação: dentro quando o desvio (B − A) cabe na banda; a banda sai com as casas com que veio.
   const banda = (i) => {
     const b = d.bandas[i], fora = Math.abs(d.series[1].valores[i] - d.series[0].valores[i]) > b + 1e-9;
     return `<td class="n">±${formatador(d.unidadeDif, Math.min(2, casasDe(b)))(b)}</td><td class="sit${fora ? ' fora' : ''}">${fora ? 'Fora' : 'Dentro'}</td>`;
@@ -728,14 +690,12 @@ function blocoGrafico(g, t, onde) {
   return `<div class="bloco-graf">${figura}${tabela}</div>`;
 }
 
-// Margem de baixo de toda página: aviso curto à esquerda; marcas e "N de M" à direita.
 function logosRodape(t) {
   const cm = logoCaptaMais();
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cm ? 92 : 50}" height="22" viewBox="0 0 ${cm ? 92 : 50} 22"><text x="0" y="15" font-family="Segoe UI,Helvetica Neue,Arial,sans-serif" font-weight="800" font-size="13" letter-spacing="-0.3" fill="${t.forte}">Mesa</text><circle cx="39.5" cy="12.5" r="2.6" fill="${t.acento}"/>${cm ? `<image x="56" y="0" width="36" height="22" preserveAspectRatio="xMidYMid meet" href="${cm}"/>` : ''}</svg>`;
   return `url("data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}")`;
 }
 
-// O que é do assessor (Conferir, Próximo passo) vai no chat, nunca no arquivo do cliente: a seção sai e a Mesa avisa o Claude.
 const DO_ASSESSOR = /^\s*(o que |para )?conferir\b|^\s*pr[óo]ximos? passos?\b/i;
 export function secoesDoCliente(secoes) {
   const ficam = [], saem = [];
@@ -831,7 +791,6 @@ ${corpo}
 ${aviso}`;
 }
 
-// Páginas do PDF que o navegador gerou: a árvore de páginas do Chromium sai sem compressão ("/Type /Pages /Count N").
 export function paginasDoPdf(arq) {
   try {
     const n = [...readFileSync(arq, 'latin1').matchAll(/\/Type\s*\/Pages\b[^>]*?\/Count\s+(\d+)/g)].map((m) => Number(m[1]));
@@ -839,13 +798,10 @@ export function paginasDoPdf(arq) {
   } catch { return 0; }
 }
 
-// Espaçamento justo: a mesma letra, menos ar entre blocos, linhas e células.
 const CSS_JUSTO = 'body{line-height:1.42}.topo{margin-bottom:9px}header{padding-bottom:8px;margin-bottom:9px}h2{margin:10px 0 5px}h3{margin:9px 0 3px}'
   + 'p,ul,ol{margin-bottom:6px}li{margin-bottom:2px}.resumo{padding:8px 12px;margin-bottom:8px}.destaques{margin-bottom:9px}table{margin:4px 0 9px}'
   + 'th,td{padding-top:4px;padding-bottom:4px}figure.graf{padding:8px 12px 6px}.aviso{margin-top:8px}';
 
-// Folha que passa da página por pouco (a última página ficaria com o fim da última seção e o aviso): imprime de novo com o
-// espaçamento justo e fica com essa versão só se ela tiver menos páginas. Folha de uma página não é impressa de novo.
 async function justoSeEconomiza(html, pdf) {
   const n = paginasDoPdf(pdf);
   if (n < 2) return false;
