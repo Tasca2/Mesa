@@ -28,11 +28,13 @@ $bw.Write($png); $bw.Close()
 $desktop = if ($Destino) { $Destino } else { [Environment]::GetFolderPath('Desktop') }
 $vbs = Join-Path $pasta 'iniciar-mesa.vbs'
 $wsh = New-Object -ComObject WScript.Shell
-$atalho = $wsh.CreateShortcut((Join-Path $desktop 'Mesa do Assessor.lnk'))
+$antigo = Join-Path $desktop 'Mesa do Assessor.lnk'
+if (Test-Path $antigo) { try { if ($wsh.CreateShortcut($antigo).Arguments -match 'iniciar-mesa\.vbs') { Remove-Item $antigo -Force } } catch { } }
+$atalho = $wsh.CreateShortcut((Join-Path $desktop 'Mesa.lnk'))
 $atalho.TargetPath = Join-Path $env:WINDIR 'System32\wscript.exe'
 $atalho.Arguments = "`"$vbs`""
 $atalho.WorkingDirectory = $pasta
 $atalho.IconLocation = "$icone,0"
-$atalho.Description = 'Mesa do Assessor'
+$atalho.Description = 'Atalho da Mesa no desktop'
 $atalho.Save()
 Write-Output "Atalho criado em $desktop"

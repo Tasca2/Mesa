@@ -18,7 +18,8 @@ function areaDeTrabalho() {
   }
   return path.join(os.homedir(), 'Desktop');
 }
-const alvo = (pasta) => path.join(pasta, process.platform === 'win32' ? 'Mesa do Assessor.lnk' : process.platform === 'darwin' ? 'Mesa do Assessor.app' : 'Mesa do Assessor.desktop');
+const alvo = (pasta) => path.join(pasta, process.platform === 'win32' ? 'Mesa.lnk' : process.platform === 'darwin' ? 'Mesa.app' : 'Mesa.desktop');
+const alvoAntigo = (pasta) => path.join(pasta, process.platform === 'win32' ? 'Mesa do Assessor.lnk' : process.platform === 'darwin' ? 'Mesa do Assessor.app' : 'Mesa do Assessor.desktop');
 const lerMarca = () => { try { return JSON.parse(readFileSync(MARCA, 'utf8')); } catch { return {}; } };
 
 function criar(pasta) {
@@ -31,7 +32,7 @@ function criar(pasta) {
     mkdirSync(path.dirname(exe), { recursive: true });
     writeFileSync(path.join(app, 'Contents', 'Info.plist'),
       '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n' +
-      '<key>CFBundleName</key><string>Mesa do Assessor</string><key>CFBundleDisplayName</key><string>Mesa do Assessor</string>\n' +
+      '<key>CFBundleName</key><string>Mesa</string><key>CFBundleDisplayName</key><string>Mesa</string>\n' +
       '<key>CFBundleExecutable</key><string>MesaDoAssessor</string><key>CFBundleIdentifier</key><string>br.captamais.mesadoassessor</string>\n' +
       '<key>CFBundlePackageType</key><string>APPL</string><key>CFBundleVersion</key><string>1.0.0</string><key>LSUIElement</key><true/>\n</dict></plist>\n');
     const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -43,7 +44,7 @@ function criar(pasta) {
     chmodSync(exe, 0o755);
   } else {
     const d = alvo(pasta);
-    writeFileSync(d, `[Desktop Entry]\nType=Application\nName=Mesa do Assessor\nExec=${process.execPath} ${abrir}\nTerminal=false\n`);
+    writeFileSync(d, `[Desktop Entry]\nType=Application\nName=Mesa\nComment=Atalho da Mesa no desktop\nExec=${process.execPath} ${abrir}\nTerminal=false\n`);
     chmodSync(d, 0o755);
   }
 }
@@ -53,5 +54,5 @@ if (flag('--criar')) {
 } else if (flag('--nunca')) {
   mkdirSync(PASTA_DADOS, { recursive: true }); writeFileSync(MARCA, JSON.stringify({ ...lerMarca(), nunca: true })); console.log('nunca');
 } else {
-  console.log(existsSync(alvo(areaDeTrabalho())) ? 'existe' : lerMarca().nunca ? 'nunca' : 'nao');
+  console.log(existsSync(alvo(areaDeTrabalho())) || existsSync(alvoAntigo(areaDeTrabalho())) ? 'existe' : lerMarca().nunca ? 'nunca' : 'nao');
 }

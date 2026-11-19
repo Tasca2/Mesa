@@ -3102,8 +3102,8 @@
       const mostrar = (...x) => { acoes.replaceChildren(...x); };
       const cancelar = () => mini("Agora não", "mini", () => fechar(false));
       const pedirChave = () => {
-        h.textContent = "Falta só a chave de transcrição";
-        t.textContent = "O editor ouve o seu vídeo para cortar os silêncios e criar as legendas. Só o áudio vai ao serviço Groq, que é gratuito. Abra o site, crie uma chave (Create API Key), copie e cole aqui. Ela fica guardada só neste computador.";
+        h.textContent = "Coloque a sua chave da Groq";
+        t.textContent = "Importante: a chave da Groq é o que transcreve a fala do seu vídeo, para cortar os silêncios e criar as legendas. Sem ela o editor não funciona. O serviço é gratuito e só o áudio é enviado. Abra o site, crie a sua chave (Create API Key), copie e cole aqui. Ela fica guardada só neste computador.";
         campo.style.display = ""; est.textContent = "";
         const abrir = mini("Abrir o site da Groq", "mini", async () => { try { await app.openLink({ url: "https://console.groq.com/keys" }); } catch { est.textContent = "Abra console.groq.com/keys no navegador."; } });
         const salvar = mini("Salvar e continuar", "mini ouro", async () => {

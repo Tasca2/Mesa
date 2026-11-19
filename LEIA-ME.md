@@ -2,7 +2,7 @@
 
 A Mesa tem pedidos prontos para o dia a dia do assessor de investimentos (reuniões, retomada de leads, objeções, estudos de ativos, posts para Instagram), com dados do CaptaMais. Embaixo da tela fica uma conversa com o Claude, para ajustar cada pedido.
 
-Obrigado por testar. Leva uns 15 minutos.
+A instalação leva poucos minutos e tudo o que a Mesa precisa vem junto, inclusive o editor de vídeo.
 
 ## Primeiros 5 minutos
 
@@ -16,23 +16,30 @@ Atalhos úteis: **Ctrl+K** busca qualquer tarefa pelo nome; **Histórico**, no a
 
 ## Antes de começar
 
-- **Claude** (aplicativo Claude Desktop ou Claude Code) instalado e com login feito.
-- **Node.js 20 ou mais novo** (nodejs.org). Para conferir, digite `node -v` no terminal.
+- **Claude Code instalado e com login feito** (claude.com/code). É nele que os pedidos da Mesa rodam, na sua conta. Só o aplicativo Claude Desktop não basta.
+- **Windows 10 ou 11** (com o winget, que já vem no Windows 11) ou **Mac**.
 - **Microsoft Edge ou Google Chrome** (o Windows já traz o Edge).
+- Conexão com a internet durante a instalação.
+
+O Python, o ffmpeg, o Node.js e o editor de vídeo **não precisam ser instalados antes**: o instalador da Mesa cuida de tudo.
 
 ## Instalar no Windows
 
 1. Extraia o arquivo `Mesa-do-Assessor.zip` em qualquer pasta.
-2. Dê dois cliques em **Instalar no Windows.bat**.
-3. Feche o Claude e abra de novo.
+2. Dê dois cliques em **Instalar a Mesa**.
+3. O instalador pergunta uma vez: **Instalar agora? (S/N)**. Respondendo S, ele instala a Mesa e, em seguida, o que ela usa para editar vídeos (Python, ffmpeg, Node.js e o editor Edvid) e cria na área de trabalho o atalho **Mesa**. A chave gratuita da Groq, usada para transcrever a fala do vídeo, a Mesa pede só na primeira vez que você for editar um vídeo.
+4. Se o Windows pedir uma confirmação durante a instalação, aceite. Depois feche o Claude e abra de novo.
 
 ## Instalar no Mac
 
 1. Extraia o arquivo `Mesa-do-Assessor.zip`.
-2. Clique com o **botão direito** em **Instalar no Mac.command** e escolha **Abrir** (o Mac pede uma confirmação na primeira vez).
-3. Feche o Claude e abra de novo.
+2. Clique com o **botão direito** em **Instalar a Mesa** (o arquivo com extensão .command) e escolha **Abrir** (o Mac pede uma confirmação na primeira vez).
+3. Responda **s** à pergunta **Instalar agora?**. O instalador instala a Mesa e o que ela usa para editar vídeos, usando o Homebrew. Se o Homebrew não estiver instalado, o Mac pode pedir a sua senha.
+4. Feche o Claude e abra de novo.
 
-> O instalador só copia uma pasta para `.claude/skills/mesa`. Se você já tinha uma skill `mesa`, a antiga fica guardada em `.claude/skills-backup`.
+> No Mac a instalação ainda não foi testada por nós. Se algo falhar, use **Copiar diagnóstico para o suporte** no menu **+** da Mesa.
+
+> O instalador só copia a Mesa para `.claude/skills/mesa`. Se você já tinha uma skill `mesa`, a antiga fica guardada em `.claude/skills-backup`.
 
 ## Usar
 
@@ -69,6 +76,9 @@ Ao conectar, a Mesa avisa o CaptaMais **quais tarefas você usou** (só os nomes
 
 - No post para Instagram, a Mesa gera as **imagens do carrossel** em PNG (com a sua identificação e o aviso de conteúdo educativo no rodapé) e um PDF com todos os slides.
 - Qualquer tarefa com resultado em PDF sai como arquivo pronto.
+- **Anexar arquivo:** o clipe da conversa, em qualquer tarefa, aceita PDF e imagem (até 6 por pedido). O Claude lê só as pastas **Anexos** e **Fontes** da Mesa, sem terminal e sem acesso ao seu perfil. Na edição de vídeo não há anexo.
+- **PDF em mais tarefas:** comparador de carteira, revisão de carteira (duas roscas, política × atual), proposta de assessoria e diagnóstico financeiro, além das apresentações das duas reuniões.
+- **Produtos:** o Raio-X de produto lê a lâmina e mostra cada condição com a página de onde saiu, sem recomendar compra. Comparar produtos é a antiga Renda fixa.
 - **Apresentação em PDF com a sua marca** (primeira e segunda reunião): escolha o resultado PDF e a Mesa monta páginas 16:9 com capa, quem sou, escritório, custódia, soluções, processo, remuneração e próximos passos, com ícones e diagramas. Na primeira vez ela pergunta a sua marca (logo, foto, cor do escritório e fundo escuro, claro ou azul-marinho) e guarda; não precisa repetir.
 - **Suas próprias imagens e ícones:** guarde os arquivos (PNG, JPG, WEBP ou SVG, até 6 MB) em **Documentos › Mesa do Assessor › Minhas imagens** e peça no chat, citando o nome do arquivo ("use a foto escritorio.jpg na página do escritório").
 - Trechos que a Mesa não tem como confirmar saem com **[CONFERIR]** em destaque nas páginas: preencha ou valide antes de usar com o cliente. A Mesa também se recusa a escrever, sem [CONFERIR], frases sobre independência, custo, regulação ou retorno que você não disse.
@@ -82,24 +92,30 @@ Ao conectar, a Mesa avisa o CaptaMais **quais tarefas você usou** (só os nomes
 - **Senha errada tem limite:** depois de 5 erros seguidos, a Mesa e o CaptaMais bloqueiam novas tentativas por 15 minutos; se continuar, por 1 hora, 6 horas e 24 horas. Durante o bloqueio nem a senha certa entra, e o aviso é o mesmo para e-mail que existe ou não. O bloqueio fica salvo e não zera ao reiniciar.
 - Seus rascunhos somem sozinhos depois de 14 dias e a conversa depois de 30. **Limpar** e **Começar do zero** apagam na hora.
 - PDFs e imagens ficam em **Documentos › Mesa do Assessor**; se o seu Documentos sincroniza na nuvem (OneDrive), eles sobem junto.
-- Dentro da Mesa o Claude só abre páginas de fontes oficiais (Banco Central, CVM, B3, IBGE, Tesouro, gov.br etc.). A busca na internet funciona normalmente.
+- Dentro da Mesa o Claude só abre páginas de fontes oficiais (Banco Central, CVM, B3, IBGE, Tesouro, gov.br etc.). A busca na internet funciona normalmente. Juros e inflação, fato relevante da CVM e taxas do Tesouro vêm direto dessas fontes, cada número com data e fonte.
+- Fora da edição de vídeo, o Claude da Mesa não usa terminal, não grava arquivos por conta própria e ignora as configurações pessoais do seu Claude (por exemplo, permissões liberadas ou proxy definido no settings.json). Quem gera os arquivos é a Mesa.
 
 ## Cuidados
 
 - Não digite CPF nem o nome completo do cliente: a Mesa não precisa deles.
 - A Mesa organiza o trabalho: ela **não** recomenda compra nem venda e não promete retorno. Os pontos que você precisa validar com o compliance saem marcados com `[CONFERIR]`.
 
-## Editar vídeos (opcional)
+## Editar vídeos
 
-A tarefa **Editar um vídeo (Reels)**, em Post para Instagram, corta, ajusta a cor e coloca legendas num vídeo vertical, e o resultado fica em **Documentos › Mesa do Assessor › Videos editados**. Ela usa a skill **edvid**, que **não vem neste kit**. Sem ela a Mesa avisa e todo o resto funciona normalmente.
+A tarefa **Editar um vídeo (Reels)**, em Post para Instagram, corta, ajusta a cor e coloca legendas num vídeo vertical, e o resultado fica em **Documentos › Mesa do Assessor › Videos editados**.
 
-Para ativar, é preciso ter no computador: a skill edvid instalada, o **ffmpeg**, o **Python**, o **Node.js** e uma chave gratuita de transcrição (Groq). Música e imagens de apoio pedem chaves próprias, opcionais. Ao clicar na tarefa, a Mesa abre a janela de arquivos, você escolhe o vídeo e a edição começa; o corte aparece na tela para você aprovar, e **Abrir o editor do Edvid** deixa ajustar na linha do tempo.
+O instalador já deixa tudo pronto: o editor **Edvid**, o **ffmpeg**, o **Python**, o **Node.js** e o modelo de legendas. O Edvid é um projeto de código aberto (licença MIT): o instalador baixa do GitHub para `.claude/skills/edvid` e, se o download não for possível, usa a cópia que vem neste kit. Python, ffmpeg e Node.js também são baixados dos sites oficiais. A única coisa que falta é a sua **chave gratuita da Groq**, que é importante: é ela que transcreve a fala do vídeo para criar as legendas. A Mesa não cria contas por você, então na primeira edição ela abre uma janela, você cria a chave no site da Groq, cola ali e pronto. Cada pessoa usa a sua.
+
+Se por algum motivo algo não estiver instalado, ao clicar na tarefa a Mesa mostra **Instalar e continuar** e instala na hora, com o andamento na tela. Só o áudio do vídeo vai ao serviço de transcrição. Música e imagens de apoio pedem chaves próprias, opcionais, que você coloca no arquivo `.env` do editor se quiser usá-las.
+
+Ao clicar na tarefa, a Mesa abre a janela de arquivos, você escolhe o vídeo e a edição começa. O corte aparece na tela para você aprovar, e **Abrir o editor do Edvid** deixa ajustar na linha do tempo.
 
 ## Se algo não funcionar
 
-- **/mesa não abre a janela:** feche o Claude e abra de novo; confira se o Node.js está instalado (`node -v`). Sem Edge nem Chrome, a Mesa abre no navegador padrão.
+- **/mesa não abre a janela:** feche o Claude e abra de novo; confira se o Node.js está instalado (`node -v`) e, se não estiver, rode o instalador de novo. Sem Edge nem Chrome, a Mesa abre no navegador padrão.
 - **A janela mostra um erro de "Claude":** a Mesa roda os pedidos no Claude Code, que precisa estar instalado e com login feito (claude.com/code).
 - **Um botão não respondeu ou deu erro:** no menu **+**, use **Copiar diagnóstico para o suporte**. O resumo sai sem os seus dados.
+- **A instalação do editor de vídeo terminou com pendências:** o que faltou aparece na tela do instalador e em `instalacao-video.log`, na pasta `.mesa-do-assessor` do seu usuário. Rode o instalador de novo (ele só refaz o que falta) ou use **Instalar e continuar** ao clicar em Editar um vídeo.
 - **Atualizar a Mesa:** rode o instalador do kit novo; a versão antiga fica guardada em `.claude/skills-backup`. Seus perfil, modelos e arquivos em Documentos continuam.
 
 ## Opcional: painel dentro do Cowork

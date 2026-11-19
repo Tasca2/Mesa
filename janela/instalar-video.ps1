@@ -2,6 +2,7 @@
   [string]$Pacote = (Join-Path $PSScriptRoot '..\edvid'),
   [string]$Skills = (Join-Path $env:USERPROFILE '.claude\skills'),
   [string]$Status = (Join-Path $env:USERPROFILE '.mesa-do-assessor\instalacao-video.json'),
+  [string]$EdvidUrl = 'https://github.com/fillrochaa/edvid/archive/3f3e984814187b3ca2d24e5bdd93ed43f260c5e2.zip',
   [string]$ChaveGroq = ''
 )
 if (-not $ChaveGroq) { $ChaveGroq = $env:MESA_CHAVE_GROQ }
@@ -13,6 +14,7 @@ $Erros = New-Object System.Collections.ArrayList
 $Log = Join-Path (Split-Path $Status) 'instalacao-video.log'
 New-Item -ItemType Directory -Force (Split-Path $Status) | Out-Null
 $Ed = Join-Path $Skills 'edvid'
+$Ferramentas = Join-Path $env:LOCALAPPDATA 'MesaDoAssessor'
 
 function Gravar($estado, $passo, $texto) {
   $o = [ordered]@{ estado = $estado; passo = $passo; total = $Total; texto = $texto; erros = @($Erros) }
@@ -26,6 +28,7 @@ function AtualizarPath {
   $env:Path = ($m + ';' + $u)
 }
 function Achar($nome) { $c = Get-Command $nome -ErrorAction SilentlyContinue | Select-Object -First 1; if ($c) { $c.Source } else { $null } }
+function Baixar($url, $arq) { Invoke-WebRequest -Uri $url -OutFile $arq -UseBasicParsing -TimeoutSec 600 }
 function Winget($id) {
   if (-not (Achar 'winget')) { return $false }
   Registrar ("winget " + $id)
@@ -48,7 +51,41 @@ function PythonAchado {
   }
   return $null
 }
-function Baixar($url, $arq) { Invoke-WebRequest -Uri $url -OutFile $arq -UseBasicParsing -TimeoutSec 180 }
+function FfmpegOk { return [bool]((Achar 'ffmpeg') -and (Achar 'ffprobe')) }
+function InstalarPythonDireto {
+  $f = Join-Path $env:TEMP 'python-3.12.8-amd64.exe'
+  Registrar 'baixando o Python em python.org'
+  Baixar 'https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe' $f
+  Start-Process -FilePath $f -ArgumentList '/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_test=0', 'Include_launcher=1' -Wait
+  Remove-Item $f -Force -ErrorAction SilentlyContinue
+  AtualizarPath
+}
+function InstalarNodeDireto {
+  $f = Join-Path $env:TEMP 'node-v22.11.0-x64.msi'
+  Registrar 'baixando o Node.js em nodejs.org'
+  Baixar 'https://nodejs.org/dist/v22.11.0/node-v22.11.0-x64.msi' $f
+  Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', ('"' + $f + '"'), '/qn', '/norestart' -Verb RunAs -Wait
+  Remove-Item $f -Force -ErrorAction SilentlyContinue
+  AtualizarPath
+}
+function InstalarFfmpegDireto {
+  $destino = Join-Path $Ferramentas 'ffmpeg'
+  $tmp = Join-Path $env:TEMP ('mesa-ffmpeg-' + [guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Force $tmp | Out-Null
+  Registrar 'baixando o ffmpeg'
+  Baixar 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' (Join-Path $tmp 'f.zip')
+  if (Test-Path $destino) { Remove-Item $destino -Recurse -Force -ErrorAction SilentlyContinue }
+  New-Item -ItemType Directory -Force $destino | Out-Null
+  Expand-Archive -Path (Join-Path $tmp 'f.zip') -DestinationPath $destino -Force
+  Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+  $exe = Get-ChildItem $destino -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1
+  if ($exe) {
+    $bin = $exe.DirectoryName
+    $u = [Environment]::GetEnvironmentVariable('Path', 'User')
+    if (-not (($u -split ';') -contains $bin)) { [Environment]::SetEnvironmentVariable('Path', ($u.TrimEnd(';') + ';' + $bin), 'User') }
+  }
+  AtualizarPath
+}
 
 Gravar 'rodando' 0 'Preparando o editor de vídeo'
 Write-Host ''
@@ -58,7 +95,9 @@ AtualizarPath
 
 Passo 1 'Node.js'
 if (-not (NodeOk)) {
-  if (-not (Winget 'OpenJS.NodeJS.LTS') -or -not (NodeOk)) { Falhou 'Não consegui instalar o Node.js. Instale em nodejs.org e rode de novo.' }
+  [void](Winget 'OpenJS.NodeJS.LTS')
+  if (-not (NodeOk)) { try { InstalarNodeDireto } catch { Registrar $_.Exception.Message } }
+  if (-not (NodeOk)) { Falhou 'Não consegui instalar o Node.js. Instale em nodejs.org e rode de novo.' }
 }
 
 Passo 2 'Python'
@@ -66,21 +105,41 @@ $py = PythonAchado
 if (-not $py) {
   [void](Winget 'Python.Python.3.12')
   $py = PythonAchado
+  if (-not $py) { try { InstalarPythonDireto } catch { Registrar $_.Exception.Message }; $py = PythonAchado }
   if (-not $py) { Falhou 'Não consegui instalar o Python. Instale em python.org (marque Add to PATH) e rode de novo.' }
 }
 
 Passo 3 'ffmpeg'
-if (-not ((Achar 'ffmpeg') -and (Achar 'ffprobe'))) {
+if (-not (FfmpegOk)) {
   [void](Winget 'Gyan.FFmpeg')
-  if (-not ((Achar 'ffmpeg') -and (Achar 'ffprobe'))) { Falhou 'Não consegui instalar o ffmpeg. Instale em ffmpeg.org e rode de novo.' }
+  if (-not (FfmpegOk)) { try { InstalarFfmpegDireto } catch { Registrar $_.Exception.Message } }
+  if (-not (FfmpegOk)) { Falhou 'Não consegui instalar o ffmpeg. Instale em ffmpeg.org e rode de novo.' }
 }
 
 Passo 4 'Editor Edvid'
 if (-not (Test-Path (Join-Path $Ed 'SKILL.md'))) {
-  if (Test-Path (Join-Path $Pacote 'SKILL.md')) {
-    New-Item -ItemType Directory -Force $Ed | Out-Null
-    Copy-Item -Path (Join-Path $Pacote '*') -Destination $Ed -Recurse -Force
-  } else { Falhou 'Os arquivos do editor Edvid não estão neste kit.' }
+  if ($EdvidUrl) {
+    try {
+      $tmp = Join-Path $env:TEMP ('mesa-edvid-' + [guid]::NewGuid().ToString('N'))
+      New-Item -ItemType Directory -Force $tmp | Out-Null
+      Baixar $EdvidUrl (Join-Path $tmp 'e.zip')
+      Expand-Archive -Path (Join-Path $tmp 'e.zip') -DestinationPath $tmp -Force
+      $raiz = Get-ChildItem $tmp -Directory | Select-Object -First 1
+      if ($raiz -and (Test-Path (Join-Path $raiz.FullName 'SKILL.md'))) {
+        New-Item -ItemType Directory -Force $Ed | Out-Null
+        Copy-Item -Path (Join-Path $raiz.FullName '*') -Destination $Ed -Recurse -Force
+        Registrar 'Edvid baixado do GitHub'
+      }
+      Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    } catch { Registrar ('Edvid: download do GitHub não deu certo (' + $_.Exception.Message + '); usando a cópia do kit') }
+  }
+  if (-not (Test-Path (Join-Path $Ed 'SKILL.md'))) {
+    if (Test-Path (Join-Path $Pacote 'SKILL.md')) {
+      New-Item -ItemType Directory -Force $Ed | Out-Null
+      Copy-Item -Path (Join-Path $Pacote '*') -Destination $Ed -Recurse -Force
+      Registrar 'Edvid copiado do kit'
+    } else { Falhou 'Não consegui baixar o editor Edvid e a cópia do kit não está aqui.' }
+  }
 }
 $envArq = Join-Path $Ed '.env'
 if ((Test-Path $Ed) -and -not (Test-Path $envArq)) {
