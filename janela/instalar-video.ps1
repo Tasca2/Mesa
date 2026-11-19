@@ -2,7 +2,7 @@
   [string]$Pacote = (Join-Path $PSScriptRoot '..\edvid'),
   [string]$Skills = (Join-Path $env:USERPROFILE '.claude\skills'),
   [string]$Status = (Join-Path $env:USERPROFILE '.mesa-do-assessor\instalacao-video.json'),
-  [string]$EdvidUrl = 'https://github.com/fillrochaa/edvid/archive/3f3e984814187b3ca2d24e5bdd93ed43f260c5e2.zip',
+  [string]$EdvidUrl = '',
   [string]$ChaveGroq = ''
 )
 if (-not $ChaveGroq) { $ChaveGroq = $env:MESA_CHAVE_GROQ }
