@@ -670,7 +670,9 @@ const nomeArquivo = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u0
 // casca da página em vez do documento (em 18/11/2026, de 14 pedidos espaçados, 4 trouxeram o PDF; repetir com o cookie
 // da sessão não ajudou). Tenta até 8 vezes, em cerca de 30 segundos, e só grava quando o arquivo chega inteiro.
 const TENTATIVAS_RAD = 8;
+const linkDaCvm = (u) => { try { const x = new URL(u); return x.protocol === 'https:' && /(^|\.)cvm\.gov\.br$/.test(x.hostname); } catch { return false; } };
 async function baixarPdf(doc, pasta) {
+  if (!linkDaCvm(doc.link)) throw new Error('o link do documento não é do site da CVM');
   let erro = '';
   for (let t = 1; t <= TENTATIVAS_RAD; t++) {
     try {
