@@ -1,6 +1,6 @@
 ---
 name: portfolio-rebalance-review
-description: Revisa a carteira de um cliente frente à política de investimento dele ou à carteira modelo do escritório, mostrando desvios por classe, concentração e liquidez em tabela e resumo. Só análise do desvio: não gera ordem de compra, venda, troca nem cálculo de imposto.
+description: Revisa a carteira de um cliente frente à política de investimento dele, mostrando desvios por classe, concentração e liquidez em tabela e resumo. Só análise do desvio: não gera ordem de compra, venda, troca nem cálculo de imposto.
 ---
 
 # Revisão de carteira (análise de desvio)
@@ -10,9 +10,9 @@ Deixar pronta a conversa de revisão: o desvio medido, o que merece pergunta ao 
 
 ## Entradas
 - Posição atual (ativo, classe, valor, data-base), por arquivo ou colagem. Se o cliente estiver no CaptaMais Consolidador, aceite o relatório dele.
-- **Base de comparação**: política do cliente ou carteira modelo do escritório, com a banda de tolerância. Sem base, entregue só a fotografia (composição e concentração) e avise que não há desvio a medir. Sem banda, pergunte; não invente tolerância.
+- **Base de comparação**: a política de investimento do cliente, com as bandas de tolerância. Sem política, entregue só a fotografia (composição e concentração) e avise que não há desvio a medir. Sem banda, pergunte; não invente tolerância.
 - Perfil do assessor (`mesa_perfil`). Para ativos listados, `analise_ativo` quando o pedido disser que o CaptaMais está conectado. Rode `consultar_cofre` (tema `alocação de ativos finanças comportamentais perfil de risco`); sem cofre, siga o método.
-- Quer comparar com outra carteira (e não com a política)? Isso é a tarefa Comparador de carteira (skill `comparador-de-carteira`); aqui a referência é a política ou o modelo.
+- Quer comparar com outra carteira, inclusive a carteira modelo do escritório? Isso é a tarefa Comparador de carteira (skill `comparador-de-carteira`); aqui a referência é sempre a política do cliente.
 
 Falta algo essencial? Pergunte **uma** coisa e entregue o resto com `[CONFERIR]`.
 
@@ -34,6 +34,8 @@ Falta algo essencial? Pergunte **uma** coisa e entregue o resto com `[CONFERIR]`
 - `whatsapp` — convite curto para a revisão (até 4 linhas, uma pergunta de resposta fácil, sem alarmar nem prometer).
 - `nota-crm` — o que foi medido e o próximo passo, em até 6 linhas.
 **Conferir** — dados, banda e data-base que o assessor valida.
+
+**Em PDF** (Resultado PDF): gere a peça `relatorio` com `mesa_documento`, `tipo: "carteira"`, `cliente` (apelido ou iniciais) e `dataBase`. O desvio vai em `grafico` `rosca` com duas séries em % (`Política` e `Atual`, nesta ordem, cada uma somando 100%), `categoria` "Classe", `bandas` com a tolerância de cada classe em pontos percentuais e `fonte` com a data-base: o código desenha as duas roscas e, embaixo, a tabela com a diferença, a banda e a situação (dentro ou fora), então não repita essa tabela no texto. Sem banda informada, mande o gráfico sem `bandas` e deixe a banda no Conferir. Concentração e liquidez seguem em tabelas curtas no texto. Roteiro, WhatsApp, nota de CRM e Conferir ficam no chat, fora do PDF.
 
 ## Exemplo
 Bom (convite): "Oi, Paula! Fiz a revisão trimestral da sua carteira e tem dois pontos que quero conversar com você: a parte em renda variável e o que vence ano que vem. Consegue 20 minutos na quinta ou na sexta?"

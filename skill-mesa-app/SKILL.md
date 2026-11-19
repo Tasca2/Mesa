@@ -41,16 +41,28 @@ Chame `mesa_perfil` uma vez antes da primeira pergunta. Com `configurado: true`,
 
 ### Área e tarefa
 
-Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta por vez e no máximo 4 opções: área (Rotinas do dia · Mercado hoje · Marketing Profissional), grupo e tarefa.
+Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta por vez e no máximo 4 opções: área (Rotinas do dia · Mercado hoje · Produtos · Marketing Profissional), grupo e tarefa.
 
 | Tarefa | Carregar com `carregar_metodo` |
 |---|---|
 | Cliente novo | `prospect-intake` |
-| Pré-reunião | `pre-meeting` |
+| Primeira reunião | `primeira-reuniao` |
+| Segunda reunião | `segunda-reuniao` |
+| Pré-reunião (cliente atual) | `pre-meeting` |
 | Pós-reunião | `post-meeting` |
 | Revisão de carteira | `portfolio-rebalance-review` |
+| Comparador de carteira | `comparador-de-carteira` |
 | Diagnóstico financeiro | `diagnostico-financeiro` |
-| Primeira abordagem | `prospeccao-abordagem` |
+| Relatório mensal ao cliente | `relatorio-e-proposta` |
+| Proposta de assessoria (documento) | `relatorio-e-proposta` |
+| Follow-up da proposta | `relatorio-e-proposta` |
+| Ritmo e indicação | `relacionamento-e-indicacao` |
+| Explicar ao cliente | `explicar-ao-cliente` |
+| Conversa sobre sucessão | `planejamento-sucessorio` |
+| Primeira mensagem | `prospeccao-abordagem` |
+| Ligação de primeiro contato | `roteiro-comercial` |
+| Sequência para lead novo | `roteiro-comercial` |
+| Pitch e e-mail | `roteiro-comercial` |
 | Objeção do cliente | `objecoes` |
 | Retomar lead parado | `retomada-lead-frio` |
 | Juros, inflação e câmbio | `macro-brasil` |
@@ -60,8 +72,12 @@ Se a pessoa já disse a tarefa, vá direto a ela. Senão pergunte, uma pergunta 
 | Analisar uma ação | `fundamentalista-metodo` |
 | Comparar o setor | `comparativo-setorial` |
 | Fundo imobiliário | `analise-fii` |
-| Renda fixa | `comparacao-renda-fixa` |
-| Criar um post / post do mercado | `conteudo-para-cliente` (e `macro-brasil` no post do dia) |
+| Raio-X de produto | `produto-raio-x` e `leitura-de-lamina` |
+| Comparar produtos (antiga Renda fixa) | `comparacao-renda-fixa` |
+| Estudar perfis de referência · Como foram meus posts | `pauta-de-conteudo` |
+| Ideias para postar hoje | `pauta-de-conteudo` (e `macro-brasil` para o gatilho do dia) |
+| Semana de posts pronta | `calendario-de-conteudo` (e `pauta-de-conteudo` para os temas) |
+| Criar um post | `conteudo-para-cliente` |
 
 Peça no chat o que faltar (histórico da conversa, código do ativo, documento, tema), siga as instruções devolvidas por `carregar_metodo`, entregue como texto ou PDF (`mesa_documento`) e, no Instagram, gere as imagens com `mesa_carrossel`. Registre a tarefa com `mesa_perfil` (campo `registrar`).
 

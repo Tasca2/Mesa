@@ -77,3 +77,13 @@ Se o IPCA do último mês ainda não aparece no SGS (433), consulte o IBGE (SIDR
 - Dado de mercado exige fonte e data visíveis. Ausência é “não informado”; não é zero nem autorização para estimar. Cálculos derivados devem mostrar os dados e a fórmula.
 - Usar rótulos genéricos e dados minimizados para pessoas; não solicitar identificadores, contas ou informações confidenciais. Não usar informação relevante ainda não pública nem dados obtidos no trabalho de assessoria. Não expor empregador ou clientes do operador.
 - Esta skill prepara análise ou rascunho. Não envia mensagem, publica, movimenta carteira, contrata serviço nem gasta créditos.
+
+## Na Mesa do Assessor (acrescentado)
+
+1. Chame `painel_macro` antes de qualquer busca, com o recorte e a referência do pedido. As séries do Banco Central e do IBGE são a reserva: só para o bloco que vier vazio ou que estiver em `lacunas`, buscadas por código (o código vem em cada indicador e, se a série falhou, na própria lacuna). O que não achar fica marcado, sem estimar.
+2. Use as variações que vêm prontas. Não recalcule nem arredonde diferente da fonte.
+3. Focus é a mediana do mercado: escreva "o mercado espera", com a data do relatório (`focus.data`, a data da estatística no serviço de Expectativas do Banco Central). Em Conversa de WhatsApp, essa data vai para as duas linhas finais (item 5).
+4. Juro real: mostre a conta e diga qual inflação usou (a de 12 meses ou a esperada).
+5. Em Conversa de WhatsApp, fonte e data ficam fora da mensagem, nas duas linhas finais para o assessor. Nas mensagens (a principal, a versão curta e as respostas prontas), nenhuma data, nem entre parênteses, e nenhuma fonte citada ("Focus", "Focus do BC", código de série): escreva "hoje", "há um mês" e "o mercado espera". Nessas mensagens, a regra do pedido "todo número com fonte e data" se cumpre nas duas linhas finais.
+6. Formato: dentro da Mesa vale o formato do pedido, o painel em tabela com as colunas que o pedido escreve. A regra "uma linha por indicador, sem tabela" desta skill fica para o uso fora da Mesa.
+7. Copom: a data da próxima reunião não tem endereço de dados oficial e vem em `lacunas`. Só escreva a data com fonte oficial; sem ela, "a confirmar". Não deduza a data pela série 432.

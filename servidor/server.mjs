@@ -11,6 +11,7 @@ import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from '@model
 import { z } from 'zod';
 import { gerarCarrossel, gerarDocumento, gerarApresentacao, pastaBase } from './gerador.mjs';
 import { NOMES_LAYOUT, NOMES_ICONE, NOMES_ILUSTRACAO } from './layouts.mjs';
+import { painelMacro, documentosCvm, taxasTesouro, RECORTES, REFERENCIAS } from './dados-publicos.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const PASTA_SKILLS = process.env.METODO_SKILLS
@@ -117,14 +118,15 @@ const comSkill = (pasta) => readdirSync(pasta, { withFileTypes: true })
 const SKILLS_METODO = comSkill(PASTA_SKILLS);
 const pastaDa = (skill) => path.join(ROTINAS.includes(skill) ? PASTA_ROTINAS : PASTA_SKILLS, skill);
 
-const AREAS = 'Rotinas do dia (cliente novo, pré-reunião, pós-reunião, revisão de carteira, diagnóstico, primeira abordagem, objeções, retomada de lead frio); ' +
-  'Mercado hoje (juros, inflação e câmbio, fato relevante, gráfico, ação, setor, fundo imobiliário, renda fixa, estudo e apresentação de ativo); ' +
-  'Marketing Profissional (Post para Instagram: criar um post, ideias para postar hoje, calendário de post; editar um Reels; landing page)';
+const AREAS = 'Rotinas do dia (antes da reunião: cliente novo, primeira reunião, segunda reunião, pré-reunião (cliente atual); depois da reunião: pós-reunião; carteira: revisão de carteira, comparador de carteira; cliente: diagnóstico financeiro, relatório mensal ao cliente, proposta de assessoria (documento), follow-up da proposta; relacionamento: ritmo e indicação, explicar ao cliente, conversa sobre sucessão; prospecção: primeira mensagem, ligação de primeiro contato, sequência para lead novo, pitch e e-mail, objeção do cliente, retomar lead parado); ' +
+  'Mercado hoje (juros, inflação e câmbio, fato relevante, gráfico, ação, setor, fundo imobiliário, estudo e apresentação de ativo); ' +
+  'Produtos (raio-X de produto, comparar produtos, a antiga renda fixa); ' +
+  'Marketing Profissional (Post para Instagram: estudar perfis de referência, ideias para postar hoje, semana de posts pronta, criar um post, como foram meus posts; editar um Reels; landing page)';
 const COMO_ATUALIZAR = 'Em toda tarefa enviada pela Mesa (mensagem que começa com [Mesa]), chame mesa_perfil para saber quem é o assessor, ' +
   'chame mesa_andamento antes de cada pedido ao assessor, dizendo em uma frase o que ele precisa responder ou anexar no chat, ' +
   'e ao terminar, com concluido=true; depois registre a tarefa com mesa_perfil (registrar).';
 
-const PERFIL_VAZIO = { nome: '', atuacao: '', escritorio: '', publico: '', tom: '', exemplo: '', canal: '', tamanho: '', tratamento: '', assinatura: '', evitar: '', exemplos: [], historico: [], modelos: {} };
+const PERFIL_VAZIO = { nome: '', atuacao: '', escritorio: '', publico: '', tom: '', exemplo: '', canal: '', tamanho: '', tratamento: '', assinatura: '', evitar: '', referencias: '', exemplos: [], historico: [], modelos: {} };
 const lerPerfil = () => {
   try { return { ...PERFIL_VAZIO, ...JSON.parse(readFileSync(ARQUIVO_PERFIL, 'utf8')) }; } catch { return { ...PERFIL_VAZIO }; }
 };
@@ -251,11 +253,11 @@ function buildServer() {
       title: 'Abrir a Mesa do Assessor',
       description:
         'Abre a Mesa do Assessor: painel interativo que guia o assessor de investimentos pelas rotinas do dia, pelo ' +
-        'mercado e pelos posts, até a skill certa. Use quando o usuário pedir a mesa ou o painel, ou não souber por onde ' +
+        'mercado, pelos produtos e pelos posts, até a skill certa. Use quando o usuário pedir a mesa ou o painel, ou não souber por onde ' +
         'começar. O parâmetro opcional area abre o painel direto numa área.',
       inputSchema: {
-        area: z.enum(['rotinas', 'mercado', 'instagram']).optional()
-          .describe('Área para abrir direto: rotinas, mercado ou instagram'),
+        area: z.enum(['rotinas', 'mercado', 'produtos', 'instagram']).optional()
+          .describe('Área para abrir direto: rotinas, mercado, produtos ou instagram'),
       },
       annotations: { readOnlyHint: true },
       _meta: { ui: { resourceUri: PAINEL_URI } },
@@ -348,7 +350,7 @@ function buildServer() {
     {
       title: 'Perfil do assessor',
       description:
-        'Lê o perfil do assessor (nome, atuação, escritório, público, tom, canal, tamanho, tratamento, assinatura, termos que evita e até 3 mensagens de exemplo) e as últimas tarefas feitas na Mesa. ' +
+        'Lê o perfil do assessor (nome, atuação, escritório, público, tom, canal, tamanho, tratamento, assinatura, termos que evita, até 3 mensagens de exemplo e "Minhas referências", a ficha dos perfis de Instagram que ele acompanha) e as últimas tarefas feitas na Mesa. ' +
         'Chame no começo de toda tarefa da Mesa e use o que vier em vez de perguntar de novo. ' +
         'Para salvar ou atualizar o perfil, envie "salvar"; para lembrar a tarefa que acabou de entregar, envie "registrar".',
       inputSchema: {
@@ -365,6 +367,7 @@ function buildServer() {
           assinatura: z.string().max(200).optional().describe('Identificação que vai no fim das peças: nome, registro e escritório'),
           evitar: z.string().max(200).optional().describe('Palavras, expressões e emojis que o assessor nunca usa'),
           exemplos: z.array(z.string().max(600)).max(3).optional().describe('Até 3 mensagens reais do assessor, sem dados de cliente: modelo do jeito de escrever, nunca dos fatos'),
+          referencias: z.string().max(3000).optional().describe('Minhas referências: perfis de Instagram que o assessor acompanha, padrões e ganchos que funcionam, em até 15 linhas. Substitui a ficha anterior: grave só depois do ok do assessor'),
           avisoDados: z.enum(['nunca', 'sempre']).optional().describe('Uso do painel: se a Mesa deve voltar a perguntar sobre conectar os dados de mercado'),
           marca: z.object({
             tema: z.enum(['escuro', 'claro', 'marinho']).optional(),
@@ -494,31 +497,43 @@ function buildServer() {
     {
       title: 'Gerar imagens do carrossel ou da arte',
       description:
-        'Gera as imagens prontas para postar (PNG) e um PDF com todos os slides, a partir do texto que você escreveu. Use para carrossel (3 a 10 slides) ou para uma arte única (1 slide) de Instagram. ' +
-        'Slides curtos: título de até 12 palavras, texto de até 2 linhas, "destaque" só para um número grande (ex.: "10,75%"), "fonte" com órgão e data quando houver dado de mercado. ' +
-        'Capa no primeiro slide e fechamento com chamada no último. O rodapé leva a identificação do profissional conforme a atuação dele e o aviso "conteúdo educativo, não é recomendação". ' +
-        'Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF devolvido, e diga ao assessor onde ficou a pasta com as imagens.',
+        'Gera as imagens prontas para postar (PNG, uma por slide) e um PDF com todos os slides, a partir do texto que você escreveu. Use para carrossel (3 a 10 slides; o Meta Business Suite aceita até 10 fotos por post), para uma arte única (1 slide) e para a capa de um Reels. ' +
+        'Tipos de slide: capa (título; a foto, o nome e o cargo do assessor e a seta de arrastar entram sozinhos, vindos do perfil) · conteudo (título, texto e, se houver, destaque com um número curto) · numero (destaque = o número gigante, ex.: "6,2%", com título, texto e fonte) · ' +
+        'lista (itens [{titulo, texto}], 2 a 4) · comparacao (colunas: 2 × {titulo, itens[] ou texto}: A × B, antes × depois) · passos (passos[], 2 a 5) · citacao (texto = a frase, autor e fonte) · fechamento (a chamada no título; foto e nome do assessor entram sozinhos). Varie os tipos: nada de 7 telas iguais. ' +
+        'Slides curtos: título de até 12 palavras, texto de até 2 linhas, "fonte" com órgão e data quando houver dado de mercado. O contador (2/7) e a seta saem sozinhos. Tema e cor vêm da marca do perfil, se você não mandar outros. ' +
+        'pasta junta os posts da semana dentro de Documentos › Mesa do Assessor, ex.: "Semana de 23-11/1-seg-previdencia" (a semana com a data da segunda-feira; uma subpasta por post, com número, dia e tema). Pasta que já tem arquivo não é sobrescrita: ganha "(2)". ' +
+        'Trava de palavras: promessa de retorno, risco zero, superlativo e rentabilidade sem o período no mesmo slide barram a geração; reescreva só com o que o assessor informou ou, se ele afirmou o termo, repita a chamada com termosConfirmados. ' +
+        'O rodapé leva a identificação do profissional conforme a atuação dele e o aviso "conteúdo educativo, não é recomendação". ' +
+        'Depois de gerar a última peça do pedido, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF devolvido, e diga ao assessor onde ficaram as pastas com as imagens. Se vier "avisos", conte ao assessor.',
       inputSchema: {
         titulo: z.string().min(2).max(120).describe('Nome da peça (vira o nome da pasta)'),
         formato: z.enum(['feed', 'quadrado', 'stories']).optional().describe('feed 1080x1350 (padrão), quadrado 1080x1080, stories 1080x1920'),
-        tema: z.enum(['escuro', 'claro']).optional().describe('Fundo escuro (padrão) ou claro'),
-        cor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Cor de destaque em hexadecimal, ex.: #E8C88E'),
+        tema: z.enum(['escuro', 'claro', 'marinho']).optional().describe('Padrão: o tema da marca do perfil, ou escuro'),
+        cor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Cor de destaque em hexadecimal, ex.: #E8C88E; padrão: a da marca do perfil'),
         rodape: z.string().max(240).describe('Identificação do profissional e aviso, em uma linha'),
+        pasta: z.string().max(160).optional().describe('Subpasta dentro de Documentos › Mesa do Assessor, ex.: "Semana de 23-11/1-seg-previdencia". Sem ela, a peça ganha uma pasta própria'),
+        termosConfirmados: z.array(z.string().max(40)).max(8).optional().describe('Só quando o assessor afirmou de fato algo que a trava de palavras bloqueou; nunca por conta própria'),
         slides: z.array(z.object({
-          tipo: z.enum(['capa', 'conteudo', 'fechamento']).optional(),
+          tipo: z.enum(['capa', 'conteudo', 'numero', 'lista', 'comparacao', 'passos', 'citacao', 'fechamento']).optional(),
           titulo: z.string().min(1).max(140),
           texto: z.string().max(420).optional(),
           destaque: z.string().max(24).optional(),
           fonte: z.string().max(140).optional(),
+          itens: z.array(z.object({ titulo: z.string().min(1).max(80), texto: z.string().max(180).optional() })).max(4).optional().describe('lista: 2 a 4 itens'),
+          colunas: z.array(z.object({ titulo: z.string().min(1).max(40), itens: z.array(z.string().max(90)).max(4).optional(), texto: z.string().max(220).optional() })).max(2).optional().describe('comparacao: as 2 colunas'),
+          passos: z.array(z.string().max(120)).max(5).optional().describe('passos: 2 a 5 etapas, na ordem'),
+          autor: z.string().max(80).optional().describe('citacao: quem disse'),
         })).min(1).max(10),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     async (args) => {
       try {
-        const r = await gerarCarrossel(args);
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pasta: r.pasta, imagens: r.imagens.map((x) => path.basename(x)), pdf: r.pdf }) }] };
+        const p = lerPerfil();
+        const r = await gerarCarrossel(args, { ...(p.marca || {}), nome: p.nome, cargo: p.atuacao, escritorio: p.escritorio });
+        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pasta: r.pasta, imagens: r.imagens.map((x) => path.basename(x)), pdf: r.pdf, ...(r.avisos?.length ? { avisos: r.avisos } : {}) }) }] };
       } catch (e) {
+        if (e?.trava) return { isError: true, content: [{ type: 'text', text: `As imagens não foram geradas: ${e.message}` }] };
         return { isError: true, content: [{ type: 'text', text: `Não consegui gerar as imagens: ${e?.message ?? e}. Entregue o texto dos slides no chat.` }] };
       }
     },
@@ -534,12 +549,18 @@ function buildServer() {
         'agenda (titulo + itens {titulo, texto}: o roteiro da conversa) · secao (divisor de capítulo: etiqueta com o número, titulo, subtitulo) · templo (titulo + itens {titulo, texto}, 2 a 4: pilares de valores sustentando o escritório, subtitulo = nome no frontão) · ilustracao (titulo, subtitulo, ilustracao: ' + NOMES_ILUSTRACAO.join(', ') + ') · ' +
         'diagrama (titulo + itens {titulo, texto, icone, ligacao}, modelo "fluxo" com 2 a 5 nós ligados por seta, ou "hub" com o primeiro item no centro e até 6 ao redor) · imagem (titulo, subtitulo, imagem do assessor, modelo "metade" ou "cheia") · ' +
         'ícones da biblioteca (use em itens de pilares, etapas, lista e diagrama): ' + NOMES_ICONE.join(', ') + '; o assessor também pode usar a própria imagem, citando o nome do arquivo guardado na pasta "Minhas imagens" · ' +
-        'tabela (titulo, cabecalho[], linhas[][]) · barras (titulo + itens {rotulo, valor em %, valor2 opcional}, legenda[] se houver valor2) · frase (titulo como frase-conclusão) · lista (titulo + itens {titulo, texto}, até 6) · galeria (titulo, subtitulo opcional, itens {titulo, texto, imagem, icone}, 2 a 3 colunas com a foto do assessor ou de pessoas em moldura em arco; sem imagem, usa o ícone) · fechamento (titulo, passos[], contato[]). ' +
+        'tabela (titulo, cabecalho[], linhas[][]) · barras (titulo + itens {rotulo, valor em %, valor2 opcional}, legenda[] se houver valor2; o número escrito é o enviado, negativo sai à esquerda do zero em outra cor; só %) · ' +
+        'rosca (titulo + itens {rotulo, valor, texto opcional}, 2 a 8: composição, ex.: classes da carteira em % ou em R$; as fatias saem dos valores enviados) · ' +
+        'linha (titulo + rotulos[] + series [{nome, valores[]}], até 3 séries: histórico em base 100 feito pelo código; com retornos=true os valores são o retorno % de cada período e inicio é o rótulo do ponto de partida; sem retornos, níveis como cota ou preço) · ' +
+        'comparativo (titulo + legenda [A, B] + itens {rotulo, valor, valor2, texto opcional}, até 7: A × B com a diferença calculada no meio; se o valor não for número, a diferença mostra o texto) · frase (titulo como frase-conclusão) · lista (titulo + itens {titulo, texto}, até 6) · galeria (titulo, subtitulo opcional, itens {titulo, texto, imagem, icone}, 2 a 3 colunas com a foto do assessor ou de pessoas em moldura em arco; sem imagem, usa o ícone) · fechamento (titulo, passos[], contato[]). ' +
         'Regras: um título-conclusão por página, textos curtos, sem emoji, sem dado inventado; use só os layouts que o assunto pede e varie-os (não repita o mesmo em páginas seguidas). Nome, escritório, logo e foto vêm do perfil (mesa_perfil, campo marca); se faltarem, a página sai sem eles. ' +
+        'cliente (apelido ou iniciais, nunca CPF, conta ou valor) vai na capa e no rodapé. tipo: reuniao (padrão) ou, em material de mercado, estudo ou mercado: aí a trava de palavras só barra promessa, risco zero e superlativo, e rentabilidade ou retorno precisa do período na mesma página (ex.: "em 12 meses até out/2026"); a linha de fonte, os valores e os rótulos dos gráficos só passam pela trava de promessa, risco zero e superlativo, como o titulo, o rodape e o cliente. ' +
         'O rodapé leva a identificação do profissional e o aviso de compliance. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF, e diga onde o arquivo ficou. Se vier "avisos", conte ao assessor.',
       inputSchema: {
         titulo: z.string().min(2).max(120).describe('Nome da peça (vira o nome da pasta)'),
         tema: z.enum(['escuro', 'claro', 'marinho']).optional().describe('Padrão: o do perfil, ou escuro'),
+        cliente: z.string().max(60).optional().describe('Nome curto do cliente na capa e no rodapé: apelido ou iniciais'),
+        tipo: z.enum(['reuniao', 'carteira', 'relatorio', 'proposta', 'diagnostico', 'estudo', 'mercado', 'geral']).optional().describe('reuniao (padrão): trava de palavras completa; estudo ou mercado: lista menor, para material de mercado'),
         estilo: z.enum(['serifada', 'moderna', 'minimo']).optional().describe('serifada e moderna: visual private, com cartões, degradês e molduras (padrão: serifada); minimo: o visual enxuto antigo'),
         cor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Cor de destaque; padrão: a do perfil ou a do tema'),
         rodape: z.string().max(260).optional().describe('Identificação do profissional e aviso, em uma linha, em todas as páginas'),
@@ -560,11 +581,15 @@ function buildServer() {
             icone: z.string().max(400).optional().describe('Nome de um ícone da biblioteca ou imagem do assessor (caminho ou nome do arquivo em "Minhas imagens")'),
             ligacao: z.string().max(40).optional().describe('diagrama fluxo: texto curto da seta que sai deste item'),
             rotulo: z.string().max(80).optional(), titulo: z.string().max(90).optional(), texto: z.string().max(260).optional(),
-            valor: z.union([z.string().max(24), z.number()]).optional(), valor2: z.number().optional(), fonte: z.string().max(100).optional(),
+            valor: z.union([z.string().max(24), z.number()]).optional(), valor2: z.union([z.string().max(24), z.number()]).optional().describe('barras: segundo valor em %; comparativo: o valor da coluna B'), fonte: z.string().max(100).optional(),
           })).max(8).optional(),
           cabecalho: z.array(z.string().max(60)).max(5).optional(),
           linhas: z.array(z.array(z.string().max(120)).max(5)).max(8).optional(),
           legenda: z.array(z.string().max(40)).max(2).optional(),
+          rotulos: z.array(z.string().max(24)).max(24).optional().describe('linha: um rótulo por ponto, ex.: meses'),
+          series: z.array(z.object({ nome: z.string().max(40), valores: z.array(z.number()).max(24) })).max(3).optional().describe('linha: até 3 séries, um valor por rótulo'),
+          retornos: z.boolean().optional().describe('linha: true quando os valores são o retorno % de cada período'),
+          inicio: z.string().max(20).optional().describe('linha com retornos: rótulo do ponto de partida (base 100), ex.: "dez/25"'),
           passos: z.array(z.string().max(140)).max(5).optional(),
           contato: z.array(z.string().max(120)).max(5).optional(),
           fonte: z.string().max(160).optional(),
@@ -589,21 +614,51 @@ function buildServer() {
       title: 'Gerar documento em PDF',
       description:
         'Gera um PDF (A4) com o texto final que você escreveu, em seções. Use quando o assessor pedir o resultado em PDF. ' +
-        'O texto de cada seção aceita parágrafos, listas com "- ", títulos com "## ", **negrito** e tabelas em linhas "| a | b |" (primeira linha é o cabeçalho). ' +
+        'O texto de cada seção aceita parágrafos, listas com "- ", listas numeradas com "1. ", títulos com "## ", **negrito** e tabelas em linhas "| a | b |" (primeira linha é o cabeçalho; coluna de números sai alinhada à direita; linha que começa com "Total" sai destacada). ' +
+        'cliente (apelido ou iniciais, nunca CPF, conta ou valor) e dataBase vão no cabeçalho: "Preparado para M. · Data-base 31/10/2026". capa=true abre com uma capa (título, cliente, logo e foto do perfil): use em Proposta e Estudo. ' +
+        'destaques: até 4 cartões no topo com número grande, rótulo e nota, só com números que estão no texto. grafico em uma seção (barras, barras-duplas, rosca ou linha, com rotulos e series): o código desenha o gráfico e, embaixo, a tabela com os mesmos números (diferença e total feitos pelo código), então não repita essa tabela no texto. Rosca com duas séries em % (ex.: Política e Atual) desenha as duas lado a lado; bandas (uma por rótulo) põem na tabela a Banda e a Situação, dentro ou fora. ' +
+        'tipo escolhe o aviso do fim (carteira, relatorio, proposta, diagnostico, estudo, mercado ou geral); o rodapé de toda página já leva o aviso curto e o número da página. Trava de palavras: promessa de retorno, risco zero e superlativo em qualquer texto (título, destaques, seções, gráfico, rodapé) impedem o PDF; em estudo e mercado, rentabilidade ou retorno pedem o período na mesma seção (ex.: "em 12 meses até out/2026"). ' +
         'Dado de mercado leva fonte e data no próprio texto. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho devolvido, e diga ao assessor onde o arquivo ficou.',
       inputSchema: {
         titulo: z.string().min(2).max(120),
         subtitulo: z.string().max(200).optional().describe('Ex.: ativo e data-base'),
-        secoes: z.array(z.object({ titulo: z.string().max(120).optional(), texto: z.string().max(8000) })).min(1).max(30),
+        cliente: z.string().max(60).optional().describe('Para quem é o material: apelido ou iniciais, ex.: "M." ou "Família T."'),
+        dataBase: z.string().max(40).optional().describe('Data-base dos números, ex.: 31/10/2026'),
+        capa: z.boolean().optional().describe('true: página de capa (Proposta e Estudo)'),
+        tipo: z.enum(['reuniao', 'carteira', 'relatorio', 'proposta', 'diagnostico', 'estudo', 'mercado', 'geral']).optional().describe('Decide o texto do aviso no fim do documento'),
+        tema: z.enum(['marinho', 'escuro', 'claro']).optional().describe('Cores da folha, sempre em fundo branco: marinho (padrão), escuro (grafite) ou claro (bege)'),
+        destaques: z.array(z.object({ rotulo: z.string().max(40), valor: z.string().max(30), nota: z.string().max(80).optional() })).max(4).optional().describe('Até 4 números em destaque no topo, ex.: {rotulo: "Renda fixa pós", valor: "70% → 40%", nota: "atual → modelo"}'),
+        secoes: z.array(z.object({
+          titulo: z.string().max(120).optional(),
+          texto: z.string().max(8000).optional(),
+          grafico: z.object({
+            tipo: z.enum(['barras', 'barras-duplas', 'rosca', 'linha']),
+            titulo: z.string().max(100).optional(),
+            rotulos: z.array(z.string().max(60)).min(1).max(24),
+            series: z.array(z.object({ nome: z.string().max(40), valores: z.array(z.number()).max(24) })).min(1).max(3).describe('barras: 1 série; barras-duplas: 2 (A e B); rosca: 1, ou 2 em % (ex.: Política e Atual); linha: até 3'),
+            unidade: z.string().max(6).optional().describe('%, R$, US$ ou vazio'),
+            casas: z.number().int().min(0).max(4).optional(),
+            retornos: z.boolean().optional().describe('linha: valores são o retorno % de cada período; o código compõe a base 100'),
+            base100: z.boolean().optional().describe('linha: valores são níveis (cota, preço); o código põe em base 100'),
+            inicio: z.string().max(20).optional().describe('linha com retornos: rótulo do ponto de partida'),
+            categoria: z.string().max(30).optional().describe('Nome da primeira coluna da tabela'),
+            total: z.boolean().optional().describe('barras: linha de total na tabela (a rosca já soma)'),
+            bandas: z.array(z.number().min(0)).max(24).optional().describe('Com 2 séries (alvo e atual), em rosca ou barras-duplas: a tolerância de cada rótulo, na unidade do gráfico (em %, pontos percentuais); o código põe Banda e Situação (dentro ou fora) na tabela'),
+            tabela: z.boolean().optional().describe('false: só o gráfico, sem a tabela'),
+            fonte: z.string().max(160).optional(),
+          }).optional().describe('Gráfico desenhado pelo código a partir destes números, com a tabela dos mesmos números embaixo'),
+        })).min(1).max(30),
         rodape: z.string().max(400).optional().describe('Identificação do profissional e avisos, quando a peça for para o público'),
+        termosConfirmados: z.array(z.string().max(40)).max(8).optional().describe('Só quando o assessor afirmou de fato algo que a trava de palavras bloqueou; nunca por conta própria'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     async (args) => {
       try {
         const p = lerPerfil();
-        const r = await gerarDocumento(args, { ...(p.marca || {}), nome: p.nome, escritorio: p.escritorio });
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pdf: r.pdf }) }] };
+        const r = await gerarDocumento(args, { ...(p.marca || {}), nome: p.nome, escritorio: p.escritorio, cargo: p.atuacao });
+        const fora = r.foraDoPdf ? { aviso: `Ficou fora do PDF, porque é do assessor: ${r.foraDoPdf.join(', ')}. Entregue isso no chat, depois do link do arquivo.` } : {};
+        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pdf: r.pdf, ...fora }) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui gerar o PDF: ${e?.message ?? e}. Entregue o texto no chat.` }] };
       }
@@ -691,6 +746,88 @@ function buildServer() {
         return { content: [{ type: 'text', text: JSON.stringify(json.data ?? json) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui falar com o CaptaMais: ${e?.message ?? e}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'painel_macro',
+    {
+      title: 'Painel de juros, inflação e câmbio (Banco Central e IBGE)',
+      description:
+        'Consulta as fontes oficiais direto, por código, e devolve num pacote só: indicadores (Selic, CDI ao ano e no mês, IPCA do mês e em 12 meses, meta de inflação, IGP-M, dólar, euro, poupança e desemprego, ' +
+        'cada um com o código da série, valor, unidade, data e as variações já calculadas no dia, no mês, no ano e contra a referência escolhida), juroReal (Selic contra o IPCA de 12 meses e contra o IPCA esperado, com a conta), ' +
+        'copom (as duas últimas reuniões: data, decisão, placar, texto do comunicado e link da ata), focus (medianas da data mais recente e de 4 semanas antes, deste ano e do próximo), ' +
+        'agenda (divulgações do IBGE nos próximos 30 dias) e lacunas (o que não respondeu, com o motivo). Chame antes de qualquer busca sobre juros, inflação ou câmbio. ' +
+        'Use as variações como vieram, sem refazer as contas; o que estiver em lacunas fica marcado, sem estimar.',
+      inputSchema: {
+        recorte: z.enum(Object.keys(RECORTES)).optional().describe('Padrão: Painel completo'),
+        comparar: z.enum(REFERENCIAS).optional().describe('Referência da coluna Antes. Padrão: Mês passado'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ recorte, comparar }) => {
+      try {
+        const painel = await painelMacro({ recorte, comparar });
+        return { content: [{ type: 'text', text: JSON.stringify(painel) }], structuredContent: painel };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: `Não consegui montar o painel agora: ${e?.message ?? e}. Busque as séries oficiais uma a uma (api.bcb.gov.br, SGS) e marque o que não achar, sem estimar.` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'documentos_cvm',
+    {
+      title: 'Documentos das companhias abertas (CVM)',
+      description:
+        'Lista fatos relevantes e comunicados ao mercado de uma companhia aberta pela base aberta da CVM (dados.cvm.gov.br): data de entrega, categoria, assunto, protocolo e link oficial, do mais recente para o mais antigo. ' +
+        'Com protocolo, baixa o PDF do documento para a pasta Mesa do Assessor/Fontes e devolve o caminho do arquivo; se você não conseguir ler o PDF, diga isso ao assessor e peça o texto colado, sem resumir por notícia. ' +
+        'A base da CVM é atualizada uma vez por semana: o campo aviso diz até que dia ela vai, e documento entregue depois disso não aparece; nesse caso peça ao assessor o texto, o link ou o PDF. ' +
+        'Empresa: nome da companhia ou CNPJ (a analise_ativo devolve o cnpj pelo ticker). Se o nome servir para mais de uma companhia, a resposta traz as candidatas: chame de novo com o CNPJ.',
+      inputSchema: {
+        empresa: z.string().max(120).optional().describe('Nome da companhia ou CNPJ, ex.: Petrobras ou 33.000.167/0001-01'),
+        tipos: z.array(z.string().max(60)).max(6).optional().describe('Categorias da CVM. Padrão: Fato Relevante e Comunicado ao Mercado. Outras: Aviso aos Acionistas, Assembleia, Calendário de Eventos Corporativos'),
+        quantidade: z.number().int().min(1).max(20).optional().describe('Quantos documentos, do mais recente para o mais antigo. Padrão: 5'),
+        protocolo: z.string().max(20).optional().describe('Protocolo de um documento da lista: baixa o PDF e devolve o caminho do arquivo'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ empresa, tipos, quantidade, protocolo }) => {
+      if (!empresa && !protocolo) return { isError: true, content: [{ type: 'text', text: 'Informe o nome ou o CNPJ da companhia, ou o protocolo de um documento.' }] };
+      try {
+        const r = await documentosCvm({ empresa, tipos, quantidade, protocolo });
+        return { content: [{ type: 'text', text: JSON.stringify(r) }], structuredContent: r };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: `Não consegui consultar a CVM agora: ${e?.message ?? e}. Peça ao assessor o texto, o link ou o PDF do comunicado.` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'taxas_tesouro',
+    {
+      title: 'Taxas e preços do Tesouro Direto (Tesouro Transparente)',
+      description:
+        'Lê o arquivo oficial de preços e taxas do Tesouro Direto (Tesouro Transparente, guardado no dia) e devolve a última data base. ' +
+        'Para um título: taxa de compra e de venda já com o indexador escrito (taxaCompraTexto, por exemplo "IPCA + 7,76% ao ano"), preço (PU), forma de pagamento, dias até o vencimento ' +
+        'e, em parecidos, o título de vencimento mais perto de cada tipo: a referência do "título público de prazo parecido" para comparar CDB, LCI, LCA, debênture ou fundo na mesma base. ' +
+        'Aceita o nome do site ("Tesouro IPCA+ 2035", "Prefixado 2029", "Renda+ 2030", "Educa+ 2027") e os antigos (LTN, LFT, NTN-B, NTN-B Principal, NTN-F). ' +
+        'No Renda+ e no Educa+ o ano do nome é o início da renda mensal, não o vencimento. Sem título e com vencimento: os títulos de prazo parecido com essa data. Sem nada: a lista do dia. ' +
+        'Cite a fonte e a data base que vierem na resposta. O arquivo não diz se o título está à venda hoje: não diga que está disponível para compra.',
+      inputSchema: {
+        titulo: z.string().max(120).optional().describe('Nome do título, ex.: Tesouro IPCA+ 2035, Prefixado 2029, Renda+ 2030, NTN-B 2045'),
+        vencimento: z.string().max(20).optional().describe('Data de vencimento DD/MM/AAAA. Com título, escolhe entre títulos do mesmo tipo; sem título, é o prazo do produto a comparar'),
+        indexador: z.enum(['prefixado', 'ipca', 'selic', 'igpm']).optional().describe('Restringe os títulos parecidos e a lista a um indexador'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ titulo, vencimento, indexador }) => {
+      try {
+        const r = await taxasTesouro({ titulo, vencimento, indexador }, { pastaCache: path.join(PASTA_PERFIL, 'cache') });
+        return { content: [{ type: 'text', text: JSON.stringify(r) }], structuredContent: r };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: `Não consegui ler o arquivo do Tesouro agora: ${e?.message ?? e}. Marque o título público de prazo parecido como sem dado, sem estimar.` }] };
       }
     },
   );

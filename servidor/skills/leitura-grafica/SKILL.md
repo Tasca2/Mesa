@@ -57,6 +57,6 @@ Pedido pontual recebe o trecho pertinente e a limitação necessária. Se fundam
 ## Na Mesa do Assessor (acrescentado)
 
 - **Sem imagem nem série**: com o CaptaMais conectado, `analise_ativo` traz o histórico do ativo. Confira a periodicidade que veio antes de calcular. Se for mensal, a leitura é mensal: indicador que o assessor pediu em outra escala (ex.: IFR de 14 dias no gráfico diário) fica pendente, com o pedido da série ou do print na escala certa. Não converta mensal em diário.
-- **Escala declarada**: toda leitura abre dizendo ativo, período, escala e fonte. Se o campo "Ativo, período e escala" veio incompleto, pergunte só a escala.
-- **Ordem da entrega**: base e limites da entrada · estrutura de preços · níveis com o critério · indicadores pedidos, com parâmetros · condições e o que invalidaria a leitura · leitura para o cliente.
+- **Escala declarada**: toda leitura abre dizendo ativo, período, escala e fonte. Se o campo Escala veio em branco, use a escala que os dados permitem e diga qual foi, sem perguntar.
+- **Ordem da entrega**: a do pedido da Mesa: frase · base · medidas · estrutura · níveis com o critério · indicadores pedidos, com parâmetros · o que distorce o gráfico · condições e o que invalidaria a leitura · leitura para o cliente · conferir.
 - **Leitura para o cliente**: descreva o que o preço fez no período ("oscilou entre X e Y, com fonte e data"), sem dizer para onde vai. Se ele perguntar "vai subir?", a resposta pronta é que gráfico descreve o passado e que a decisão volta ao objetivo e ao prazo dele.

@@ -21,6 +21,9 @@ Entregar um PDF que pareça feito por um designer do escritório: poucas palavra
 - `etapas`: sequência no tempo (processo, plano de execução, próximos 30 dias).
 - `tabela`: comparação ou plano com colunas (de-para, prazos, responsáveis).
 - `barras`: composição em % (alocação atual); com `valor2` e `legenda` mostra antes × depois ou A × B. Só com dado real informado e `fonte`.
+- `rosca`: composição de uma carteira ou de um patrimônio (2 a 8 itens `rotulo` + `valor`, em % ou em R$). As fatias saem dos valores enviados. Só com dado real informado e `fonte`.
+- `linha`: histórico em base 100, até 3 séries (`rotulos`, `series` [{nome, valores}]); com `retornos: true` os valores são o retorno % de cada período e `inicio` é o ponto de partida. Cada série com `fonte` e data.
+- `comparativo`: A × B lado a lado (`legenda` [A, B], itens `rotulo` + `valor` + `valor2`), com a diferença calculada no meio; quando o valor não é número (ex.: "D+0"), o `texto` do item vai no lugar da diferença.
 - `frase`: uma conclusão por página, em letra grande, para virar o ponto da conversa.
 - `lista`: 2 a 6 itens curtos com título e uma linha (equipe, para quem atendo, documentos).
 - `diagrama`: mostra uma relação em vez de descrevê-la. `modelo: "fluxo"` (2 a 5 nós ligados por seta, com `ligacao` curta na seta: custódia "cliente → corretora ← escritório", processo, caminho de um recurso) ou `modelo: "hub"` (o primeiro item no centro e até 6 ao redor: o assessor e a equipe de apoio, o escritório e as soluções). Só desenhe o que o assessor informou: sem custodiante informado, não há diagrama de custódia.
@@ -67,7 +70,8 @@ Poucas palavras, bastante espaço em branco, uma só ideia por página, títulos
 
 ## Gerar e conferir
 - Chame `mesa_apresentacao` com `titulo`, o `rodape` e os `slides` (de 6 a 12 páginas, nunca mais de 14). Passe `previas: true` só quando puder abrir as imagens para conferir.
-- A ferramenta tem uma trava: se uma frase afirmar independência, custo, regulação, garantia, superlativo ou retorno sem `[CONFERIR]`, o PDF não é gerado e ela lista as frases. Reescreva só com o que o assessor informou (ou marque `[CONFERIR]`) e chame de novo. `termosConfirmados` só se o assessor disse aquilo com todas as letras.
+- Passe `cliente` (apelido ou iniciais): ele sai na capa e no rodapé.
+- A ferramenta tem uma trava: se uma frase afirmar independência, custo, regulação, garantia, superlativo ou retorno sem `[CONFERIR]`, o PDF não é gerado e ela lista as frases. A linha `fonte`, os valores e os rótulos dos gráficos só passam pela parte de promessa, risco zero e superlativo, como o `titulo`, o `rodape` e o `cliente`. Em material de mercado (`tipo: "estudo"` ou `"mercado"`), a trava usa uma lista menor: barra promessa de retorno, risco zero e superlativo, e pede o período junto de rentabilidade ou retorno na mesma página ("em 12 meses até out/2026"); "Banco Central", "CVM" e "garantia do FGC" passam. Reescreva só com o que o assessor informou (ou marque `[CONFERIR]`) e chame de novo. `termosConfirmados` só se o assessor disse aquilo com todas as letras.
 - Os `[CONFERIR]` saem destacados nas páginas; no fim da resposta liste o que o assessor precisa preencher ou validar.
 - Se a ferramenta devolver `avisos` (logo ou foto não encontrados, formato não aceito), conte ao assessor em uma frase.
 - Depois, `mesa_andamento` com `concluido` e `entrega.arquivo` = caminho do PDF, e diga onde o arquivo ficou.

@@ -56,7 +56,7 @@ Antes de montar a abordagem, chame `mesa_perfil` e `consultar_cofre` (tema `cold
 - **Descoberta (SPIN)**: motivo da conversa, objetivo e emoção por trás dele (não aceite só a primeira resposta), perguntas de problema, de implicação negativa e de implicação positiva. Use os ganchos que o lead falar: não é script.
 - **O que fica para a reunião**: mapeamento de instituições, renda fixa x variável e valores são perguntas da reunião de descoberta, depois que ele aceitou conversar. Na primeira mensagem ou nos primeiros minutos da ligação, não pergunte patrimônio nem onde ele investe.
 - **Solução**: só depois da dor; falar do escritório antes de resolver o problema do lead não vende.
-- **Depois do primeiro contato**: entregue uma linha para cada caminho (se ele responder; se não responder, quando e por onde voltar a falar, uma vez). Sequência completa de toques só se o assessor pedir: aí use `retomada-lead-frio`. Para a resposta a uma objeção, `objecoes`.
+- **Depois do primeiro contato**: entregue uma linha para cada caminho (se ele responder; se não responder, quando e por onde voltar a falar, uma vez). Sequência completa de toques só se o assessor pedir: na Mesa, é a tarefa Sequência para lead novo (skill `roteiro-comercial`); lead que já conversou e parou de responder é `retomada-lead-frio`. Para a resposta a uma objeção, `objecoes`.
 
 ## Modelo de saída na Mesa (nesta ordem)
 
@@ -64,7 +64,7 @@ Antes de montar a abordagem, chame `mesa_perfil` e `consultar_cofre` (tema `cold
 **Peça principal**, só a do canal escolhido, pronta para copiar:
 - `whatsapp`: até 4 linhas. Quem sou e de onde nos conhecemos · o motivo específico · uma pergunta de resposta fácil. Sem anexo, sem link, sem falar de produto.
 - `email`: assunto de até 6 palavras, sem "oportunidade" nem "proposta" · 5 a 6 linhas · uma chamada só.
-- `roteiro-ligacao`: abertura de 30 a 40 segundos (nome, motivo, pedido de permissão) · o porquê da ligação em 2 frases · 2 perguntas de qualificação · como marcar o próximo passo · o que dizer se ele não puder falar agora.
+- Ligação: na Mesa, a ligação de primeiro contato é a tarefa Ligação de primeiro contato (skill `roteiro-comercial`); aqui a peça é só mensagem.
 **Perguntas de descoberta** — 4 a 6, para quando ele aceitar conversar: objetivo, o que o incomoda hoje, o que acontece se nada mudar. Nenhuma sobre valores.
 **Contexto público que vale citar** — até 3 fatos com fonte e data, ou "nada encontrado: abertura pelo vínculo".
 **Se ele responder / se não responder** — uma linha para cada caminho.
