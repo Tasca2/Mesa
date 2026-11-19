@@ -735,7 +735,7 @@ function buildServer() {
           method: 'POST',
           redirect: 'error', signal: AbortSignal.timeout(20000),
           headers: { 'Content-Type': 'application/json', 'x-captamais-market-key': CHAVE, 'x-captamais-client': 'mesa-do-assessor/1.0.0' },
-          body: JSON.stringify({ ticker, tipo, nome, cnpj, pesquisa: pesquisa === true }),
+          body: JSON.stringify({ ticker: ticker ? ticker.normalize('NFD').replace(/[̀-ͯ]/g, '') : ticker, tipo, nome, cnpj, pesquisa: pesquisa === true }),
         });
         const json = await res.json().catch(() => ({}));
         if (res.status === 404) return { content: [{ type: 'text', text: 'Esta versão do CaptaMais ainda não oferece a análise de ativo pelo conector. Peça ao assessor os dados da tela Análise de Ativo (colagem ou print) e siga com eles.' }] };
