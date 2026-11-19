@@ -743,6 +743,7 @@ const servidor = http.createServer(async (req, res) => {
         estado.video = { ativo: true, dir, nome: arq, usado: false }; guardarConversa();
         return json(res, 200, { ok: true, caminho: path.join(dir, arq), nome: arq, edvid: existsSync(EDVID_DIR) });
       }
+      case '/api/video/descartar': { if (!estado.rodando && estado.video && estado.video.usado === false) { estado.video = null; guardarConversa(); } return json(res, 200, { ok: true }); }
       case '/api/video/preparo': return json(res, 200, await preparoVideo());
       case '/api/video/instalar': { const r = instalarVideo(); return json(res, r.erro ? 409 : 200, r); }
       case '/api/video/chave': { const r = gravarChaveGroq(corpo.chave); return json(res, r.erro ? 400 : 200, r); }

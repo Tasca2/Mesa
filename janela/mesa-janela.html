@@ -262,6 +262,7 @@
     async escolherVideo() { return api("/api/escolher-video"); }
     async listarVideos() { return api("/api/videos"); }
     async usarVideo(pasta) { return api("/api/usar-video", { pasta }); }
+    async descartarVideo() { return api("/api/video/descartar"); }
     async preparoVideo() { return api("/api/video/preparo"); }
     async instalarVideo() { return api("/api/video/instalar"); }
     async salvarChaveGroq(chave) { return api("/api/video/chave", { chave }); }
@@ -3158,46 +3159,86 @@
       caixa.style.cssText = "background:#17171a;color:#f3eee6;border:1px solid rgba(232,200,142,.45);border-radius:18px;padding:26px 28px;max-width:580px;width:100%;max-height:88vh;overflow:auto";
       const h = document.createElement("h3"); h.textContent = "Qual vídeo você quer editar?"; h.style.cssText = "margin:0 0 8px;font-size:22px";
       const p = document.createElement("p"); p.style.cssText = "margin:0 0 16px;font-size:14px;line-height:1.5;opacity:.8";
-      p.textContent = "Escolha o arquivo no seu computador. A Mesa guarda uma cópia em Documentos › Mesa do Assessor › Videos e o edvid edita a cópia, sem mexer no original. Só o áudio vai a um serviço de transcrição (Groq).";
+      p.textContent = "Escolha um vídeo, confira a seleção e clique em Concluir e editar. A Mesa guarda uma cópia em Documentos › Mesa do Assessor › Videos e o edvid edita a cópia, sem mexer no original. Só o áudio vai a um serviço de transcrição (Groq).";
       const est = document.createElement("div"); est.style.cssText = "min-height:20px;font-size:14px;margin:12px 0 0;color:#e8c88e";
-      const acoes = document.createElement("div"); acoes.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;margin-top:6px";
+      const lista = document.createElement("div"); lista.style.cssText = "display:flex;flex-direction:column;gap:6px;margin:0 0 4px";
+      const rot = document.createElement("div"); rot.style.cssText = "margin:18px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;opacity:.7;display:none";
+      const acoes = document.createElement("div"); acoes.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1)";
       const botoes = [];
+      const itens = [];
+      let sel = null, escolhaDoPc = false, ocupado = false;
       const fechar = (v) => { fundo.remove(); resolve(v || ""); };
-      const trava = (sim) => botoes.forEach((b) => { b.disabled = sim; b.style.opacity = sim ? ".5" : ""; });
-      const concluir = (r) => {
-        if (r && r.ok) {
-          if (!r.edvid) { est.textContent = "O vídeo foi copiado, mas a skill edvid não está instalada neste computador. Instale a skill edvid para editar."; trava(false); return; }
-          fechar(r.caminho); return;
-        }
-        if (r && r.cancelado) { est.textContent = "Nenhum vídeo escolhido."; trava(false); return; }
-        est.textContent = (r && r.erro) || "Não consegui usar esse vídeo."; trava(false);
+      const desistir = () => { if (ocupado) return; if (escolhaDoPc) { try { app.descartarVideo(); } catch {   } } fechar(""); };
+      const erroDe = (e, padrao) => (e && e.message && !/^motor /.test(e.message) ? e.message : padrao);
+      const concluirBt = document.createElement("button"); concluirBt.type = "button"; concluirBt.className = "mini ouro"; concluirBt.textContent = "Concluir e editar"; concluirBt.disabled = true; concluirBt.style.opacity = ".5";
+      const trava = (sim) => { ocupado = sim; botoes.forEach((b) => { b.disabled = sim; b.style.opacity = sim ? ".5" : ""; }); concluirBt.disabled = sim || !sel; concluirBt.style.opacity = concluirBt.disabled ? ".5" : ""; };
+      const pintar = () => {
+        itens.forEach((it) => {
+          const marcado = sel === it.alvo;
+          it.b.setAttribute("aria-pressed", marcado ? "true" : "false");
+          it.marca.textContent = marcado ? "✓" : "";
+          it.marca.style.cssText = "display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;margin-right:10px;flex:none;font-size:13px;font-weight:700;" + (marcado ? "background:#e8c88e;color:#17171a;border:1px solid #e8c88e" : "border:1px solid rgba(255,255,255,.35)");
+          it.b.style.borderColor = marcado ? "#e8c88e" : "";
+          it.b.style.background = marcado ? "rgba(232,200,142,.16)" : "";
+        });
+        concluirBt.disabled = ocupado || !sel; concluirBt.style.opacity = concluirBt.disabled ? ".5" : "";
+        est.textContent = sel ? "Selecionado: " + sel.nome : "";
       };
-      const escolher = document.createElement("button"); escolher.type = "button"; escolher.className = "mini ouro"; escolher.textContent = "Escolher um vídeo no computador…";
+      const novoItem = (alvo, texto, noTopo) => {
+        const b = document.createElement("button"); b.type = "button"; b.className = "mini"; b.style.cssText = "text-align:left;justify-content:flex-start;white-space:normal;align-items:center";
+        const marca = document.createElement("span"); const t = document.createElement("span"); t.textContent = texto;
+        b.append(marca, t);
+        b.onclick = () => { if (ocupado) return; sel = sel === alvo ? null : alvo; pintar(); };
+        itens.push({ b, marca, alvo }); botoes.push(b);
+        if (noTopo) lista.insertBefore(b, lista.firstChild); else lista.append(b);
+        rot.style.display = "";
+      };
+      const escolher = document.createElement("button"); escolher.type = "button"; escolher.className = "mini"; escolher.textContent = "Escolher outro vídeo no computador…";
+      escolher.style.cssText = "border-color:#5b9dff;background:rgba(91,157,255,.16);color:#d6e6ff";
       escolher.onclick = async () => {
         trava(true); est.textContent = "Abrindo a janela de arquivos… escolha o vídeo e clique em Abrir.";
-        try { concluir(await app.escolherVideo()); }
-        catch (e) { est.textContent = e && e.message && !/^motor /.test(e.message) ? e.message : "Não consegui abrir a janela de arquivos."; trava(false); }
+        try {
+          const r = await app.escolherVideo();
+          if (r && r.ok) {
+            if (!r.edvid) { est.textContent = "O vídeo foi copiado, mas o editor de vídeo não está instalado neste computador."; trava(false); return; }
+            escolhaDoPc = true;
+            const nome = String(r.caminho || "").split(/[\\/]/).pop();
+            const alvo = { tipo: "caminho", caminho: r.caminho, nome };
+            novoItem(alvo, nome + " · do computador", true);
+            sel = alvo; trava(false); pintar(); return;
+          }
+          est.textContent = r && r.cancelado ? "Nenhum vídeo escolhido." : ((r && r.erro) || "Não consegui usar esse vídeo.");
+          trava(false); if (sel) pintar();
+        } catch (e) { est.textContent = erroDe(e, "Não consegui abrir a janela de arquivos."); trava(false); }
       };
-      const cancelar = document.createElement("button"); cancelar.type = "button"; cancelar.className = "mini"; cancelar.textContent = "Cancelar"; cancelar.onclick = () => fechar("");
-      botoes.push(escolher, cancelar); acoes.append(escolher, cancelar);
-      caixa.append(h, p, acoes, est);
-      fundo.append(caixa); fundo.addEventListener("keydown", (e) => { if (e.key === "Escape") fechar(""); });
+      concluirBt.onclick = async () => {
+        if (!sel || ocupado) return;
+        if (sel.tipo === "caminho") { fechar(sel.caminho); return; }
+        trava(true); est.textContent = "Preparando…";
+        try {
+          const r = await app.usarVideo(sel.pasta);
+          if (r && r.ok && r.edvid) { fechar(r.caminho); return; }
+          est.textContent = r && r.ok ? "O editor de vídeo não está instalado neste computador." : ((r && r.erro) || "Não consegui usar esse vídeo.");
+        } catch (e) { est.textContent = erroDe(e, "Não consegui usar esse vídeo."); }
+        trava(false); pintar();
+      };
+      const cancelar = document.createElement("button"); cancelar.type = "button"; cancelar.className = "mini"; cancelar.textContent = "Cancelar"; cancelar.onclick = desistir;
+      botoes.push(escolher, cancelar);
+      acoes.append(concluirBt, cancelar);
+      caixa.append(h, p, escolher, rot, lista, est, acoes);
+      fundo.append(caixa); fundo.addEventListener("keydown", (e) => { if (e.key === "Escape") desistir(); });
       document.body.append(fundo); escolher.focus();
       app.listarVideos().then((l) => {
         if (!l?.itens?.length) return;
-        const rot = document.createElement("div"); rot.textContent = "Ou use um vídeo que você já enviou:"; rot.style.cssText = "margin:20px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;opacity:.7";
-        const lista = document.createElement("div"); lista.style.cssText = "display:flex;flex-direction:column;gap:6px";
+        const vistos = new Set();
         l.itens.forEach((v) => {
-          const b = document.createElement("button"); b.type = "button"; b.className = "mini"; b.style.cssText = "text-align:left;justify-content:flex-start";
+          if (vistos.has(v.nome)) return;
+          vistos.add(v.nome);
           const quando = new Date(v.em).toLocaleDateString("pt-BR");
-          const primeiro = lista.children.length === 0;
-          b.textContent = primeiro ? "Usar este vídeo: " + v.nome + " · " + quando : v.nome + " · " + quando;
-          if (primeiro) { b.className = "mini ouro"; b.style.cssText = "text-align:left;justify-content:flex-start;white-space:normal"; escolher.className = "mini"; escolher.textContent = "Escolher outro vídeo no computador…"; }
-          b.onclick = async () => { trava(true); est.textContent = "Preparando…"; try { concluir(await app.usarVideo(v.pasta)); } catch (e) { est.textContent = e && e.message && !/^motor /.test(e.message) ? e.message : "Não consegui usar esse vídeo."; trava(false); } };
-          botoes.push(b); lista.append(b);
+          novoItem({ tipo: "pasta", pasta: v.pasta, nome: v.nome }, v.nome + " · " + quando, false);
         });
-        rot.textContent = "Último vídeo que você enviou" + (l.itens.length > 1 ? " e outros anteriores:" : ":");
-        caixa.insertBefore(rot, acoes); caixa.insertBefore(lista, acoes);
+        rot.textContent = vistos.size > 1 ? "Vídeos que você já enviou:" : "Vídeo que você já enviou:";
+        pintar();
       }).catch(() => {});
     });
   }
