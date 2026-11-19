@@ -854,7 +854,20 @@
       const vd = e.videos, qual = vd.final ? "final" : "cut", inf = vd[qual], caixa = document.createElement("div"); caixa.className = "galeria";
       const rotulo = document.createElement("div"); rotulo.className = "esp";
       rotulo.textContent = qual === "final" ? "Vídeo final pronto. Salvo em Documentos › Mesa do Assessor › Videos editados." : "Corte para aprovar (Fase 1): " + (vd.nome || ""); caixa.append(rotulo);
-      const pl = document.createElement("video"); pl.controls = true; pl.preload = "metadata"; pl.style.cssText = "width:100%;height:64vh;object-fit:contain;border-radius:12px;background:#000;margin-top:6px";
+      const ajustarPlayer = (pl, caixa) => {
+        const vw = pl.videoWidth, vh = pl.videoHeight;
+        if (!vw || !vh) return;
+        const medir = () => {
+          if (!pl.isConnected) { window.removeEventListener("resize", medir); return; }
+          const larg = Math.max(200, caixa.clientWidth || 600);
+          const alt = Math.max(240, Math.round(window.innerHeight * 0.78));
+          const e = Math.min(larg / vw, alt / vh);
+          pl.style.width = Math.floor(vw * e) + "px"; pl.style.height = Math.floor(vh * e) + "px";
+        };
+        medir(); window.addEventListener("resize", medir);
+      };
+      const pl = document.createElement("video"); pl.controls = true; pl.preload = "metadata"; pl.style.cssText = "display:block;width:100%;height:64vh;object-fit:contain;border-radius:12px;background:#000;margin:6px auto 0";
+      pl.addEventListener("loadedmetadata", () => ajustarPlayer(pl, caixa));
       pl.src = "/api/video?f=" + qual + "&t=" + TOKEN + "&v=" + inf.em; caixa.append(pl);
       const b = document.createElement("button"); b.type = "button"; b.className = "bt"; b.textContent = "Abrir a pasta";
       b.onclick = () => api("/api/abrir-pasta", { video: true }).catch(() => {});
@@ -2690,6 +2703,7 @@
     "- Use a skill edvid. Procure, nesta conversa, uma mensagem com «Vídeo anexado: <caminho>». Se ainda não houver, peça em uma frase para eu anexar pelo botão + › Anexar vídeo e termine a resposta aí, sem fazer mais nada.",
     "- COMECE A EDIÇÃO AGORA, sem perguntas antes: eu já autorizo a estratégia (esta é a minha ordem direta, vale no lugar da confirmação de estratégia do edvid). Leia a transcrição, deduza sozinho o tema e o tom, escreva a estratégia em até 3 linhas na conversa (só para eu ler) e execute a Fase 1 em seguida.",
     "- Fase 1: corte limpo (tire silêncios, hesitações e repetições), correção de cor e ampliação automática do vídeo (zoom in nos pontos de ênfase e nos cortes, com zoomAuto e zoomCuts do edvid). Grave edit/cut.mp4.",
+    "- Formato: o Reels sai em vertical 9:16, com a imagem ocupando o quadro inteiro. Se o vídeo original for horizontal (16:9), reenquadre cortando as laterais, centrado no rosto de quem fala, sem barras pretas em cima e embaixo e sem deixar a imagem pequena no meio do quadro. Se o original já for vertical, mantenha como está.",
     "- Fale comigo em frases simples e curtas, como numa conversa, sem jargão (nada de inventário, EDL, gate, fase, transcript). Registre o andamento com mesa_andamento usando EXATAMENTE estes passos, nesta ordem: «Preparando o vídeo», «Ouvindo e transcrevendo», «Cortando e ajustando a cor», «Sua aprovação do corte», «Legendas e elementos visuais», «Vídeo final pronto». Em «agora», diga em linguagem simples o que está fazendo (ex.: «Cortando as pausas e ajustando a cor do vídeo»).",
     "- Quando o cut.mp4 existir, diga em uma frase o que fez e peça a minha aprovação. Só depois da aprovação, pergunte o estilo das legendas e siga: Fase 2 (legendas e elementos visuais) e, se eu quiser, Fase 3 (trilha).",
     "- Grave tudo na pasta edit/ ao lado do vídeo (cut.mp4 no primeiro corte, final.mp4 no fim). A Mesa mostra esses vídeos aqui na conversa, com botão para baixar. Ao terminar, a Mesa copia sozinha o vídeo final para Documentos › Mesa do Assessor › Videos editados › (nome do vídeo)-editado.mp4: diga isso, nesse caminho.",
