@@ -3,7 +3,6 @@ PACOTE="${MESA_EDVID_PACOTE:-$(cd "$(dirname "$0")/../edvid" 2>/dev/null && pwd)
 SKILLS="${MESA_SKILLS_DIR:-$HOME/.claude/skills}"
 STATUS="${MESA_STATUS_VIDEO:-$HOME/.mesa-do-assessor/instalacao-video.json}"
 CHAVE_GROQ="${MESA_CHAVE_GROQ:-}"
-EDVID_URL="${MESA_EDVID_URL:-}"
 TOTAL=7
 ERROS=()
 ED="$SKILLS/edvid"
@@ -59,18 +58,11 @@ if [ -z "$PY" ]; then brew_instalar python@3.12; PY="$(python_cmd)"; [ -n "$PY" 
 passo 3 "ffmpeg"
 if ! { tem ffmpeg && tem ffprobe; }; then brew_instalar ffmpeg; { tem ffmpeg && tem ffprobe; } || falhou "Não consegui instalar o ffmpeg. Instale com Homebrew (brew install ffmpeg) e rode de novo."; fi
 
-passo 4 "Editor Edvid"
-if [ ! -f "$ED/SKILL.md" ] && [ -n "$EDVID_URL" ]; then
-  TMPE="$(mktemp -d)"
-  if curl -fsSL "$EDVID_URL" -o "$TMPE/e.zip" && unzip -q "$TMPE/e.zip" -d "$TMPE"; then
-    RAIZE="$(find "$TMPE" -mindepth 1 -maxdepth 1 -type d | head -1)"
-    if [ -f "$RAIZE/SKILL.md" ]; then mkdir -p "$ED" && cp -R "$RAIZE/." "$ED/" && registrar "Edvid baixado do GitHub"; fi
-  else registrar "Edvid: download do GitHub não deu certo; usando a cópia do kit"; fi
-  rm -rf "$TMPE"
-fi
-if [ ! -f "$ED/SKILL.md" ]; then
-  if [ -n "$PACOTE" ] && [ -f "$PACOTE/SKILL.md" ]; then mkdir -p "$ED" && cp -R "$PACOTE/." "$ED/" && registrar "Edvid copiado do kit"
-  else falhou "Não consegui baixar o editor Edvid e a cópia do kit não está aqui."; fi
+passo 4 "Edição Mesa"
+if [ -n "$PACOTE" ] && [ -f "$PACOTE/SKILL.md" ]; then
+  mkdir -p "$ED" && cp -R "$PACOTE/." "$ED/" && rm -f "$ED/install.md" "$ED/assets/preview/edvid-logo.png" "$ED/assets/preview/edvid-logo-white.png" && registrar "Edição Mesa instalada ou atualizada a partir da Mesa"
+elif [ ! -f "$ED/SKILL.md" ]; then
+  falhou "Não encontrei a Edição Mesa dentro da instalação da Mesa. Instale a Mesa de novo."
 fi
 if [ -d "$ED" ] && [ ! -f "$ED/.env" ]; then
   if [ -f "$ED/.env.example" ]; then cp "$ED/.env.example" "$ED/.env"; else : > "$ED/.env"; fi

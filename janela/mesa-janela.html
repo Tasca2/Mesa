@@ -470,7 +470,7 @@
       let r = {}; try { r = JSON.parse(x.responseText); } catch {   }
       if (x.status !== 200 || !r.ok) { msg((r && r.erro) || "Não consegui enviar o vídeo. Tente de novo."); return; }
       msg("");
-      if (!r.edvid) alert("O vídeo foi salvo, mas a skill edvid não está instalada neste computador. Instale a skill edvid para editar.");
+      if (!r.edvid) alert("O vídeo foi salvo, mas a Edição Mesa não está instalada neste computador. Instale a Mesa de novo para editar.");
       const linha = "Vídeo anexado: " + r.caminho + ". Pode começar.";
       txt.value = txt.value.trim() ? txt.value.trim() + "\n" + linha : linha;
       ajustarAltura(); atualizarBotao(); txt.focus();
@@ -794,7 +794,7 @@
     e.turnos.forEach((t, i) => {
       const b = document.createElement("div");
       if (t.papel === "sistema") { b.className = "esp"; b.style.cssText = "text-align:center;font-size:12px;opacity:.7"; b.textContent = "— " + t.texto.toLowerCase() + " —"; }
-      else if (t.papel === "progresso") { b.className = "ia"; b.style.cssText = "font-size:14px;padding:8px 14px;opacity:.92"; b.textContent = t.texto; const rt = document.createElement("div"); rt.textContent = "EDVID"; rt.style.cssText = "font-size:10.5px;letter-spacing:.14em;color:#e8c88e;margin-bottom:2px"; b.prepend(rt); }
+      else if (t.papel === "progresso") { b.className = "ia"; b.style.cssText = "font-size:14px;padding:8px 14px;opacity:.92"; b.textContent = t.texto; const rt = document.createElement("div"); rt.textContent = "EDIÇÃO MESA"; rt.style.cssText = "font-size:10.5px;letter-spacing:.14em;color:#e8c88e;margin-bottom:2px"; b.prepend(rt); }
       else if (t.papel === "assessor") { b.className = "eu"; b.textContent = t.texto.length > 400 ? t.texto.slice(0, 400) + "…" : t.texto; }
       else {
         b.className = "ia md"; const limpo = tirarMarcas(t.texto) || "Pronto.";
@@ -873,8 +873,8 @@
       b.onclick = () => api("/api/abrir-pasta", { video: true }).catch(() => {});
       const dl = document.createElement("a"); dl.className = "bt"; dl.textContent = qual === "final" ? "Baixar o vídeo final" : "Baixar o corte";
       dl.href = "/api/video?f=" + qual + "&t=" + TOKEN + "&baixar=1"; dl.download = ""; dl.style.cssText = "text-decoration:none;display:inline-block;margin-right:8px";
-      const ed = document.createElement("button"); ed.type = "button"; ed.className = "bt"; ed.textContent = "Abrir o editor do Edvid"; ed.style.cssText = "margin-right:8px;border-color:rgba(232,200,142,.6);color:#e8c88e";
-      ed.onclick = async () => { ed.textContent = "Abrindo o editor…"; try { await api("/api/editor"); ed.textContent = "Abrir o editor do Edvid"; } catch (er) { ed.textContent = "Abrir o editor do Edvid"; alert(er && er.message ? er.message : "Não consegui abrir o editor."); } };
+      const ed = document.createElement("button"); ed.type = "button"; ed.className = "bt"; ed.textContent = "Abrir a Edição Mesa"; ed.style.cssText = "margin-right:8px;border-color:rgba(232,200,142,.6);color:#e8c88e";
+      ed.onclick = async () => { ed.textContent = "Abrindo o editor…"; try { await api("/api/editor"); ed.textContent = "Abrir a Edição Mesa"; } catch (er) { ed.textContent = "Abrir a Edição Mesa"; alert(er && er.message ? er.message : "Não consegui abrir o editor."); } };
       const acV = document.createElement("div"); acV.style.cssText = "margin-top:10px"; acV.append(ed, dl, b); caixa.append(acV);
       corpo.append(caixa);
     }
@@ -969,7 +969,7 @@
       { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo da semana?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] },
       { id: "quantos", curto: "Posts", titulo: "Quantos posts?", opcoes: [{ t: "3" }, { t: "5", d: "Padrão: de segunda a sexta" }, { t: "7" }] },
       { id: "programar", curto: "Programar", titulo: "Como você vai programar?", opcoes: [{ t: "Meta Business Suite", d: "Com o passo a passo da Central de Ajuda da Meta" }, { t: "Conector ligado ao Claude", d: "No Claude Desktop, com o conector já ligado" }, { t: "Só quero a pasta", d: "Imagens e legendas prontas; você programa como quiser" }] } ] },
-    "editar-reels": { nome: "Editar um vídeo (Reels)", linha: "Escolha o vídeo no computador e o edvid faz a edição.", ref: "", acao: "Escolher o vídeo e editar", perguntas: [
+    "editar-reels": { nome: "Editar um vídeo (Reels)", linha: "Escolha o vídeo no computador e a Edição Mesa faz a edição.", ref: "", acao: "Escolher o vídeo e editar", perguntas: [
       { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo do vídeo?", opcoes: [{ t: "Captar novos clientes" }, { t: "Educar iniciantes" }, { t: "Relacionamento com clientes" }, { t: "Bastidores do escritório" }] } ] },
     "cliente-novo": { nome: "Cliente novo", linha: "Ficha de entrada e o que pedir ao cliente.", ref: "rotina prospect-intake", acao: "Abrir a ficha", perguntas: [
       { id: "ponto", curto: "Momento", titulo: "Em que ponto está esse cliente?", opcoes: [{ t: "Antes da primeira conversa", d: "O que perguntar e pedir a ele" }, { t: "Já tenho notas ou documentos", d: "Extratos, IR ou carteira" }] } ] },
@@ -2556,7 +2556,7 @@
     const vidro = el("section", "vidro acomp" + (pronto ? " pronto" : "") + (sv === "sua-vez" ? " suavez" : ""));
     const rotulo = pronto ? (sv === "pensando" ? "Entrega pronta · o Claude está finalizando a mensagem" : "Entrega pronta") : sv === "sua-vez" ? "Sua vez" : sv === "pensando" ? "O Claude está trabalhando" : a || semNoticia ? (emJanela ? "Agora, na conversa com o Claude" : "Agora, na conversa abaixo") : "O Claude está lendo o pedido";
     const ehVideo = ehEdicaoVideo();
-    vidro.append(el("div", "rotulo", `<i></i>${ehVideo ? (pronto ? "Edvid · vídeo pronto" : sv === "sua-vez" ? "Edvid · esperando você" : "Edvid · editando") : rotulo}`));
+    vidro.append(el("div", "rotulo", `<i></i>${ehVideo ? (pronto ? "Edição Mesa · vídeo pronto" : sv === "sua-vez" ? "Edição Mesa · esperando você" : "Edição Mesa · editando") : rotulo}`));
     if (ehVideo) {
       const tot = a?.passos?.length || 6, feitos = (a?.passos || []).filter((p) => p.estado === "feito").length;
       const pct = pronto ? 100 : Math.max(6, Math.round((feitos / tot) * 100));
@@ -2696,11 +2696,11 @@
     ...(perfil?.tom ? [`Meu tom: ${perfil.tom}`] : []),
     ...linhasVoz(),
     "",
-    "Objetivo: editar o meu vídeo para um Reels (vertical 9:16) usando a skill edvid (trilha short-form).",
+    "Objetivo: editar o meu vídeo para um Reels (vertical 9:16) usando a skill edvid, que para mim se chama Edição Mesa (trilha short-form).",
     ...(ps.length ? ["", "Minhas escolhas:", ...ps.map((p) => `- ${p.curto}: ${(estado.respostas[p.id] ?? ["não informado"]).join(", ")}`)] : []),
     "",
     "Como proceder:",
-    "- Use a skill edvid. Procure, nesta conversa, uma mensagem com «Vídeo anexado: <caminho>». Se ainda não houver, peça em uma frase para eu anexar pelo botão + › Anexar vídeo e termine a resposta aí, sem fazer mais nada.",
+    "- Use a skill edvid (para mim ela se chama Edição Mesa: nunca escreva Edvid na conversa). Procure, nesta conversa, uma mensagem com «Vídeo anexado: <caminho>». Se ainda não houver, peça em uma frase para eu anexar pelo botão + › Anexar vídeo e termine a resposta aí, sem fazer mais nada.",
     "- COMECE A EDIÇÃO AGORA, sem perguntas antes: eu já autorizo a estratégia (esta é a minha ordem direta, vale no lugar da confirmação de estratégia do edvid). Leia a transcrição, deduza sozinho o tema e o tom, escreva a estratégia em até 3 linhas na conversa (só para eu ler) e execute a Fase 1 em seguida.",
     "- Fase 1: corte limpo (tire silêncios, hesitações e repetições), correção de cor e ampliação automática do vídeo (zoom in nos pontos de ênfase e nos cortes, com zoomAuto e zoomCuts do edvid). Grave edit/cut.mp4.",
     "- Formato: o Reels sai em vertical 9:16, com a imagem ocupando o quadro inteiro. Se o vídeo original for horizontal (16:9), reenquadre cortando as laterais, centrado no rosto de quem fala, sem barras pretas em cima e embaixo e sem deixar a imagem pequena no meio do quadro. Se o original já for vertical, mantenha como está.",
@@ -3150,7 +3150,7 @@
       if (p && p.pronto) pedirChave();
       else {
         h.textContent = "Preparar o editor de vídeo";
-        const faltam = [!p.python && "Python", !p.ffmpeg && "ffmpeg", !p.node && "Node.js", !p.edvid && "o editor Edvid"].filter(Boolean);
+        const faltam = [!p.python && "Python", !p.ffmpeg && "ffmpeg", !p.node && "Node.js", !p.edvid && "a Edição Mesa"].filter(Boolean);
         t.textContent = "Para editar vídeo, a Mesa instala no seu computador" + (faltam.length ? ": " + faltam.join(", ") : " os programas que faltam") + ", mais o modelo de legendas. Leva alguns minutos, uma vez só.";
         mostrar(mini("Instalar e continuar", "mini ouro", instalar), cancelar());
       }
@@ -3173,7 +3173,7 @@
       caixa.style.cssText = "background:#17171a;color:#f3eee6;border:1px solid rgba(232,200,142,.45);border-radius:18px;padding:26px 28px;max-width:580px;width:100%;max-height:88vh;overflow:auto";
       const h = document.createElement("h3"); h.textContent = "Qual vídeo você quer editar?"; h.style.cssText = "margin:0 0 8px;font-size:22px";
       const p = document.createElement("p"); p.style.cssText = "margin:0 0 16px;font-size:14px;line-height:1.5;opacity:.8";
-      p.textContent = "Escolha um vídeo, confira a seleção e clique em Concluir e editar. A Mesa guarda uma cópia em Documentos › Mesa do Assessor › Videos e o edvid edita a cópia, sem mexer no original. Só o áudio vai a um serviço de transcrição (Groq).";
+      p.textContent = "Escolha um vídeo, confira a seleção e clique em Concluir e editar. A Mesa guarda uma cópia em Documentos › Mesa do Assessor › Videos e a Edição Mesa edita a cópia, sem mexer no original. Só o áudio vai a um serviço de transcrição (Groq).";
       const est = document.createElement("div"); est.style.cssText = "min-height:20px;font-size:14px;margin:12px 0 0;color:#e8c88e";
       const lista = document.createElement("div"); lista.style.cssText = "display:flex;flex-direction:column;gap:6px;margin:0 0 4px";
       const rot = document.createElement("div"); rot.style.cssText = "margin:18px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;opacity:.7;display:none";

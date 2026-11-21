@@ -27,7 +27,7 @@ O Python, o ffmpeg, o Node.js e o editor de vídeo **não precisam ser instalado
 
 1. Extraia o arquivo `Mesa-do-Assessor.zip` em qualquer pasta.
 2. Dê dois cliques em **Instalar a Mesa**.
-3. O instalador pergunta uma vez: **Instalar agora? (S/N)**. Respondendo S, ele instala a Mesa e, em seguida, o que ela usa para editar vídeos (Python, ffmpeg, Node.js e o editor Edvid) e cria na área de trabalho o atalho **Mesa**. A chave gratuita da Groq, usada para transcrever a fala do vídeo, a Mesa pede só na primeira vez que você for editar um vídeo.
+3. O instalador pergunta uma vez: **Instalar agora? (S/N)**. Respondendo S, ele instala a Mesa e, em seguida, o que ela usa para editar vídeos (Python, ffmpeg, Node.js e a Edição Mesa) e cria na área de trabalho o atalho **Mesa**. A chave gratuita da Groq, usada para transcrever a fala do vídeo, a Mesa pede só na primeira vez que você for editar um vídeo.
 4. Se o Windows pedir uma confirmação durante a instalação, aceite. Depois feche o Claude e abra de novo.
 
 ## Instalar no Mac
@@ -104,11 +104,11 @@ Ao conectar, a Mesa avisa o CaptaMais **quais tarefas você usou** (só os nomes
 
 A tarefa **Editar um vídeo (Reels)**, em Post para Instagram, corta, ajusta a cor e coloca legendas num vídeo vertical, e o resultado fica em **Documentos › Mesa do Assessor › Videos editados**.
 
-O instalador já deixa tudo pronto: o editor **Edvid**, o **ffmpeg**, o **Python**, o **Node.js** e o modelo de legendas. O editor vem dentro da Mesa, já com o jeito de editar ajustado (corte limpo, cor, zoom e legendas simples), e o instalador o coloca em `.claude/skills/edvid` sem baixar nada de outro lugar. Ele é baseado no Edvid, um projeto de código aberto (licença MIT, mantida na pasta). Python, ffmpeg e Node.js são baixados dos sites oficiais, e as bibliotecas do editor (pip e npm) dos repositórios oficiais. A única coisa que falta é a sua **chave gratuita da Groq**, que é importante: é ela que transcreve a fala do vídeo para criar as legendas. A Mesa não cria contas por você, então na primeira edição ela abre uma janela, você cria a chave no site da Groq, cola ali e pronto. Cada pessoa usa a sua.
+O instalador já deixa tudo pronto: a **Edição Mesa** (o editor de vídeo), o **ffmpeg**, o **Python**, o **Node.js** e o modelo de legendas. A Edição Mesa vem dentro da Mesa, já com o jeito de editar ajustado (corte limpo, cor, zoom e legendas simples), e o instalador a coloca em `.claude/skills/edvid` sem baixar nada de outro lugar. Ela é baseada em um projeto de código aberto (licença MIT, mantida na pasta). Python, ffmpeg e Node.js são baixados dos sites oficiais, e as bibliotecas do editor (pip e npm) dos repositórios oficiais. A única coisa que falta é a sua **chave gratuita da Groq**, que é importante: é ela que transcreve a fala do vídeo para criar as legendas. A Mesa não cria contas por você, então na primeira edição ela abre uma janela, você cria a chave no site da Groq, cola ali e pronto. Cada pessoa usa a sua.
 
 Se por algum motivo algo não estiver instalado, ao clicar na tarefa a Mesa mostra **Instalar e continuar** e instala na hora, com o andamento na tela. Só o áudio do vídeo vai ao serviço de transcrição. Música e imagens de apoio pedem chaves próprias, opcionais, que você coloca no arquivo `.env` do editor se quiser usá-las.
 
-Ao clicar na tarefa, a Mesa abre a janela de arquivos, você escolhe o vídeo e a edição começa. O corte aparece na tela para você aprovar, e **Abrir o editor do Edvid** deixa ajustar na linha do tempo.
+Ao clicar na tarefa, a Mesa pergunta **Qual vídeo você quer editar?**. Você marca o vídeo na lista (ou escolhe outro no computador pelo botão azul), confere a seleção e clica em **Concluir e editar**. A Mesa guarda uma cópia em **Documentos › Mesa do Assessor › Videos** e edita a cópia, sem mexer no original. O corte aparece na tela para você aprovar, e **Abrir a Edição Mesa** deixa ajustar na linha do tempo. O Reels sai sempre em vertical (9:16): se o vídeo original for horizontal, a Mesa reenquadra para o rosto de quem fala, sem barras pretas.
 
 ## Se algo não funcionar
 

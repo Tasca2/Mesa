@@ -91,7 +91,7 @@ const PROTOCOLO = 'Você é o assistente dentro da janela da Mesa do Assessor. A
   'Quando o Resultado for "Texto no chat", a resposta final traz o TEXTO COMPLETO da entrega, pronto para copiar, e não só um resumo; as dúvidas e o que conferir vêm depois, em poucas linhas. ' +
   'ENTREGA COMPLETA: nunca entregue só a lista ou a descrição do que cada peça contém ("3 peças entregues: roteiro, resumo..."). O texto integral e pronto de cada peça vai na resposta final, cada um em sua marca <peca>; o cartão da entrega leva o mesmo conteúdo. ' +
   'REVISÃO: antes de entregar texto para cliente ou público, confira sem promessa nem projeção de retorno, sem "compre/venda/indico", com a identificação do profissional, e com [CONFERIR] em todo número sem fonte; corrija antes de entregar.';
-const VERSAO = '1.15';
+const VERSAO = '1.15.1';
 const MODELOS = [['', 'Padrão do Claude Code'], ['claude-fable-5-2', 'Fable 5.2'], ['claude-opus-5-5', 'Opus 5.5'], ['claude-sonnet-5-5', 'Sonnet 5.5'], ['claude-haiku-5-5', 'Haiku 5.5']];
 const ARQ_MODELO = path.join(PASTA_DADOS, 'modelo.json');
 let modeloEscolhido = ''; let modeloUsado = '';
@@ -242,7 +242,7 @@ async function abrirEditorEdvid() {
   const edit = path.join(d, 'edit');
   if (!existsSync(path.join(edit, 'cut.mp4')) && !existsSync(path.join(edit, 'final.mp4'))) return { erro: 'O corte ainda não ficou pronto. Quando ele aparecer, abra o editor.' };
   const servidorPy = path.join(EDVID_DIR, 'helpers', 'preview_server.py');
-  if (!existsSync(servidorPy)) return { erro: 'Não achei o editor do Edvid neste computador.' };
+  if (!existsSync(servidorPy)) return { erro: 'Não achei a Edição Mesa neste computador.' };
   escreverStateEditor(edit);
   if (!editorProc || editorProc.exitCode !== null || editorDir !== edit) {
     try { editorProc?.kill(); } catch {   }
@@ -252,7 +252,7 @@ async function abrirEditorEdvid() {
     editorProc.on('error', () => { editorProc = null; });
     let ok = false;
     for (let i = 0; i < 40 && !ok && editorProc; i++) { try { ok = (await fetch(`http://127.0.0.1:${editorPorta}/api/state`, { signal: AbortSignal.timeout(800) })).ok; } catch { await new Promise((r) => setTimeout(r, 250)); } }
-    if (!ok) { try { editorProc?.kill(); } catch {   } editorProc = null; return { erro: 'Não consegui ligar o editor do Edvid.' }; }
+    if (!ok) { try { editorProc?.kill(); } catch {   } editorProc = null; return { erro: 'Não consegui ligar a Edição Mesa.' }; }
   }
   const url = `http://127.0.0.1:${editorPorta}/`, nav = navegador();
   if (nav) spawn(nav, [`--app=${url}`, '--window-size=1400,900', `--user-data-dir=${path.join(PASTA_DADOS, 'navegador')}`, '--disable-extensions', '--no-first-run', '--no-default-browser-check'], { detached: true, stdio: 'ignore' }).unref();
@@ -263,8 +263,8 @@ const vistoEditor = {};
 setInterval(() => {
   if (!editorProc || estado.rodando || !estado.video?.ativo) return;
   for (const [arq, texto, exibir] of [
-    ['preview_edits.json', 'Salvei ajustes no editor do Edvid. Leia preview_edits.json na pasta edit, confira as bordas dos cortes contra as falas (speech_regions.py), aplique, refaça o corte, apague o arquivo e diga em uma frase o que mudou, sem termos técnicos.', 'Salvei ajustes no editor do Edvid.'],
-    ['preview_style.json', 'Escolhi o estilo no editor do Edvid. Leia preview_style.json na pasta edit, monte as legendas e os elementos com essa escolha, apague o arquivo ao terminar e diga em uma frase o que mudou, sem termos técnicos.', 'Escolhi o estilo no editor do Edvid.'],
+    ['preview_edits.json', 'Salvei ajustes na Edição Mesa. Leia preview_edits.json na pasta edit, confira as bordas dos cortes contra as falas (speech_regions.py), aplique, refaça o corte, apague o arquivo e diga em uma frase o que mudou, sem termos técnicos.', 'Salvei ajustes na Edição Mesa.'],
+    ['preview_style.json', 'Escolhi o estilo na Edição Mesa. Leia preview_style.json na pasta edit, monte as legendas e os elementos com essa escolha, apague o arquivo ao terminar e diga em uma frase o que mudou, sem termos técnicos.', 'Escolhi o estilo na Edição Mesa.'],
   ]) {
     let mt = 0; try { mt = statSync(path.join(editorDir, arq)).mtimeMs; } catch { continue; }
     if (mt === vistoEditor[arq]) continue;

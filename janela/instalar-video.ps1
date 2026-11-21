@@ -2,7 +2,6 @@
   [string]$Pacote = (Join-Path $PSScriptRoot '..\edvid'),
   [string]$Skills = (Join-Path $env:USERPROFILE '.claude\skills'),
   [string]$Status = (Join-Path $env:USERPROFILE '.mesa-do-assessor\instalacao-video.json'),
-  [string]$EdvidUrl = '',
   [string]$ChaveGroq = ''
 )
 if (-not $ChaveGroq) { $ChaveGroq = $env:MESA_CHAVE_GROQ }
@@ -116,30 +115,15 @@ if (-not (FfmpegOk)) {
   if (-not (FfmpegOk)) { Falhou 'Não consegui instalar o ffmpeg. Instale em ffmpeg.org e rode de novo.' }
 }
 
-Passo 4 'Editor Edvid'
-if (-not (Test-Path (Join-Path $Ed 'SKILL.md'))) {
-  if ($EdvidUrl) {
-    try {
-      $tmp = Join-Path $env:TEMP ('mesa-edvid-' + [guid]::NewGuid().ToString('N'))
-      New-Item -ItemType Directory -Force $tmp | Out-Null
-      Baixar $EdvidUrl (Join-Path $tmp 'e.zip')
-      Expand-Archive -Path (Join-Path $tmp 'e.zip') -DestinationPath $tmp -Force
-      $raiz = Get-ChildItem $tmp -Directory | Select-Object -First 1
-      if ($raiz -and (Test-Path (Join-Path $raiz.FullName 'SKILL.md'))) {
-        New-Item -ItemType Directory -Force $Ed | Out-Null
-        Copy-Item -Path (Join-Path $raiz.FullName '*') -Destination $Ed -Recurse -Force
-        Registrar 'Edvid baixado do GitHub'
-      }
-      Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-    } catch { Registrar ('Edvid: download do GitHub não deu certo (' + $_.Exception.Message + '); usando a cópia do kit') }
-  }
-  if (-not (Test-Path (Join-Path $Ed 'SKILL.md'))) {
-    if (Test-Path (Join-Path $Pacote 'SKILL.md')) {
-      New-Item -ItemType Directory -Force $Ed | Out-Null
-      Copy-Item -Path (Join-Path $Pacote '*') -Destination $Ed -Recurse -Force
-      Registrar 'Edvid copiado do kit'
-    } else { Falhou 'Não consegui baixar o editor Edvid e a cópia do kit não está aqui.' }
-  }
+Passo 4 'Edição Mesa'
+if (Test-Path (Join-Path $Pacote 'SKILL.md')) {
+  New-Item -ItemType Directory -Force $Ed | Out-Null
+  Copy-Item -Path (Join-Path $Pacote '*') -Destination $Ed -Recurse -Force
+  Get-ChildItem -Path $Pacote -Force -Filter '.*' -File -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName $Ed -Force }
+  foreach ($velho in @('install.md', 'assets\preview\edvid-logo.png', 'assets\preview\edvid-logo-white.png')) { Remove-Item (Join-Path $Ed $velho) -Force -ErrorAction SilentlyContinue }
+  Registrar 'Edição Mesa instalada ou atualizada a partir da Mesa'
+} elseif (-not (Test-Path (Join-Path $Ed 'SKILL.md'))) {
+  Falhou 'Não encontrei a Edição Mesa dentro da instalação da Mesa. Instale a Mesa de novo.'
 }
 $envArq = Join-Path $Ed '.env'
 if ((Test-Path $Ed) -and -not (Test-Path $envArq)) {
