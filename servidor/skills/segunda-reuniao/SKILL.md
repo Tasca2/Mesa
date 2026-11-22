@@ -1,6 +1,6 @@
 ---
 name: segunda-reuniao
-description: Prepara a segunda reunião, em que o assessor devolve ao cliente o que ouviu na primeira, mostra a leitura da situação e a proposta de trabalho e pede a decisão. Entrega roteiro, estrutura do material, adaptação ao perfil de quem decide, tratamento de objeção e fechamento com data. Descritivo, sem prometer resultado.
+description: Prepara a segunda reunião, em que o assessor devolve ao cliente o que ouviu na primeira, mostra a leitura da situação e a proposta de trabalho e pede a decisão. Gera o material da reunião em PDF e em PowerPoint editável e entrega o roteiro, a adaptação ao perfil de quem decide, o tratamento de objeção e o fechamento com data. Depois de gerado, o material evolui pela conversa. Descritivo, sem prometer resultado.
 ---
 
 # Segunda reunião: devolutiva e decisão
@@ -9,7 +9,7 @@ description: Prepara a segunda reunião, em que o assessor devolve ao cliente o 
 Transformar o que o cliente disse na primeira reunião em uma proposta clara e sair com uma decisão ou com o próximo passo marcado. Reunião que termina em "vou pensar" sem data não avançou. A segunda reunião só funciona se o material fala dos objetivos **nas palavras do cliente**.
 
 ## Entradas
-- O que o pedido diz: apelido do cliente, o que ele disse na primeira reunião (objetivos, preocupações, o que recusou), o que o assessor vai propor, duração e canal.
+- **Minhas escolhas**, no pedido: como o cliente decide, quem é o cliente e a data, o que ele disse na primeira reunião (objetivos, preocupações, o que recusou), a proposta e a carteira atual. "não informado" quer dizer que o assessor pulou a pergunta: gere com o que há, e o que faltar fica fora da página ou vai como `[CONFERIR]`. Não faça a pergunta da marca da skill `apresentacao-pdf`: foto e logo vêm do perfil.
 - O jeito de decidir do cliente. Se o assessor não souber, proponha pelo que ele contou e marque `[CONFERIR]`:
   - **Delega**: quer segurança e tranquilidade, pouco jargão, valoriza o atendimento.
   - **Valida**: quer entender a lógica e ver que o assessor sabe, compara antes de decidir.
@@ -28,7 +28,7 @@ Transformar o que o cliente disse na primeira reunião em uma proposta clara e s
 7. **Conclusão e próximos passos**: checklist, agenda com datas e contatos do assessor.
 8. **Nota de compliance**, no fim: "Material informativo. Não constitui oferta, recomendação nem garantia de retorno. A adequação ao perfil e a documentação seguem as normas aplicáveis." Inclui a identificação do profissional.
 
-**Em PDF** (Resultado PDF ou pedido de material pronto): carregue a skill `apresentacao-pdf` e gere as páginas com `mesa_apresentacao`. Layouts sugeridos: 1 `capa` (com sumário no subtítulo) · 2 `frase` ou `lista` (objetivos nas palavras dele) · 3 `pilares` ou `numeros` (cenário, com fonte e data) · 4 `rosca` (alocação atual: um item por classe, com o % informado) e, se houver, `tabela` (custos e liquidez) · 5 `comparativo` (atual × proposta por classe, `legenda` ["Atual", "Proposta"]; a diferença sai calculada) seguida de `pilares` (3 pontos do porquê) · se o assessor informar os retornos mensais da carteira, `linha` com `retornos: true` (carteira, CDI e índice, até 3 séries, cada uma com fonte e data) · 6 `etapas` ou `tabela` (plano de execução) · 7 `fechamento` · a nota de compliance vai no `rodape` e o `cliente` (apelido ou iniciais) vai na capa e no rodapé. Roteiro, objeções, WhatsApp e nota de CRM continuam em texto.
+**Em PDF e PowerPoint, sempre:** carregue a skill `apresentacao-pdf` e gere as páginas com `mesa_apresentacao`. A ferramenta devolve `pdf` e `pptx`: o PDF é o material de apresentar, e o PowerPoint é o mesmo conteúdo em texto e caixas editáveis, com visual mais simples (gráficos viram tabela). Diga onde os dois ficaram e que o PowerPoint abre no PowerPoint, no Google Slides ou importado no Canva. Se `pptx` vier vazio, diga que só o PDF saiu. Não existe a opção de entregar o material só como texto: se a ferramenta falhar, corrija o que ela apontou e gere de novo. Layouts sugeridos: 1 `capa` (com sumário no subtítulo) · 2 `frase` ou `lista` (objetivos nas palavras dele) · 3 `pilares` ou `numeros` (cenário, com fonte e data) · 4 `rosca` (alocação atual: um item por classe, com o % informado) e, se houver, `tabela` (custos e liquidez) · 5 `comparativo` (atual × proposta por classe, `legenda` ["Atual", "Proposta"]; a diferença sai calculada) seguida de `pilares` (3 pontos do porquê) · se o assessor informar os retornos mensais da carteira, `linha` com `retornos: true` (carteira, CDI e índice, até 3 séries, cada uma com fonte e data) · 6 `etapas` ou `tabela` (plano de execução) · 7 `fechamento` · a nota de compliance vai no `rodape` e o `cliente` (apelido ou iniciais) vai na capa e no rodapé. Roteiro, objeções, WhatsApp e nota de CRM continuam em texto.
 
 **Estrutura** (padrão 60 min):
 1. **Retomada (5 a 7 min):** conexão pessoal, horário-limite e o slide com os objetivos como ele disse. Pergunte: "continuam sendo as prioridades?".
@@ -42,9 +42,12 @@ Transformar o que o cliente disse na primeira reunião em uma proposta clara e s
 
 **Depois:** mensagem em até 24 h com o resumo do combinado e o que cada um faz, e 3 toques se a decisão ficou em aberto (use a skill `relatorio-e-proposta`).
 
+## Evoluir o material
+Depois da entrega, a conversa serve para melhorar o material: trocar um título, tirar ou acrescentar página, mudar o tema, ajustar a proposta. A cada pedido, chame `mesa_apresentacao` de novo com **todas** as páginas, mudando só o que ele pediu, e entregue o PDF e o PowerPoint novos. Diga em uma linha o que mudou e em qual página. Se ele editou o PowerPoint por fora, você não vê essa edição: peça que diga o que mudou.
+
 ## Modelo de saída (nesta ordem)
-**Resumo** — 2 linhas: o objetivo da reunião, o perfil de decisão e a decisão que se pede.
-**Peças** (cada uma separada, sem comentário dentro): `roteiro-reuniao` (minuto a minuto, o que fazer e dizer), `material` (as páginas já escritas para o cliente, com título por página, na ordem acima), `objecoes` (as 3 mais prováveis para esse perfil, com a pergunta que responde cada uma), `whatsapp` (resumo do combinado, até 4 linhas), `nota-crm` (decisão, pendências e data).
+**Resumo** — 2 linhas: o material está pronto, com o número de páginas e onde ficaram o PDF e o PowerPoint, e a decisão que se pede na reunião.
+**Peças** (cada uma separada, sem comentário dentro; a resposta final na conversa traz o caminho do PDF e do PowerPoint e todas as peças por inteiro: na janela da Mesa o assessor lê a conversa, e um "tudo entregue" deixa ele sem o texto): `roteiro-reuniao` (minuto a minuto, o que fazer e dizer), `objecoes` (as 3 mais prováveis para esse perfil, com a pergunta que responde cada uma), `whatsapp` (resumo do combinado, até 4 linhas), `nota-crm` (decisão, pendências e data).
 **Conferir** — perfil de decisão, números do cenário e da carteira, condições comerciais e remuneração.
 
 ## Exemplo

@@ -126,7 +126,7 @@ const COMO_ATUALIZAR = 'Em toda tarefa enviada pela Mesa (mensagem que começa c
   'chame mesa_andamento antes de cada pedido ao assessor, dizendo em uma frase o que ele precisa responder ou anexar no chat, ' +
   'e ao terminar, com concluido=true; depois registre a tarefa com mesa_perfil (registrar).';
 
-const PERFIL_VAZIO = { nome: '', atuacao: '', escritorio: '', publico: '', tom: '', exemplo: '', canal: '', tamanho: '', tratamento: '', assinatura: '', evitar: '', referencias: '', exemplos: [], historico: [], modelos: {} };
+const PERFIL_VAZIO = { nome: '', atuacao: '', escritorio: '', corretora: '', atendimento: '', pontosFortes: '', sobre: '', publico: '', tom: '', exemplo: '', canal: '', tamanho: '', tratamento: '', assinatura: '', evitar: '', referencias: '', exemplos: [], historico: [], modelos: {} };
 const lerPerfil = () => {
   try { return { ...PERFIL_VAZIO, ...JSON.parse(readFileSync(ARQUIVO_PERFIL, 'utf8')) }; } catch { return { ...PERFIL_VAZIO }; }
 };
@@ -350,7 +350,7 @@ function buildServer() {
     {
       title: 'Perfil do assessor',
       description:
-        'Lê o perfil do assessor (nome, atuação, escritório, público, tom, canal, tamanho, tratamento, assinatura, termos que evita, até 3 mensagens de exemplo e "Minhas referências", a ficha dos perfis de Instagram que ele acompanha) e as últimas tarefas feitas na Mesa. ' +
+        'Lê o perfil do assessor (nome, atuação, escritório, corretora, formato de atendimento, pontos fortes, quem ele é, público, tom, canal, tamanho, tratamento, assinatura, termos que evita, até 3 mensagens de exemplo e "Minhas referências", a ficha dos perfis de Instagram que ele acompanha) e as últimas tarefas feitas na Mesa. ' +
         'Chame no começo de toda tarefa da Mesa e use o que vier em vez de perguntar de novo. ' +
         'Para salvar ou atualizar o perfil, envie "salvar"; para lembrar a tarefa que acabou de entregar, envie "registrar".',
       inputSchema: {
@@ -358,6 +358,10 @@ function buildServer() {
           nome: z.string().max(80).optional(),
           atuacao: z.enum(['Assessor de investimento', 'Consultor de valores mobiliários', 'Planejador financeiro']).optional(),
           escritorio: z.string().max(80).optional(),
+          corretora: z.string().max(80).optional().describe('Corretora ou instituição com que o escritório trabalha e onde ficam os ativos do cliente'),
+          atendimento: z.string().max(80).optional().describe('Formato de atendimento, ex.: presencial, online, presencial e online'),
+          pontosFortes: z.string().max(600).optional().describe('Pontos fortes do assessor e do escritório, nas palavras dele'),
+          sobre: z.string().max(1200).optional().describe('Quem é o assessor: trajetória, formação, certificações, prêmios com o ano, o que o move'),
           publico: z.string().max(200).optional().describe('Quem ele atende, ex.: médicos, empresários, aposentados'),
           tom: z.string().max(200).optional().describe('Como ele fala com clientes, ex.: direto e próximo, formal'),
           exemplo: z.string().max(600).optional().describe('Uma mensagem real do assessor a um cliente, sem dados do cliente: serve de modelo do jeito de escrever, nunca dos fatos'),
@@ -542,9 +546,9 @@ function buildServer() {
   server.registerTool(
     'mesa_apresentacao',
     {
-      title: 'Gerar apresentação em PDF',
+      title: 'Gerar apresentação em PDF e PowerPoint',
       description:
-        'Gera uma apresentação em PDF (16:9) com a marca do assessor (logo, foto, cores e fonte guardadas no perfil), montada em layouts prontos. Use para apresentação de reunião (quem sou, escritório, soluções) e material de reunião. ' +
+        'Gera uma apresentação em PDF (16:9) e, junto, o mesmo conteúdo em PowerPoint editável (.pptx, com textos e caixas que o assessor muda no PowerPoint, no Google Slides ou importando no Canva), com a marca do assessor (logo, foto, cores e fonte guardadas no perfil), montada em layouts prontos. O PowerPoint tem visual mais simples que o PDF: gráficos e diagramas viram tabela ou cartões. Para mudar a apresentação depois, chame de novo com todos os slides já alterados: saem um PDF e um PowerPoint novos. Use para apresentação de reunião (quem sou, escritório, soluções) e material de reunião. ' +
         'Você escreve o conteúdo; o visual é dos layouts: capa (titulo, subtitulo) · perfil (titulo + itens {rotulo, texto}, até 5) · numeros (titulo + itens {valor, rotulo, fonte}, até 4, só número informado com fonte e data) · pilares (titulo + itens {titulo, texto}, 2 a 4) · etapas (titulo + itens {titulo, texto}, 2 a 4) · ' +
         'agenda (titulo + itens {titulo, texto}: o roteiro da conversa) · secao (divisor de capítulo: etiqueta com o número, titulo, subtitulo) · templo (titulo + itens {titulo, texto}, 2 a 4: pilares de valores sustentando o escritório, subtitulo = nome no frontão) · ilustracao (titulo, subtitulo, ilustracao: ' + NOMES_ILUSTRACAO.join(', ') + ') · ' +
         'diagrama (titulo + itens {titulo, texto, icone, ligacao}, modelo "fluxo" com 2 a 5 nós ligados por seta, ou "hub" com o primeiro item no centro e até 6 ao redor) · imagem (titulo, subtitulo, imagem do assessor, modelo "metade" ou "cheia") · ' +
@@ -555,7 +559,7 @@ function buildServer() {
         'comparativo (titulo + legenda [A, B] + itens {rotulo, valor, valor2, texto opcional}, até 7: A × B com a diferença calculada no meio; se o valor não for número, a diferença mostra o texto) · frase (titulo como frase-conclusão) · lista (titulo + itens {titulo, texto}, até 6) · galeria (titulo, subtitulo opcional, itens {titulo, texto, imagem, icone}, 2 a 3 colunas com a foto do assessor ou de pessoas em moldura em arco; sem imagem, usa o ícone) · fechamento (titulo, passos[], contato[]). ' +
         'Regras: um título-conclusão por página, textos curtos, sem emoji, sem dado inventado; use só os layouts que o assunto pede e varie-os (não repita o mesmo em páginas seguidas). Nome, escritório, logo e foto vêm do perfil (mesa_perfil, campo marca); se faltarem, a página sai sem eles. ' +
         'cliente (apelido ou iniciais, nunca CPF, conta ou valor) vai na capa e no rodapé. tipo: reuniao (padrão) ou, em material de mercado, estudo ou mercado: aí a trava de palavras só barra promessa, risco zero e superlativo, e rentabilidade ou retorno precisa do período na mesma página (ex.: "em 12 meses até out/2026"); a linha de fonte, os valores e os rótulos dos gráficos só passam pela trava de promessa, risco zero e superlativo, como o titulo, o rodape e o cliente. ' +
-        'O rodapé leva a identificação do profissional e o aviso de compliance. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF, e diga onde o arquivo ficou. Se vier "avisos", conte ao assessor.',
+        'O rodapé leva a identificação do profissional e o aviso de compliance. Depois de gerar, chame mesa_andamento com concluido=true e entrega.arquivo = o caminho do PDF, e diga onde ficaram o PDF e o PowerPoint (campo pptx da resposta; se vier vazio, diga que só o PDF saiu). Se vier "avisos", conte ao assessor.',
       inputSchema: {
         titulo: z.string().min(2).max(120).describe('Nome da peça (vira o nome da pasta)'),
         tema: z.enum(['escuro', 'claro', 'marinho']).optional().describe('Padrão: o do perfil, ou escuro'),
@@ -566,6 +570,7 @@ function buildServer() {
         rodape: z.string().max(260).optional().describe('Identificação do profissional e aviso, em uma linha, em todas as páginas'),
         termosConfirmados: z.array(z.string().max(40)).max(8).optional().describe('Só quando o assessor afirmou de fato algo que a trava de compliance bloqueou (ex.: "independência"); nunca por conta própria'),
         previas: z.boolean().optional().describe('true também gera uma imagem PNG por página (para conferir o visual)'),
+        pptx: z.boolean().optional().describe('Padrão true: gera também o PowerPoint editável ao lado do PDF'),
         slides: z.array(z.object({
           layout: z.enum(NOMES_LAYOUT),
           etiqueta: z.string().max(40).optional().describe('Rótulo pequeno acima do título, ex.: "Quem sou"'),
@@ -601,7 +606,7 @@ function buildServer() {
       try {
         const p = lerPerfil();
         const r = await gerarApresentacao(args, { ...(p.marca || {}), nome: p.nome, escritorio: p.escritorio, cargo: p.atuacao });
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pasta: r.pasta, pdf: r.pdf, imagens: r.imagens, avisos: r.avisos, minhasImagens: r.minhasImagens }) }] };
+        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, pasta: r.pasta, pdf: r.pdf, pptx: r.pptx, imagens: r.imagens, avisos: r.avisos, minhasImagens: r.minhasImagens }) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: `Não consegui gerar a apresentação: ${e?.message ?? e}. Entregue o texto dos slides no chat.` }] };
       }

@@ -82,6 +82,12 @@ const PROTOCOLO = 'Você é o assistente dentro da janela da Mesa do Assessor. A
   'Para mudar uma tarefa que já existe (opções de uma pergunta, regras pessoais) use <editar_tarefa>, para evoluir uma skill use <ajustar_skill> e para desfazer use <restaurar>, no formato descrito nas instruções da Mesa; nunca crie uma tarefa nova quando o assessor pedir para mudar a que está aberta. ' +
   'Nunca diga que criou, atualizou ou apagou algo sem incluir a marca na resposta final (depois de usar qualquer ferramenta). Escreva o JSON da tarefa em uma única marca, sem comentários dentro dele. ' +
   'Fora das marcas, explique em 1 ou 2 frases. Responda em português do Brasil. ' +
+  'FOCO NA TAREFA ABERTA: quando o [Contexto da Mesa] ou o pedido indicar uma tarefa aberta, a conversa inteira é só sobre ela: fazer a entrega, ajustar, gerar o material e tirar dúvidas dessa tarefa. ' +
+  'Se o assessor pedir algo que é trabalho de outra tarefa da Mesa (por exemplo, analisar uma ação, ver juros e câmbio ou criar um post estando em Primeira reunião), NÃO faça: não pesquise, não chame ferramenta de dados e não carregue outra skill para isso. ' +
+  'Responda em até 3 frases: diga que isso fica em Área › Tarefa (use "onde fica cada tarefa" do contexto), que basta clicar em Início e abrir essa tarefa, que começa uma conversa nova, e ofereça seguir com a tarefa atual. ' +
+  'Vale o mesmo para assunto fora da Mesa. Na dúvida se o pedido serve à tarefa aberta, pergunte em uma frase antes de pesquisar. ' +
+  'Continua dentro do foco: o dado que a skill da própria tarefa manda buscar, dúvida sobre o material ou o cliente desta tarefa, e os pedidos de criar, mudar ou apagar tarefa e de ajustar skill pelas marcas. ' +
+  'Sem tarefa aberta (tela de início ou lista), não execute tarefa nenhuma: ajude a achar a tarefa certa e diga onde ela fica. ' +
   'FORMATO DO TEXTO: escreva em Markdown simples (negrito **assim**, listas com "- ", títulos curtos com ##); a Mesa mostra formatado. ' +
   'Quando o assessor pedir texto para WhatsApp, entregue no formato do WhatsApp: negrito com UM asterisco de cada lado (*assim*), itálico com _underline_, sem **, sem # de título, sem tabelas e sem blocos de citação; listas com "- "; frases e parágrafos curtos; no máximo 2 emojis. ' +
   'ENTREGA EM PEÇAS: quando a entrega tiver partes que o assessor usa separadamente, coloque cada parte em <peca tipo="TIPO" titulo="título curto">texto</peca>. ' +
@@ -91,7 +97,7 @@ const PROTOCOLO = 'Você é o assistente dentro da janela da Mesa do Assessor. A
   'Quando o Resultado for "Texto no chat", a resposta final traz o TEXTO COMPLETO da entrega, pronto para copiar, e não só um resumo; as dúvidas e o que conferir vêm depois, em poucas linhas. ' +
   'ENTREGA COMPLETA: nunca entregue só a lista ou a descrição do que cada peça contém ("3 peças entregues: roteiro, resumo..."). O texto integral e pronto de cada peça vai na resposta final, cada um em sua marca <peca>; o cartão da entrega leva o mesmo conteúdo. ' +
   'REVISÃO: antes de entregar texto para cliente ou público, confira sem promessa nem projeção de retorno, sem "compre/venda/indico", com a identificação do profissional, e com [CONFERIR] em todo número sem fonte; corrija antes de entregar.';
-const VERSAO = '1.15.1';
+const VERSAO = '1.16.0';
 const MODELOS = [['', 'Padrão do Claude Code'], ['claude-fable-5-2', 'Fable 5.2'], ['claude-opus-5-5', 'Opus 5.5'], ['claude-sonnet-5-5', 'Sonnet 5.5'], ['claude-haiku-5-5', 'Haiku 5.5']];
 const ARQ_MODELO = path.join(PASTA_DADOS, 'modelo.json');
 let modeloEscolhido = ''; let modeloUsado = '';
@@ -275,6 +281,7 @@ setInterval(() => {
 }, 2000);
 process.on('exit', () => { try { editorProc?.kill(); } catch {   } });
 
+const LIMITE_MARCA = 6 * 1024 * 1024;
 const pastaAnexos = () => path.join(pastaBase(), PASTA_ANEXOS);
 let anexosPendentes = [];
 const anexoParaTela = (a) => ({ id: a.id, nome: a.nome, original: a.original, tipo: a.tipo, kb: a.kb });
@@ -566,6 +573,31 @@ const servidor = http.createServer(async (req, res) => {
   if (req.url.startsWith('/api/anexo?')) {
     try { return receberAnexo(req, res); }
     catch { try { req.resume(); } catch { } if (!res.headersSent) json(res, 500, { erro: 'Não consegui receber o anexo. Tente de novo.' }); return; }
+  }
+  if (req.url.startsWith('/api/marca?')) {
+    const q = new URL(req.url, 'http://x').searchParams, tipo = String(q.get('tipo') || ''), ext = path.extname(String(q.get('nome') || '')).toLowerCase();
+    const recusar = (cod, erro) => { req.resume(); return json(res, cod, { erro }); };
+    if (!['foto', 'logo'].includes(tipo)) return recusar(400, 'tipo inválido');
+    if (!['.png', '.jpg', '.jpeg'].includes(ext)) return recusar(415, 'Envie uma imagem PNG ou JPG.');
+    if (Number(req.headers['content-length'] || 0) > LIMITE_MARCA) return recusar(413, 'A imagem passa de 6 MB.');
+    const partes = []; let total = 0, falhou = false;
+    req.on('data', (b) => { total += b.length; if (total > LIMITE_MARCA) { falhou = true; req.destroy(); if (!res.headersSent) json(res, 413, { erro: 'A imagem passa de 6 MB.' }); } else partes.push(b); });
+    req.on('error', () => { if (!falhou && !res.headersSent) json(res, 500, { erro: 'O envio falhou.' }); falhou = true; });
+    req.on('end', async () => {
+      if (falhou) return;
+      try {
+        const dados = Buffer.concat(partes);
+        const png = dados.length > 8 && dados[0] === 0x89 && dados[1] === 0x50 && dados[2] === 0x4e && dados[3] === 0x47, jpg = dados.length > 3 && dados[0] === 0xff && dados[1] === 0xd8;
+        if (!(ext === '.png' ? png : jpg)) return json(res, 415, { erro: 'Esse arquivo não é uma imagem PNG ou JPG de verdade.' });
+        const pasta = path.join(pastaBase(), 'Minhas imagens'); mkdirSync(pasta, { recursive: true });
+        for (const e of ['.png', '.jpg', '.jpeg']) rmSync(path.join(pasta, (tipo === 'foto' ? 'minha-foto' : 'logo-do-escritorio') + e), { force: true });
+        const destino = path.join(pasta, (tipo === 'foto' ? 'minha-foto' : 'logo-do-escritorio') + ext);
+        writeFileSync(destino, dados);
+        await (await cliente()).callTool({ name: 'mesa_perfil', arguments: { salvar: { marca: { [tipo]: destino } } } });
+        json(res, 200, { ok: true, tipo, caminho: destino, nome: path.basename(destino) });
+      } catch { if (!res.headersSent) json(res, 500, { erro: 'Não consegui guardar a imagem.' }); }
+    });
+    return;
   }
   if (req.url.startsWith('/api/upload?')) {
     const nomeOrig = String(new URL(req.url, 'http://x').searchParams.get('nome') || 'video.mp4').slice(0, 200);

@@ -279,12 +279,13 @@
     "body.com-conversa .portas{margin-top:auto;margin-bottom:auto}",
     "#conversa{flex:0 0 auto;width:100%;margin:0;padding:0 0 18px;position:relative;z-index:5}",
     "#cvPainel .cv-cab,#cvPainel .dica-vazia{display:none}",
+    "#cvNova{background:transparent;border:1px solid var(--line2);border-radius:999px;color:var(--mute);padding:3px 11px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:.04em;text-transform:none}#cvNova:hover{color:var(--ink);border-color:rgba(232,200,142,.6)}#cvNova[hidden]{display:none}",
     "#cvPainel .cv-corpo{display:none;max-height:20vh;overflow-y:auto;flex-direction:column;gap:9px;padding:0 6px 12px;font-size:14.5px;line-height:1.55;scrollbar-width:thin}",
     "#cvPainel.tem .cv-corpo{display:flex}#cvPainel.grande .cv-corpo{max-height:50vh}",
     "body.com-conversa .guia{grid-template-columns:minmax(0,1fr) clamp(300px,32vw,440px)}",
     ".dossie.lateral{position:relative;min-height:340px;padding:0;overflow:hidden}",
     ".dossie.lateral>#cvPainel{position:absolute;inset:0;display:flex;flex-direction:column;padding:18px 16px 12px}",
-    "#cvPainel.lateral .cv-cab{display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)}",
+    "#cvPainel.lateral .cv-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)}",
     "#cvPainel.lateral .cv-corpo{display:flex;flex:1;min-height:0;max-height:none;padding:0 4px 8px 0}",
     "#cvPainel.lateral .dica-vazia{display:block;color:var(--faint);font-size:13.5px;line-height:1.5}",
     "#cvPainel.lateral .estado-cv{padding:8px 0 6px}#cvPainel.lateral .ajustes{padding:0 0 6px}",
@@ -317,6 +318,7 @@
     "#conversa .ponto.verde{background:#7fd6a0;box-shadow:0 0 12px #7fd6a0;animation:none}",
     "#conversa .ajustes{display:none;flex-wrap:wrap;gap:7px;padding:0 6px 10px}#conversa .ajustes.on{display:flex}",
     "#conversa .ajustes button{background:transparent;border:1px solid var(--line2);border-radius:999px;color:var(--mute);padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}",
+    "#conversa .ajustes button.forte{color:var(--ink);border-color:rgba(232,200,142,.75);background:rgba(232,200,142,.16);font-weight:600}",
     "#conversa .ajustes button:hover{color:var(--ink);border-color:rgba(232,200,142,.6);background:rgba(232,200,142,.08)}",
     "#conversa .caixa.chamando{border-color:rgba(127,214,160,.7);box-shadow:0 0 0 3px rgba(127,214,160,.14),0 6px 28px rgba(0,0,0,.35)}",
     "#conversa .caixa.ocupada textarea{opacity:.75}",
@@ -432,7 +434,7 @@
   const ICONE_PARAR = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>';
   const ICONE_CLIPE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
 
-  let raiz = null, painelEl = null, corpoEl = null, estadoEl = null, ajustesEl = null, txt = null, botaoEnviar = null, rodando = false, vigia = null, ultimo = null, esperandoAcao = false, estadoCv = "ocioso", segundosCv = 0, focoFeito = false, posCv = null, marcaCv = "";
+  let raiz = null, painelEl = null, corpoEl = null, estadoEl = null, ajustesEl = null, txt = null, botaoEnviar = null, rodando = false, vigia = null, ultimo = null, esperandoAcao = false, estadoCv = "ocioso", aprovaCv = false, segundosCv = 0, focoFeito = false, posCv = null, marcaCv = "";
   function posicionar() {
     const c = corpoEl; if (!c || !c.isConnected) return;
     if (posCv != null) { c.scrollTop = posCv; return; }
@@ -441,9 +443,16 @@
     if (!rodando && u && u.classList.contains("ia") && u.offsetHeight > c.clientHeight) c.scrollTop += u.getBoundingClientRect().top - c.getBoundingClientRect().top;
   }
   window.__mesaStatus = () => ({ estado: estadoCv, segundos: segundosCv });
+  window.__mesaMarca = { async enviar(tipo, f) {
+    const r = await fetch("/api/marca?tipo=" + encodeURIComponent(tipo) + "&nome=" + encodeURIComponent(f.name || ""), { method: "POST", headers: { "x-mesa-token": TOKEN, "content-type": "application/octet-stream" }, body: f });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.erro || "Não consegui enviar a imagem. Tente de novo.");
+    return j;
+  } };
+  const APROVACAO = [["Aprovar e gerar os roteiros", "Aprovado. Gere agora o roteiro completo de todos os posts do cronograma, na ordem dos dias, com as imagens dos carrosséis, as legendas e a tabela de programação."], ["Trocar um post", ""]];
   const AJUSTES = [["Mais curto", "Deixe mais curto."], ["Mais formal", "Deixe mais formal."], ["Mais próximo", "Deixe mais próximo e natural."], ["Revisar compliance", "Revise o resultado quanto a compliance e aponte o que ajustar."], ["Versão para WhatsApp", "Reescreva em uma versão curta para WhatsApp: negrito com UM asterisco de cada lado (*assim*), itálico com _underline_, sem ** e sem # de título, sem tabelas, parágrafos curtos e listas com \"- \"."], ["Gerar em PDF", "Gere o resultado final em PDF."], ["Mostrar o texto completo", "Mostre agora o texto completo e pronto para copiar de cada peça, cada uma dentro de sua marca <peca>, sem resumir nem descrever."]];
   const feitos = new Map();
-  let tarefaVista = "", zerarAoEntrar = false, reabertaAgora = false;
+  let tarefaVista = "", telaVista = "", zerarAoEntrar = false, reabertaAgora = false;
 
   let avisoVideoOk = false;
   function anexarVideo() {
@@ -560,7 +569,9 @@
       "; perguntas da tarefa aberta: " + ((c.perguntas || []).join("; ") || "nenhuma") +
       "; skills da tarefa aberta: " + ((c.skillsTarefa || []).join(", ") || "nenhuma") +
       "; regras pessoais da tarefa: " + ((c.regrasTarefa || []).join(" / ") || "nenhuma") +
-      "; regras pessoais por skill: " + ((c.regrasSkills || []).join("; ") || "nenhuma") + "\n";
+      "; regras pessoais por skill: " + ((c.regrasSkills || []).join("; ") || "nenhuma") +
+      "; onde fica cada tarefa: " + ((c.mapa || []).join(" | ") || "não informado") + "\n" +
+      (c.tarefa ? "[Foco] Esta conversa é só sobre a tarefa «" + c.tarefa + "»" + (c.areaNome ? " (" + c.areaNome + ")" : "") + ". Pedido que pertence a outra tarefa da Mesa não é feito aqui: diga em qual área e tarefa ele fica e que basta clicar em Início e abrir essa tarefa.\n" : "");
   };
 
   function atualizarBotao() {
@@ -578,7 +589,7 @@
     if (!palco) return;
     document.body.classList.add("com-conversa");
     const s = document.createElement("section"); s.id = "conversa"; s.setAttribute("aria-label", "Conversa com o Claude");
-    s.innerHTML = '<div class="cv-painel" id="cvPainel"><div class="cv-cab">Conversa com o Claude</div><div class="cv-corpo" id="cvCorpo"></div>'
+    s.innerHTML = '<div class="cv-painel" id="cvPainel"><div class="cv-cab"><span>Conversa com o Claude</span><button type="button" id="cvNova" title="Guarda esta conversa no Histórico e começa do zero">Nova interação</button></div><div class="cv-corpo" id="cvCorpo"></div>'
       + '<div class="estado-cv" id="cvEstado" role="status" aria-live="polite"></div><div class="ajustes" id="cvAjustes"></div></div>'
       + '<div class="caixa" id="cvCaixa"><div class="anexos" id="cvAnexos" aria-label="Arquivos anexados" hidden></div><textarea id="cvTxt" rows="1" placeholder="Peça ao Claude: ajustar este pedido, criar uma tarefa, buscar dados…" aria-label="Mensagem para o Claude"></textarea>'
       + '<input type="file" id="cvArquivo" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" hidden>'
@@ -673,9 +684,16 @@
     caixa.classList.toggle("chamando", estadoCv === "sua-vez");
     caixa.classList.toggle("ocupada", estadoCv === "pensando");
     txt.placeholder = estadoCv === "sua-vez" ? "Responda ao Claude…" : estadoCv === "pensando" ? "O Claude está trabalhando… você já pode ir escrevendo." : "Peça ao Claude: ajustar este pedido, criar uma tarefa, buscar dados…";
-    ajustes.className = "ajustes" + (estadoCv === "pronto" ? " on" : "");
-    if (estadoCv === "pronto" && !ajustes.childElementCount) {
-      for (const [rotulo, texto] of AJUSTES) { const b = document.createElement("button"); b.type = "button"; b.textContent = rotulo; b.onclick = () => window.__mesaEnviar(texto); ajustes.append(b); }
+    const modo = estadoCv === "pronto" ? "pronto" : estadoCv === "sua-vez" && aprovaCv ? "aprovar" : "";
+    ajustes.className = "ajustes" + (modo ? " on" : "");
+    if (modo && ajustes.dataset.modo !== modo) {
+      ajustes.textContent = ""; ajustes.dataset.modo = modo;
+      (modo === "aprovar" ? APROVACAO : AJUSTES).forEach(([rotulo, texto], i) => {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = rotulo;
+        if (modo === "aprovar" && i === 0) b.className = "forte";
+        b.onclick = () => { if (texto) window.__mesaEnviar(texto); else { txt.value = "Troque o post de "; txt.focus(); } };
+        ajustes.append(b);
+      });
     }
     if (estadoCv === "sua-vez") { if (!focoFeito && (!document.activeElement || document.activeElement === document.body)) { txt.focus(); } focoFeito = true; } else focoFeito = false;
   }
@@ -684,7 +702,9 @@
   async function vigiarTarefa() {
     const c0 = window.__mesaContexto ? window.__mesaContexto() : null;
     const tNova = c0 ? (c0.tarefa || "") : tarefaVista;
+    const telaNova = c0 ? (c0.tela || "") : telaVista;
     if (tNova !== tarefaVista) { reabertaAgora = tarefaVista === "" && !!tNova; tarefaVista = tNova; zerarAoEntrar = !!tNova; }
+    if (telaNova !== telaVista) { if (telaVista && (telaNova === "inicio" || telaNova === "lista")) { zerarAoEntrar = true; reabertaAgora = false; } telaVista = telaNova; }
     if (!zerarAoEntrar) return;
     let e; try { e = await api("/api/estado"); } catch { return; }
     if (e.rodando) return;
@@ -693,6 +713,11 @@
     try { await api("/api/limpar"); feitos.clear(); ultimo = null; esperandoAcao = false; zerarAoEntrar = false; atualizar(); } catch {   }
   }
   setInterval(vigiarTarefa, 600);
+  async function novaInteracao() {
+    if (rodando) { alert("O Claude ainda está respondendo. Espere terminar ou clique em parar na caixa de baixo."); return; }
+    try { await api("/api/limpar"); feitos.clear(); ultimo = null; esperandoAcao = false; zerarAoEntrar = false; atualizar(); if (txt) txt.focus(); } catch {   }
+  }
+  document.addEventListener("click", (ev) => { if (ev.target && ev.target.id === "cvNova") novaInteracao(); });
   window.__mesaParar = () => api("/api/parar");
   window.__mesaEncerrar = async () => {
     try { await api("/api/parar"); } catch {   }
@@ -702,7 +727,7 @@
   window.__mesaHistorico = {
     async listar() { return (await api("/api/historico")).itens || []; },
     async abrir(id) { const r = await api("/api/historico/abrir", { id }); ultimo = null; feitos.clear(); esperandoAcao = false; zerarAoEntrar = false; atualizar(); return r; },
-    fixar() { const c = window.__mesaContexto ? window.__mesaContexto() : null; tarefaVista = c ? (c.tarefa || "") : tarefaVista; zerarAoEntrar = false; },
+    fixar() { const c = window.__mesaContexto ? window.__mesaContexto() : null; tarefaVista = c ? (c.tarefa || "") : tarefaVista; telaVista = c ? (c.tela || "") : telaVista; zerarAoEntrar = false; },
     async apagar(id) { await api("/api/historico/apagar", id ? { id } : { todos: true }); },
   };
   window.addEventListener("mesa-entrega", () => { if (corpoEl) atualizar(); });
@@ -779,7 +804,8 @@
     const ctx = window.__mesaContexto ? window.__mesaContexto() : null;
     const concluido = window.__mesaConcluido ? window.__mesaConcluido() : false;
     const novoEstado = e.rodando ? "pensando" : (ctx && ctx.tela === "acompanhar" && ult && ult.papel === "claude") ? (concluido ? "pronto" : "sua-vez") : "ocioso";
-    const mudou = novoEstado !== estadoCv; estadoCv = novoEstado;
+    const pedeAprovacao = novoEstado === "sua-vez" && ctx.tarefaId === "calendario" && /Aprova o cronograma\?/i.test(String(ult.texto || ""));
+    const mudou = novoEstado !== estadoCv || pedeAprovacao !== aprovaCv; estadoCv = novoEstado; aprovaCv = pedeAprovacao;
     painelEl.classList.toggle("oculto", !!ctx && (ctx.tela === "inicio" || ctx.tela === "lista"));
     pintarEstado(); atualizarBotao();
     if (mudou) window.dispatchEvent(new Event("mesa-status"));
@@ -943,11 +969,22 @@
       { id: "para", curto: "Para quem", titulo: "Quem vai ler?", opcoes: [{ t: "Iniciante" }, { t: "Empresário" }, { t: "Aposentado" }, { t: "Profissional liberal" }] } ] },
     "sucessorio": { nome: "Conversa sobre sucessão", linha: "Perguntas e resumo para o advogado e o contador.", ref: "skill planejamento-sucessorio", acao: "Preparar a conversa", perguntas: [
       { id: "momento", curto: "Momento", titulo: "Em que ponto está a conversa?", opcoes: [{ t: "Abrir o assunto", d: "O cliente ainda não pensou nisso" }, { t: "Aprofundar", d: "Já falamos e quero as perguntas certas" }, { t: "Encaminhar", d: "Preciso do resumo para o advogado e o contador" }] } ] },
-    "primeira-reuniao": { nome: "Primeira reunião", linha: "Roteiro, sua apresentação, seu escritório e suas soluções.", ref: "skill primeira-reuniao", acao: "Preparar a reunião", perguntas: [
-      { id: "duracao", curto: "Duração", titulo: "Quanto tempo dura a reunião?", opcoes: [{ t: "30 minutos" }, { t: "45 minutos" }, { t: "60 minutos" }] },
-      { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] }, RESULTADO ] },
-    "segunda-reuniao": { nome: "Segunda reunião", linha: "Devolutiva e material da reunião de decisão.", ref: "skill segunda-reuniao", acao: "Preparar a reunião", perguntas: [
-      { id: "decide", curto: "Como decide", titulo: "Como essa pessoa costuma decidir?", opcoes: [{ t: "Delega", d: "Quer segurança e simplicidade" }, { t: "Valida", d: "Quer entender a lógica" }, { t: "Analisa", d: "Quer dados e decide sozinha" }, { t: "Não sei ainda" }] }, RESULTADO ] },
+    "primeira-reuniao": { nome: "Primeira reunião", linha: "Sua apresentação de primeira reunião em PDF e em PowerPoint editável: você, seu escritório e suas soluções.", ref: "skill primeira-reuniao", acao: "Gerar a apresentação", perguntas: [
+      { id: "perfil", curto: "Perfil", titulo: "Como é a pessoa?", opcoes: [{ t: "Empresário" }, { t: "Profissional liberal" }, { t: "Aposentado" }, { t: "Iniciante" }] },
+      { id: "escritorio", curto: "Escritório", tipo: "texto", perfilCampo: "escritorio", max: 80, pular: true, opcoes: [], titulo: "Qual é o seu escritório?", ajuda: "Fica guardado no seu perfil: da próxima vez já vem preenchido.", dica: "Ex.: Escritório Exemplo Investimentos" },
+      { id: "corretora", curto: "Corretora", tipo: "texto", perfilCampo: "corretora", max: 80, pular: true, opcoes: [], titulo: "Com qual corretora ou instituição você trabalha?", ajuda: "É onde ficam os investimentos do cliente.", dica: "Ex.: o nome da corretora ou do banco" },
+      { id: "atendimento", curto: "Atendimento", perfilCampo: "atendimento", pular: true, titulo: "Qual é o seu formato de atendimento?", opcoes: [{ t: "Presencial" }, { t: "Online" }, { t: "Presencial e online" }] },
+      { id: "pontos", curto: "Pontos fortes", tipo: "texto", longo: true, perfilCampo: "pontosFortes", max: 600, pular: true, opcoes: [], titulo: "Quais são os seus pontos fortes?", ajuda: "O que o cliente ganha por estar com você e com o seu escritório.", dica: "Ex.: atendo poucos clientes, reunião a cada três meses, equipe com especialista em previdência e câmbio" },
+      { id: "sobre", curto: "Sobre você", tipo: "texto", longo: true, perfilCampo: "sobre", max: 1200, pular: true, opcoes: [], titulo: "Fale mais sobre você.", ajuda: "Quem é você, sua trajetória, formação e certificações, e os prêmios que ganhou (com o ano).", dica: "Ex.: 8 anos de mercado, economista, certificação CEA. Em 2023 recebi o prêmio X do escritório. O que me move é ver o cliente decidir com segurança." },
+      { id: "pesquisa", curto: "Pesquisa", titulo: "Posso pesquisar o seu nome na internet para completar?", ajuda: "Só entra na apresentação o que for claramente sobre você, com a fonte.", opcoes: [{ t: "Sim, pesquisar", d: "Você confere o que eu achar antes de usar" }, { t: "Não pesquisar", d: "Uso só o que você escreveu" }] },
+      { id: "foto", curto: "Foto", tipo: "arquivo", marca: "foto", pular: true, opcoes: [], titulo: "Coloque uma foto sua.", ajuda: "A apresentação fica muito melhor com a sua foto na capa e na página sobre você." },
+      { id: "logo", curto: "Logo", tipo: "arquivo", marca: "logo", pular: true, opcoes: [], titulo: "Coloque o logo do escritório ou da empresa.", ajuda: "Entra na capa da apresentação." } ] },
+    "segunda-reuniao": { nome: "Segunda reunião", linha: "Devolutiva e material da reunião de decisão, em PDF e em PowerPoint editável.", ref: "skill segunda-reuniao", acao: "Gerar o material", perguntas: [
+      { id: "decide", curto: "Como decide", titulo: "Como essa pessoa costuma decidir?", opcoes: [{ t: "Delega", d: "Quer segurança e simplicidade" }, { t: "Valida", d: "Quer entender a lógica" }, { t: "Analisa", d: "Quer dados e decide sozinha" }, { t: "Não sei ainda" }] },
+      { id: "cliente", curto: "Cliente", tipo: "texto", max: 160, pular: true, opcoes: [], titulo: "Quem é o cliente e quando é a reunião?", ajuda: "Use um apelido ou as iniciais: sem nome completo nem CPF.", dica: "Ex.: Cliente A, quinta às 15h" },
+      { id: "ouvi", curto: "O que ouvi", tipo: "texto", longo: true, max: 1500, opcoes: [], titulo: "O que ele disse na primeira reunião?", ajuda: "Objetivos, preocupações e o que ele recusou, com as palavras dele. É o que faz o material falar do cliente e não de produto.", dica: "Ex.: quer comprar um imóvel em 3 anos; tem medo de perder a reserva; não gosta de renda variável" },
+      { id: "proposta", curto: "Proposta", tipo: "texto", longo: true, max: 1200, pular: true, opcoes: [], titulo: "O que você vai propor?", ajuda: "A proposta de trabalho e as condições que você pode informar.", dica: "Ex.: assessoria com reunião trimestral; reorganizar a renda fixa por prazo; remuneração pelo repasse dos produtos" },
+      { id: "carteira", curto: "Carteira", tipo: "texto", longo: true, max: 1200, pular: true, opcoes: [], titulo: "Como está a carteira atual?", ajuda: "Em valores ou em %. Se preferir, anexe o extrato na conversa depois.", dica: "Ex.: Renda fixa 55%, Ações 25%, FIIs 10%, Exterior 10%" } ] },
     "comparador": { nome: "Comparador de carteira", linha: "Duas carteiras lado a lado, sem dizer qual é melhor.", ref: "skill comparador-de-carteira", acao: "Comparar as carteiras",
       extra: "Só descreve as diferenças: sem compra, venda nem imposto.", perguntas: [
       { id: "comparar", curto: "Comparar", titulo: "O que você quer comparar?", opcoes: [{ t: "Atual × modelo do escritório" }, { t: "Atual × cenário em estudo" }, { t: "Atual × outra instituição" }, { t: "A mesma carteira em duas datas" }] }, RESULTADO ] },
@@ -965,9 +1002,11 @@
       { id: "tipo", curto: "Para quem", titulo: "Para quem é a proposta?", opcoes: [{ t: "Cliente novo" }, { t: "Cliente atual (ampliar)" }] }, RESULTADO ] },
     "followup": { nome: "Follow-up da proposta", linha: "3 toques para descobrir o que falta decidir.", ref: "skill relatorio-e-proposta", acao: "Montar o follow-up", perguntas: [
       { id: "tempo", curto: "Enviada há", titulo: "Há quanto tempo você enviou a proposta?", opcoes: [{ t: "2 dias" }, { t: "5 dias" }, { t: "10 dias ou mais" }] } ] },
-    "calendario": { nome: "Semana de posts pronta", linha: "Os posts da semana criados: imagens, roteiros e legendas numa pasta, com dia e hora para programar.", ref: "skills pauta-de-conteudo e calendario-de-conteudo", acao: "Montar a semana", perguntas: [
+    "calendario": { nome: "Semana de posts pronta", linha: "Você aprova o cronograma (o post de cada dia e a ideia de cada um) e só então saem os roteiros de Reels, carrossel e stories.", ref: "skills pauta-de-conteudo e calendario-de-conteudo", acao: "Montar o cronograma", perguntas: [
       { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo da semana?", opcoes: [{ t: "Educar" }, { t: "Atrair conversas" }, { t: "Mostrar o mercado" }, { t: "Misto" }] },
       { id: "quantos", curto: "Posts", titulo: "Quantos posts?", opcoes: [{ t: "3" }, { t: "5", d: "Padrão: de segunda a sexta" }, { t: "7" }] },
+      { id: "formatos", curto: "Formatos", titulo: "Quais formatos entram na semana?", ajuda: "Marque quantos quiser. Os stories acompanham os posts e não entram na conta.", multi: true,
+        opcoes: [{ t: "Reels", d: "Você grava; sai o roteiro cena a cena" }, { t: "Carrossel", d: "As imagens saem prontas" }, { t: "Stories", d: "Sequência do dia, com enquete ou caixa de perguntas" }, { t: "Post único", d: "Uma imagem e a legenda" }] },
       { id: "programar", curto: "Programar", titulo: "Como você vai programar?", opcoes: [{ t: "Meta Business Suite", d: "Com o passo a passo da Central de Ajuda da Meta" }, { t: "Conector ligado ao Claude", d: "No Claude Desktop, com o conector já ligado" }, { t: "Só quero a pasta", d: "Imagens e legendas prontas; você programa como quiser" }] } ] },
     "editar-reels": { nome: "Editar um vídeo (Reels)", linha: "Escolha o vídeo no computador e a Edição Mesa faz a edição.", ref: "", acao: "Escolher o vídeo e editar", perguntas: [
       { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo do vídeo?", opcoes: [{ t: "Captar novos clientes" }, { t: "Educar iniciantes" }, { t: "Relacionamento com clientes" }, { t: "Bastidores do escritório" }] } ] },
@@ -1077,38 +1116,35 @@
       ]
     },
     "primeira-reuniao": {
-      "obj": "Conduzir a primeira reunião apresentando quem sou, meu escritório e minhas soluções para pessoa física e para empresas, descobrindo o que a pessoa precisa e saindo com a segunda reunião marcada.",
+      "obj": "Gerar a apresentação da minha primeira reunião (uma R1 padrão, de cerca de 45 minutos) em PDF e em PowerPoint editável, apresentando quem sou, meu escritório e minhas soluções para pessoa física e para empresas, para eu descobrir o que a pessoa precisa e sair com a segunda reunião marcada.",
       "entrega": [
-        "Roteiro minuto a minuto da primeira reunião, para a duração escolhida, em peça separada",
-        "Minha apresentação falada (quem sou eu, meu escritório e como posso ajudar), de 3 a 5 minutos, em primeira pessoa, em peça separada",
-        "Apresentação de slides com história própria, de 12 a 16 páginas, centrada em mim e nas minhas soluções (pessoa física e empresas), com ilustrações e uma frase que liga cada página à próxima, em peça separada",
+        "Apresentação de 12 a 16 páginas gerada com mesa_apresentacao, que entrega o PDF e o PowerPoint editável juntos: história própria, centrada em mim e nas minhas soluções (pessoa física e empresas), com a minha foto e o logo do escritório quando eu enviei, ilustrações e uma frase que liga cada página à próxima",
+        "Gere direto, sem me fazer perguntas antes: o que eu pulei ou não informei fica fora da página ou marcado com [CONFERIR]",
+        "Se escolhi pesquisar na internet: procure o meu nome junto com o escritório, mostre na conversa o que achou, com o link, e só leve para a apresentação o que for claramente sobre mim, com fonte e ano; na dúvida de ser outra pessoa com o mesmo nome, deixe de fora e me pergunte",
+        "Na conversa, depois de gerar: onde ficaram o PDF e o PowerPoint, e que o PowerPoint abre no PowerPoint, no Google Slides ou importado no Canva para eu editar; as peças abaixo vêm escritas por inteiro na conversa, não só no cartão da entrega",
+        "Roteiro de fala página a página (uma ou duas frases por página), em peça separada",
         "Perguntas de descoberta nas quatro camadas (situação, aspirações, necessidades e obstáculos), em peça separada",
         "WhatsApp convidando para a segunda reunião (até 4 linhas), em peça separada",
-        "Nota para o CRM, em peça separada"
+        "Quando eu pedir uma mudança na apresentação, gere de novo o PDF e o PowerPoint já com a mudança, sem mexer no que eu não pedi"
       ],
       "insumos": [
         "Quem é a pessoa: apelido, perfil, como chegou até mim e o que já sei",
-        "Quem sou eu: tempo de mercado, formação e certificações; minha trajetória e o que me move",
-        "Meu escritório: o que faz, equipe, onde atende, quem guarda os ativos",
-        "Minhas conquistas, com fonte e ano",
-        "Minhas soluções para pessoa física e para empresas, e como sou remunerado",
-        "O que ética, transparência e compromisso significam na prática para mim"
+        "Minhas soluções para pessoa física",
+        "Minhas soluções para empresas",
+        "Como sou remunerado"
       ]
     },
     "segunda-reuniao": {
-      "obj": "Devolver ao cliente o que ouvi na primeira reunião, mostrar a proposta de trabalho e sair com a decisão ou o próximo passo com data.",
+      "obj": "Devolver ao cliente o que ouvi na primeira reunião, mostrar a proposta de trabalho em um material em PDF e em PowerPoint editável e sair com a decisão ou o próximo passo com data.",
       "entrega": [
+        "Material para o cliente gerado com mesa_apresentacao, que entrega o PDF e o PowerPoint editável juntos, página a página (objetivos, cenário, raio-X da carteira, proposta de melhoria, plano de execução, próximos passos e nota de compliance), com a minha foto e o logo guardados no perfil",
+        "Gere direto com o que informei: o que eu pulei fica fora da página ou marcado com [CONFERIR], e nunca invente o que o cliente disse",
+        "Na conversa, depois de gerar: onde ficaram o PDF e o PowerPoint, e que o PowerPoint abre no PowerPoint, no Google Slides ou importado no Canva para eu editar; as peças abaixo vêm escritas por inteiro na conversa, não só no cartão da entrega",
         "Roteiro minuto a minuto da segunda reunião, em peça separada",
-        "Material para o cliente, página a página (objetivos, cenário, raio-X da carteira, proposta de melhoria, plano de execução, próximos passos e nota de compliance), em peça separada",
         "As 3 objeções mais prováveis para esse perfil, cada uma com a pergunta de resposta, em peça separada",
         "WhatsApp com o resumo do combinado (até 4 linhas), em peça separada",
-        "Nota para o CRM com a decisão, as pendências e a data, em peça separada"
-      ],
-      "insumos": [
-        "Cliente (apelido) e data da reunião",
-        "O que ele disse na primeira reunião: objetivos, preocupações e o que recusou",
-        "O que vou propor e as condições comerciais que posso informar",
-        "Carteira atual, se já tenho (valores ou %)"
+        "Nota para o CRM com a decisão, as pendências e a data, em peça separada",
+        "Quando eu pedir uma mudança no material, gere de novo o PDF e o PowerPoint já com a mudança, sem mexer no que eu não pedi"
       ]
     },
     "comparador": {
@@ -1180,18 +1216,26 @@
       "fonte": "Nesta ordem: (1) Minhas referências guardadas no perfil da Mesa e os arquivos que anexei (prints e links de posts); (2) se o conector de redes sociais estiver ligado, os posts dos perfis acompanhados e os números dos meus últimos posts; (3) painel_macro, para o dado novo do dia e a agenda de divulgações; (4) busca na web para dúvidas e temas em alta, com link e data; (5) relatório FInfluence da ANBIMA, para saber quais temas mais geram interação. Diga de onde veio cada sinal. Não descreva post que você não viu e não estime alcance sem número."
     },
     "calendario": {
-      "obj": "Deixar a semana inteira pronta para programar: os posts criados (imagens, roteiros e legendas), com dia e horário, numa pasta só.",
+      "obj": "Montar o meu roteiro semanal de posts em duas fases. Fase 1: o cronograma da semana, com o post de cada dia e a ideia de cada um, para eu aprovar. Fase 2, só depois do meu ok: o roteiro completo de todos os posts do cronograma, pronto para gravar, publicar e programar.",
       "entrega": [
+        "FASE 1 (esta resposta): só o cronograma. Não escreva roteiro completo, não gere imagem e não marque a tarefa como concluída antes de eu aprovar",
+        "Se faltar o nicho, o público final ou os perfis com que me identifico nos dados abaixo, pergunte tudo de uma vez (até 3 perguntas) e espere a minha resposta antes do cronograma",
         "Em uma frase (negrito): o fio da semana e o post em que eu mais aposto",
-        "Grade em UMA tabela (Dia e hora | Tema | Formato | Objetivo: alcance, autoridade, conversa ou contato | Gancho | De onde veio a ideia)",
+        "Minha linha editorial em até 4 linhas: para quem eu falo, o que essa pessoa leva e os 3 ou 4 pilares de conteúdo do meu nicho",
+        "Cronograma em UMA tabela (Dia e hora | Formato | Tema | Pilar | Objetivo: alcance, autoridade, conversa ou contato)",
+        "A ideia de cada post, um bloco curto por dia: o que o post diz, o que a pessoa leva, o gancho da primeira tela ou dos 3 primeiros segundos, a chamada e de onde veio a ideia",
+        "Se escolhi stories: uma linha por dia com a ideia da sequência e a figurinha de interação",
+        "O que você tirou dos perfis com que me identifico: até 3 padrões de estilo que vamos adaptar, sem copiar texto, arte nem bordão, e só do que você viu ou do que eu descrevi",
+        "Feche a fase 1 com esta pergunta, sozinha na última linha (na fase 1 não há Conferir: ele vem no fim da fase 2): Aprova o cronograma? Responda aprovado para eu gerar todos os roteiros, ou diga o que trocar.",
+        "FASE 2 (só depois do meu aprovado): o roteiro completo de todos os posts do cronograma, na ordem dos dias, cada post em peça separada. Os roteiros vêm escritos por inteiro na própria resposta da conversa, não só no cartão da entrega nem em resumo. Se não couber em uma resposta, pare no fim de um post, diga quantos faltam e continue quando eu pedir",
+        "Cada Reels: gancho dos 3 primeiros segundos (fala e texto na tela), roteiro de 30 a 45 segundos em tabela (Cena | Tempo | Fala | Texto na tela | Imagem ou enquadramento), chamada final, 3 dicas de gravação e a capa gerada com mesa_carrossel",
         "Cada carrossel pronto, gerado com mesa_carrossel no formato feed e salvo na pasta da semana: capa, 5 a 7 slides e fechamento com chamada",
-        "Cada Reels em peça separada: gancho dos 3 primeiros segundos, roteiro em tabela (cena, tempo, fala e texto na tela) de 30 a 45 segundos, e a capa gerada com mesa_carrossel",
+        "Cada sequência de stories em tabela (Tela | O que aparece | Texto | Figurinha de interação): de 3 a 5 telas, com enquete, caixa de perguntas ou quiz",
         "Uma legenda por post, em peça separada: gancho, corpo, chamada, 5 hashtags e o aviso educativo",
-        "Uma sequência de 3 stories para o dia do post principal, em peça separada",
         "Tabela de programação (Post | Pasta e arquivos | Dia e hora | Legenda) e o passo a passo para programar pelo caminho que escolhi; com conector ligado, só deixe os posts agendados depois do meu ok",
         "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (dados, datas, regras do escritório)"
       ],
-      "fonte": "as mesmas da tarefa Ideias para postar hoje (Minhas referências, anexos, conector de redes sociais se estiver ligado, busca e relatório FInfluence), mais painel_macro para encaixar o post no dia em que sai um dado (agenda de divulgações). Horário: use o que os meus números mostrarem; sem número, proponha e marque como hipótese."
+      "fonte": "as mesmas da tarefa Ideias para postar hoje (Minhas referências, anexos, conector de redes sociais se estiver ligado, busca e relatório FInfluence), mais painel_macro para encaixar o post no dia em que sai um dado (agenda de divulgações). Dos perfis com que me identifico, use só o que você viu (prints, legendas, a ficha Minhas referências) ou o que eu descrevi: não descreva post que você não viu. Horário: use o que os meus números mostrarem; sem número, proponha e marque como hipótese."
     },
     "meus-posts": {
       "obj": "Ler os números dos meus posts e decidir o que repetir e o que mudar na próxima semana.",
@@ -1620,22 +1664,12 @@
       { rotulo: "Para quem vou falar", dica: "Ex.: empresários de 40 a 55 anos, em evento de networking" },
     ],
     "primeira-reuniao": [
-      { rotulo: "Quem é a pessoa e o que já sei (apelido, perfil, como chegou)", longo: true, dica: "Ex.: Marcos, empresário, 48 anos, indicação do contador" },
-      { rotulo: "Quem sou eu (tempo de mercado, formação, certificações)", longo: true, dica: "Ex.: 8 anos de mercado, CEA, atendo médicos e empresários" },
-      { rotulo: "Minha trajetória e o que me move (marcos, com o ano)", longo: true, opcional: true, dica: "Ex.: 2016 entrei no mercado; 2019 abri o escritório; o que me move é ver o cliente decidir com segurança" },
-      { rotulo: "Meu escritório (o que faz, equipe, onde atende, quem guarda os ativos)", longo: true, dica: "Ex.: assessoria com 12 pessoas, parceira de uma corretora que faz a custódia" },
-      { rotulo: "Conquistas e reconhecimentos (com fonte e ano)", longo: true, opcional: true, dica: "Ex.: certificação X (2021); prêmio Y (2023, fonte); número de clientes atendidos (fonte e data)" },
-      { rotulo: "Soluções para pessoa física", longo: true, dica: "Ex.: carteira de investimentos, previdência, câmbio, planejamento sucessório" },
+      { rotulo: "Quem é a pessoa e o que já sei (apelido, perfil, como chegou)", longo: true, opcional: true, dica: "Ex.: Marcos, empresário, 48 anos, indicação do contador" },
+      { rotulo: "Soluções para pessoa física", longo: true, opcional: true, dica: "Ex.: carteira de investimentos, previdência, câmbio, planejamento sucessório" },
       { rotulo: "Soluções para empresas (pessoa jurídica)", longo: true, opcional: true, dica: "Ex.: gestão de caixa da empresa, câmbio comercial, crédito, previdência para sócios" },
-      { rotulo: "Como sou remunerado", longo: true, dica: "Ex.: repasse dos produtos contratados; sem taxa fixa" },
-      { rotulo: "Ética, transparência e compromisso: o que significam na prática para mim", longo: true, opcional: true, dica: "Ex.: só recomendo depois de entender o cliente; mostro como ganho; reunião trimestral sem falta" },
+      { rotulo: "Como sou remunerado", longo: true, opcional: true, dica: "Ex.: repasse dos produtos contratados; sem taxa fixa" },
     ],
-    "segunda-reuniao": [
-      { rotulo: "Cliente (apelido) e data da reunião", dica: "Ex.: Cliente A, quinta às 15h" },
-      { rotulo: "O que ele disse na primeira reunião (objetivos, preocupações, o que recusou)", longo: true, dica: "Ex.: quer comprar um imóvel em 3 anos; não gosta de renda variável" },
-      { rotulo: "O que vou propor e as condições que posso informar", longo: true, dica: "Ex.: assessoria com reunião trimestral; remuneração sobre o patrimônio" },
-      { rotulo: "Carteira atual (opcional)", opcional: true, longo: true, dica: "Ex.: Renda fixa 55%, Ações 25%, FIIs 10%, Exterior 10%" },
-    ],
+    "segunda-reuniao": [],
     "comparador": [
       { rotulo: "Carteira A (a atual): ativos ou classes, valores e data-base", longo: true, dica: "Ex.: Renda fixa 55%, Ações 25%, FIIs 10%, Exterior 10% em 14/11/2026" },
       { rotulo: "Carteira B (modelo, cenário ou outra instituição): ativos ou classes, valores e data-base", longo: true, dica: "Ex.: Renda fixa 45%, Ações 30%, FIIs 10%, Exterior 15%" },
@@ -1663,9 +1697,15 @@
       { rotulo: "Links ou legendas de posts (opcional)", opcional: true, longo: true, dica: "Cole links ou legendas. Prints: anexe na conversa com o Claude" },
     ],
     "calendario": [
+      { rotulo: "Meu nicho (o assunto em que quero ser referência)", padrao: "@nicho", dica: "Ex.: previdência para médicos, renda fixa para quem está saindo da poupança" },
+      { rotulo: "Meu público final (quem eu quero que me procure)", padrao: "@publico", longo: true, dica: "Ex.: médicos de 30 a 45 anos que investem só pelo banco e não têm tempo para acompanhar" },
+      { rotulo: "Influenciadores e perfis com que mais me identifico", padrao: "@referencias", dica: "Ex.: @perfil1, @perfil2. Vem preenchido com as suas referências guardadas" },
+      { rotulo: "O que eu admiro neles (opcional)", opcional: true, longo: true, dica: "Ex.: explica sem jargão, capa com uma pergunta, vídeos curtos e diretos" },
       { rotulo: "Semana ou período", dica: "Ex.: semana de 17 a 21/11", padrao: "Próxima semana" },
-      { rotulo: "Temas que quero incluir (opcional)", opcional: true, dica: "Ex.: Copom, 13º salário" },
-      { rotulo: "Perfis que acompanho (opcional)", opcional: true, padrao: "@referencias", dica: "Ex.: @perfil1, @perfil2. Vem preenchido com as suas referências guardadas" },
+      { rotulo: "Temas ou datas que quero incluir (opcional)", opcional: true, dica: "Ex.: Copom, 13º salário" },
+      { rotulo: "Dúvidas que clientes e prospects mais me fazem (opcional)", opcional: true, longo: true, dica: "Ex.: onde investir o 13º, CDB ou Tesouro" },
+      { rotulo: "Como eu gravo os vídeos", opcoes: ["Falo para a câmera", "Só a voz, com tela ou imagens", "Não gravo vídeo"], padrao: "Falo para a câmera" },
+      { rotulo: "Chamada da semana (opcional)", opcional: true, dica: "Ex.: diagnóstico gratuito pelo link da bio, responder com a palavra CARTEIRA" },
     ],
     "referencias": [
       { rotulo: "Perfis que acompanho (até 10)", padrao: "@referencias", longo: true, dica: "Ex.: @perfil1, @perfil2 ou os links dos perfis" },
@@ -1788,9 +1828,12 @@
   const perfisDasReferencias = () => {
     const r = String(perfil?.referencias ?? "").trim();
     const arrobas = [...new Set((r.match(/@[A-Za-z0-9._]{1,30}/g) ?? []).map((x) => x.replace(/\.+$/, "")))].slice(0, 10);
-    return arrobas.length ? arrobas.join(", ") : r.split(/\r?\n/)[0].trim().slice(0, 140);
+    return arrobas.length ? arrobas.join(", ") : (r.split(/\r?\n/).map((l) => l.trim()).find((l) => l && !NICHO_RE.test(l)) ?? "").slice(0, 140);
   };
-  const padraoDe = (f) => (f.padrao === "@hoje" ? hojeBR() : f.padrao === "@referencias" ? perfisDasReferencias() : f.padrao ?? "");
+  const NICHO_RE = /^Nicho:\s*(.*)$/i;
+  const nichoDasReferencias = () => (String(perfil?.referencias ?? "").split(/\r?\n/).map((l) => l.trim().match(NICHO_RE)?.[1]).find(Boolean) ?? "").trim().slice(0, 140);
+  const PADROES = { "@hoje": () => hojeBR(), "@referencias": perfisDasReferencias, "@nicho": nichoDasReferencias, "@publico": () => String(perfil?.publico ?? "").trim() };
+  const padraoDe = (f) => (PADROES[f.padrao] ? PADROES[f.padrao]() : f.padrao ?? "");
   const valorBruto = (id, i) => estado.campos?.[id]?.[i] ?? padraoDe(camposDe(id)[i] ?? {});
   const setValor = (id, i, v) => { estado.campos ??= {}; estado.campos[id] ??= []; estado.campos[id][i] = v; };
   const textoCampo = (f, v) => {
@@ -1968,7 +2011,7 @@
     const opcoes = {};
     for (const [pid, ops] of Object.entries(aj?.opcoes ?? {})) {
       const l = listaOpcoes(ops, 6, 40);
-      if (!PERGUNTAS_FIXAS.includes(pid) && base.some((p) => p.id === pid) && l.length >= 2) opcoes[pid] = l;
+      if (!PERGUNTAS_FIXAS.includes(pid) && base.some((p) => p.id === pid && !p.tipo) && l.length >= 2) opcoes[pid] = l;
     }
     return { opcoes, regras: regrasLimpas(aj?.regras) };
   }
@@ -2022,7 +2065,7 @@
         const q = String(sp.pergunta ?? "").trim().toLowerCase();
         const p = base.find((x) => x.id.toLowerCase() === q || String(x.curto).toLowerCase() === q || String(x.titulo).toLowerCase() === q);
         if (!p) return { ok: false, motivo: `não achei a pergunta «${sp.pergunta ?? ""}». Perguntas desta tarefa: ${base.filter((x) => !PERGUNTAS_FIXAS.includes(x.id)).map((x) => x.curto).join(", ")}.` };
-        if (PERGUNTAS_FIXAS.includes(p.id)) return { ok: false, motivo: "essa pergunta é fixa da Mesa." };
+        if (PERGUNTAS_FIXAS.includes(p.id) || p.tipo) return { ok: false, motivo: "essa pergunta é fixa da Mesa." };
         const ops = listaOpcoes(sp.opcoes, 6, 40);
         if (ops.length < 2) return { ok: false, motivo: "preciso de pelo menos 2 opções (a lista completa, com as que já existem)." };
         aj.opcoes[p.id] = ops; feito.push(`opções de «${p.curto}»: ${ops.join(", ")}`);
@@ -2060,8 +2103,9 @@
     tela: estado.tela, area: estado.area, tarefa: estado.tarefa ? (T[estado.tarefa]?.nome ?? estado.historico?.nome ?? null) : null,
     areas: AREAS.map((a) => `${a.id} (${a.nome})`), skills: SKILLS_CONHECIDAS, minhas: tarefasUsuario.map((t) => `${t.id}: ${t.nome}`),
     todas: Object.values(T).map((t) => t.nome),
+    mapa: AREAS.map((a) => `${a.nome}: ${(a.grupos ?? []).flatMap((g) => g.tarefas ?? []).map((id) => T[id]?.nome).filter(Boolean).join(", ")}`),
     tarefaId: estado.tarefa, areaId: estado.area, areaNome: AREAS.find((a) => a.id === estado.area)?.nome || "",
-    perguntas: estado.tarefa && T[estado.tarefa] ? (T[estado.tarefa].perguntas ?? []).filter((p) => !PERGUNTAS_FIXAS.includes(p.id)).map((p) => `${p.curto} (id ${p.id}): ${(p.opcoes || []).map((o) => o.t).join(" | ")}`) : [],
+    perguntas: estado.tarefa && T[estado.tarefa] ? (T[estado.tarefa].perguntas ?? []).filter((p) => !PERGUNTAS_FIXAS.includes(p.id) && !p.tipo).map((p) => `${p.curto} (id ${p.id}): ${(p.opcoes || []).map((o) => o.t).join(" | ")}`) : [],
     skillsTarefa: estado.tarefa && T[estado.tarefa] ? skillsDe(T[estado.tarefa]) : [],
     regrasTarefa: estado.tarefa ? (ajustes.tarefas[estado.tarefa]?.regras ?? []) : [],
     regrasSkills: Object.entries(ajustes.skills).map(([k, v]) => `${k}: ${v.join(" / ")}`),
@@ -2368,9 +2412,20 @@
     }
   }
 
+  const respDe = (p) => estado.respostas[p.id]
+    ?? (p.perfilCampo && String(perfil?.[p.perfilCampo] ?? "").trim() ? [String(perfil[p.perfilCampo]).trim()] : p.tipo === "arquivo" && perfil?.marca?.[p.marca] ? ["enviada"] : []);
+  const respostaTexto = (p) => { const r = respDe(p).map((x) => String(x).replace(/\s*\r?\n\s*/g, " ").trim()).filter(Boolean); return r.length ? r.join(", ") : p.tipo === "arquivo" ? "não enviada" : "não informado"; };
+  function guardarNoPerfil(p, r) {
+    const v = String(r[0] ?? "").trim().slice(0, p.max || 200);
+    if (!p.perfilCampo || !v || !perfil || String(perfil[p.perfilCampo] ?? "").trim() === v) return;
+    perfil[p.perfilCampo] = v;
+    app?.callServerTool({ name: "mesa_perfil", arguments: { salvar: { [p.perfilCampo]: v } } }).catch(() => {});
+  }
+  const nomeDoArquivo = (c) => String(c || "").split(/[\\/]/).pop();
+
   function telaGuia(v) {
     const t = T[estado.tarefa], ps = perguntasDe(t), p = ps[estado.passo];
-    const sel = estado.respostas[p.id] ?? [];
+    const sel = respDe(p);
     const guia = el("div", "guia");
     const vidro = el("section", "vidro");
     vidro.append(el("div", "prog", `<span>${String(estado.passo + 1).padStart(2, "0")} — ${String(ps.length).padStart(2, "0")}</span><div class="trilha-prog"><i style="width:${(estado.passo / ps.length) * 100}%"></i></div>`));
@@ -2379,21 +2434,64 @@
     const meio = el("div", "meio");
     const ajuda = p.ajuda ?? (p.multi ? "Marque quantos quiser." : null);
     meio.append(el("div", "q", `<h2>${esc(p.titulo)}</h2>${ajuda ? `<p class="ajuda">${esc(ajuda)}</p>` : ""}`));
-    const ops = el("div", "opcoes");
-    p.opcoes.forEach((o, i) => {
-      const b = el("button", "op" + (sel.includes(o.t) ? " on" : ""), `<span class="k">${LETRAS[i]}</span><span><b>${esc(o.t)}</b>${o.d ? `<small>${esc(o.d)}</small>` : ""}</span>`);
-      b.onclick = () => escolher(p, o.t);
-      ops.append(b);
-    });
-    meio.append(ops);
+    const seguir = el("button", "seguir", `${estado.passo === ps.length - 1 ? "Revisar" : "Continuar"} <span>→</span>`);
+    const podeSeguir = () => seguir.setAttribute("aria-disabled", respDe(p).length || p.pular ? "false" : "true");
+    let dica = "";
+    if (p.tipo === "texto") {
+      const caixa = el("div", "campo"); caixa.style.cssText = "margin-top:22px;max-width:560px";
+      const inp = p.longo ? el("textarea") : el("input"); if (p.longo) inp.rows = 5;
+      inp.placeholder = p.dica || ""; inp.maxLength = p.max || 200; inp.value = sel[0] ?? ""; inp.setAttribute("aria-label", p.titulo);
+      inp.oninput = () => { estado.respostas[p.id] = inp.value.trim() ? [inp.value.trim()] : []; podeSeguir(); };
+      inp.onkeydown = (ev) => { if (ev.key === "Enter" && (!p.longo || ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); avancar(); } };
+      caixa.append(inp); meio.append(caixa);
+      requestAnimationFrame(() => { try { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } catch { } });
+      dica = p.longo ? "Ctrl + Enter para continuar" : "Enter para continuar";
+    } else if (p.tipo === "arquivo") {
+      const caixa = el("div", "campo"); caixa.style.cssText = "margin-top:22px;max-width:560px";
+      const atual = perfil?.marca?.[p.marca];
+      const st = el("p", "ajuda", atual ? `Já guardada: <b>${esc(nomeDoArquivo(atual))}</b>` : "Nenhuma imagem guardada ainda.");
+      caixa.append(st);
+      if (window.__mesaMarca) {
+        const arq = el("input"); arq.type = "file"; arq.accept = "image/png,image/jpeg"; arq.hidden = true;
+        const b = el("button", "seguir", atual ? "Trocar a imagem" : "Escolher a imagem"); b.type = "button"; b.style.marginTop = "12px";
+        b.onclick = () => arq.click();
+        arq.onchange = async () => {
+          const f = arq.files?.[0]; if (!f) return;
+          st.textContent = "Enviando…"; b.disabled = true;
+          try {
+            const r = await window.__mesaMarca.enviar(p.marca, f);
+            if (perfil) perfil.marca = { ...(perfil.marca || {}), [p.marca]: r.caminho };
+            estado.respostas[p.id] = ["enviada"]; render();
+          } catch (e) { b.disabled = false; st.textContent = (e && e.message) || "Não consegui enviar a imagem. Tente de novo."; }
+        };
+        caixa.append(arq, b, el("p", "ajuda", "PNG ou JPG, até 6 MB. Fica guardada no seu computador e entra sozinha nas próximas apresentações."));
+      } else {
+        caixa.append(el("p", "ajuda", "Aqui não dá para enviar o arquivo. Guarde a imagem em Documentos › Mesa do Assessor › Minhas imagens e diga o nome dela na conversa."));
+      }
+      meio.append(caixa);
+    } else {
+      const ops = el("div", "opcoes");
+      p.opcoes.forEach((o, i) => {
+        const b = el("button", "op" + (sel.includes(o.t) ? " on" : ""), `<span class="k">${LETRAS[i]}</span><span><b>${esc(o.t)}</b>${o.d ? `<small>${esc(o.d)}</small>` : ""}</span>`);
+        b.onclick = () => escolher(p, o.t);
+        ops.append(b);
+      });
+      meio.append(ops);
+      dica = `Teclas ${LETRAS[0]}–${LETRAS[p.opcoes.length - 1]} · Enter`;
+    }
     vidro.append(meio);
     const rod = el("div", "rodape");
     const voltar = el("button", "fantasma", estado.passo ? "← Voltar" : "← Tarefas");
     voltar.onclick = voltarPasso;
-    const seguir = el("button", "seguir", `${estado.passo === ps.length - 1 ? "Revisar" : "Continuar"} <span>→</span>`);
-    seguir.setAttribute("aria-disabled", sel.length ? "false" : "true");
+    podeSeguir();
     seguir.onclick = avancar;
-    rod.append(voltar, el("span", "dica", `Teclas ${LETRAS[0]}–${LETRAS[p.opcoes.length - 1]} · Enter`), seguir);
+    rod.append(voltar, el("span", "dica", dica));
+    if (p.pular) {
+      const pular = el("button", "fantasma", "Pular"); pular.type = "button";
+      pular.onclick = () => { if (p.tipo !== "arquivo") estado.respostas[p.id] = []; avancar(true); };
+      rod.append(pular);
+    }
+    rod.append(seguir);
     vidro.append(rod);
     guia.append(vidro, dossie(t, ps));
     v.append(guia);
@@ -2402,7 +2500,7 @@
   function dossie(t, ps, final = false) {
     const d = el("aside", "dossie", `<h4>Dossiê</h4><div class="nome">${esc(t.nome)}</div>`);
     ps.forEach((p, i) => {
-      const r = estado.respostas[p.id];
+      const r = respDe(p).map((y) => String(y).replace(/\s+/g, " ").slice(0, 90));
       const cls = "linha-d" + (r?.length ? " ok" : "") + (!final && i === estado.passo ? " agora" : "");
       d.append(el("div", cls, `<small>${esc(p.curto)}</small><div>${r?.length ? esc(r.join(", ")) : "—"}</div>`));
     });
@@ -2676,10 +2774,12 @@
     if (!p.multi) { avancando = true; setTimeout(() => { avancando = false; avancar(); }, 260); }
   }
 
-  function avancar() {
+  function avancar(pulando) {
     if (avancando) return;
     const ps = perguntasDe(T[estado.tarefa]), p = ps[estado.passo];
-    if (!(estado.respostas[p.id] ?? []).length) return;
+    const r = pulando === true ? [] : respDe(p);
+    if (!r.length && !p.pular) return;
+    if (r.length && pulando !== true) { if (estado.respostas[p.id] === undefined) estado.respostas[p.id] = r; guardarNoPerfil(p, r); }
     if (estado.passo < ps.length - 1) { estado.passo++; render(); } else ir("fim");
   }
 
@@ -2697,7 +2797,7 @@
     ...linhasVoz(),
     "",
     "Objetivo: editar o meu vídeo para um Reels (vertical 9:16) usando a skill edvid, que para mim se chama Edição Mesa (trilha short-form).",
-    ...(ps.length ? ["", "Minhas escolhas:", ...ps.map((p) => `- ${p.curto}: ${(estado.respostas[p.id] ?? ["não informado"]).join(", ")}`)] : []),
+    ...(ps.length ? ["", "Minhas escolhas:", ...ps.map((p) => `- ${p.curto}: ${respostaTexto(p)}`)] : []),
     "",
     "Como proceder:",
     "- Use a skill edvid (para mim ela se chama Edição Mesa: nunca escreva Edvid na conversa). Procure, nesta conversa, uma mensagem com «Vídeo anexado: <caminho>». Se ainda não houver, peça em uma frase para eu anexar pelo botão + › Anexar vídeo e termine a resposta aí, sem fazer mais nada.",
@@ -2730,7 +2830,7 @@
       `CaptaMais: ${captamais?.estado === "conectado" && captamais.ativos ? "conectado, Análise de Ativo liberada" : captamais?.estado === "conectado" ? "conectado, mas a Análise de Ativo não está disponível agora" : "não conectado (peça os dados ao assessor)"}`,
       ...(c.obj ? ["", `Objetivo: ${c.obj}`] : []),
       ...(c.fonte ? ["", `Fonte dos dados: ${c.fonte}`] : []),
-      ...(ps.length ? ["", "Minhas escolhas:", ...ps.map((p) => `- ${p.curto}: ${(estado.respostas[p.id] ?? ["não informado"]).join(", ")}`)] : []),
+      ...(ps.length ? ["", "Minhas escolhas:", ...ps.map((p) => `- ${p.curto}: ${respostaTexto(p)}`)] : []),
       ...(entrega.length ? ["", "O que preciso receber:", ...entrega.map((x) => `- ${x}`)] : []),
       ...(campos.length ? ["", ...linhasDados(estado.tarefa)] : []),
       ...(t.extra ? ["", t.extra] : []),
@@ -3001,8 +3101,8 @@
     let passo = Math.min(Number(e.passo) || 0, Math.max(0, ps.length - 1));
     for (const [pid, v] of Object.entries(e.respostas && typeof e.respostas === "object" ? e.respostas : {})) {
       const p = (t.perguntas ?? [RESULTADO]).find((x) => x.id === pid); if (!p) continue;
-      const ops = (p.opcoes || []).map((o) => o.t), dadas = (Array.isArray(v) ? v : [v]).map(String), ficam = dadas.filter((x) => ops.includes(x));
-      dadas.filter((x) => !ops.includes(x)).forEach((valor) => perdidas.push({ curto: p.curto, valor }));
+      const ops = (p.opcoes || []).map((o) => o.t), dadas = (Array.isArray(v) ? v : [v]).map(String), ficam = p.tipo || p.perfilCampo ? dadas : dadas.filter((x) => ops.includes(x));
+      dadas.filter((x) => !ficam.includes(x)).forEach((valor) => perdidas.push({ curto: p.curto, valor }));
       if (ficam.length) respostas[pid] = ficam;
       if (ficam.length < dadas.length && ps.includes(p)) passo = Math.min(passo, ps.indexOf(p));
     }
@@ -3491,7 +3591,7 @@
     if (estado.tela !== "guia") { if (e.key === "Escape") voltarTela(); return; }
     const p = perguntasDe(T[estado.tarefa])[estado.passo];
     const i = LETRAS.indexOf(e.key.toUpperCase());
-    if (i >= 0 && i < p.opcoes.length) { escolher(p, p.opcoes[i].t); e.preventDefault(); }
+    if (!p.tipo && i >= 0 && i < p.opcoes.length) { escolher(p, p.opcoes[i].t); e.preventDefault(); }
     else if (e.key === "Enter") { avancar(); e.preventDefault(); }
     else if (e.key === "Escape" || e.key === "Backspace") { voltarPasso(); e.preventDefault(); }
   });

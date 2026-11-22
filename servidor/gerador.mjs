@@ -429,7 +429,15 @@ export async function gerarApresentacao(a, marcaBase = {}) {
   }
   const pendencias = (JSON.stringify(slides).match(/\[CONFERIR/g) || []).length;
   if (pendencias) avisos.push(`${pendencias} trecho(s) marcados com [CONFERIR] aparecem destacados nas páginas: o assessor precisa validar ou preencher antes de usar.`);
-  const r = { tipo: 'apresentacao', titulo: a.titulo, pasta, imagens, pdf, avisos, pendencias, minhasImagens: marca.pastaImagens, em: Date.now() };
+  let pptx = '';
+  if (a.pptx !== false) {
+    try {
+      const { gerarPptx } = await import('./pptx.mjs');
+      const p = await gerarPptx({ titulo: a.titulo, slides }, { ...marca, logoArquivo: a.logo || marcaBase.logo, fotoArquivo: a.foto || marcaBase.foto }, path.join(pasta, `${slug(a.titulo)}.pptx`));
+      pptx = p.pptx; avisos.push(...p.avisos);
+    } catch { avisos.push('O PowerPoint editável não foi gerado nesta vez; o PDF está pronto.'); }
+  }
+  const r = { tipo: 'apresentacao', titulo: a.titulo, pasta, imagens, pdf, pptx, avisos, pendencias, minhasImagens: marca.pastaImagens, em: Date.now() };
   writeFileSync(ARQUIVO_GERACAO, JSON.stringify({ ...r, avisos: undefined }));
   return r;
 }

@@ -75,6 +75,7 @@ Poucas palavras, bastante espaço em branco, uma só ideia por página, títulos
 - Os `[CONFERIR]` saem destacados nas páginas; no fim da resposta liste o que o assessor precisa preencher ou validar.
 - Se a ferramenta devolver `avisos` (logo ou foto não encontrados, formato não aceito), conte ao assessor em uma frase.
 - Depois, `mesa_andamento` com `concluido` e `entrega.arquivo` = caminho do PDF, e diga onde o arquivo ficou.
+- Junto com o PDF sai o PowerPoint editável (campo `pptx` da resposta), com o mesmo texto em caixas que o assessor muda no PowerPoint, no Google Slides ou importando no Canva. O visual dele é mais simples que o do PDF. Diga onde ficou; se `pptx` vier vazio, diga que só o PDF saiu.
 - A ferramenta falhou: entregue o texto das páginas no chat, uma página por bloco "Página N — título", e diga que o PDF não foi gerado.
 
 ## Limites
