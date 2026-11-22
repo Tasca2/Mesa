@@ -1314,8 +1314,46 @@
     }
     return { opcoes, regras: regrasLimpas(aj?.regras) };
   }
+  let preenchido = {}, preenchidoTimer = null;
+  function limparPreenchido(o) {
+    const r = {};
+    for (const [id, g] of Object.entries(o && typeof o === "object" ? o : {}).slice(0, 60)) {
+      if (!T[id] || !g || typeof g !== "object") continue;
+      r[id] = { f: String(g.f ?? "").slice(0, 40), em: Number(g.em) || 0,
+        r: Object.fromEntries(Object.entries(g.r && typeof g.r === "object" ? g.r : {}).slice(0, 20).map(([k, v]) => [String(k).slice(0, 40), (Array.isArray(v) ? v : []).slice(0, 8).map((x) => String(x).slice(0, 1500))])),
+        c: (Array.isArray(g.c) ? g.c : []).slice(0, 20).map((x) => (x == null ? null : String(x).slice(0, 3000))) };
+    }
+    return r;
+  }
+  function aplicarPreenchido(id) {
+    const g = preenchido[id], t = T[id];
+    if (!g || !t || id === "editar-reels" || g.f !== formatoDe(id)) return;
+    const r = {};
+    for (const p of t.perguntas ?? []) {
+      const v = g.r[p.id]; if (!v?.length || p.tipo === "arquivo") continue;
+      const ops = (p.opcoes || []).map((o) => o.t), ok = p.tipo ? v : v.filter((x) => ops.includes(x));
+      if (ok.length) r[p.id] = p.multi || p.tipo ? ok : ok.slice(0, 1);
+    }
+    estado.respostas = r;
+    estado.campos = { ...(estado.campos || {}), [id]: g.c.map((x) => (x ? x : undefined)) };
+  }
+  function lembrarPreenchido() {
+    const id = estado.tarefa;
+    if (!id || !T[id] || id === "editar-reels" || !conectado) return;
+    const novo = { f: formatoDe(id), em: Date.now(), r: JSON.parse(JSON.stringify(estado.respostas || {})), c: [...(estado.campos?.[id] ?? [])].map((x) => x ?? null) };
+    const antes = preenchido[id];
+    if (antes && JSON.stringify([antes.f, antes.r, antes.c]) === JSON.stringify([novo.f, novo.r, novo.c])) return;
+    preenchido[id] = novo;
+    clearTimeout(preenchidoTimer); preenchidoTimer = setTimeout(guardarAjustes, 1500);
+  }
   async function guardarAjustes() {
-    const json = JSON.stringify({ ...ajustes, tarefas: { ...ajustes.tarefas, ...regrasGuardadas } });
+    preenchido = limparPreenchido(preenchido);
+    const montar = () => JSON.stringify({ ...ajustes, tarefas: { ...ajustes.tarefas, ...regrasGuardadas }, preenchido });
+    let json = montar();
+    while (json.length > 55000 && Object.keys(preenchido).length) {
+      const maisAntigo = Object.entries(preenchido).sort((a, b) => a[1].em - b[1].em)[0][0];
+      delete preenchido[maisAntigo]; json = montar();
+    }
     if (perfil) perfil.ajustes = json;
     try { await app.callServerTool({ name: "mesa_perfil", arguments: { ajustes: json } }); } catch {   }
   }
@@ -1332,6 +1370,7 @@
     }
     for (const [s, r] of Object.entries(o.skills ?? {}).slice(0, 20)) if (SKILLS_CONHECIDAS.includes(s)) ajustes.skills[s] = regrasLimpas(r);
     for (const [id, a] of Object.entries(o.modelosMantidos ?? {})) if (TEXTO_ANTIGO[id] && typeof a === "string") ajustes.modelosMantidos[id] = a.slice(0, 40);
+    preenchido = limparPreenchido(o.preenchido);
   }
   function guardarRegrasQueSairam(id, aj) {
     const regras = SAIRAM_DO_MENU[id] ? regrasLimpas(aj?.regras) : [];
@@ -1469,6 +1508,7 @@
     if (tela === "guia") { const tid = extra.tarefa || estado.tarefa; if (tid && T[tid] && perguntasDe(T[tid]).length === 0) tela = "fim"; }
     if (tela === "lista" && !("pasta" in extra)) { const gp = AREAS.flatMap((x) => x.grupos).find((g) => g.pasta && g.tarefas.includes(estado.tarefa)); extra = { ...extra, pasta: gp ? gp.nome : null }; }
     Object.assign(estado, { tela }, extra);
+    if ((tela === "guia" || tela === "fim") && extra.tarefa && extra.respostas && !Object.keys(extra.respostas).length) aplicarPreenchido(extra.tarefa);
     if (tela === "inicio") Object.assign(estado, { area: null, tarefa: null, pasta: null });
     if (tela === "lista") Object.assign(estado, { tarefa: null });
     if (tela !== "acompanhar") { clearInterval(vigia); vigia = null; estado.historico = null; }
@@ -1623,7 +1663,7 @@
       const caixa = el("div", "campo"); caixa.style.cssText = "margin-top:22px;max-width:560px";
       const inp = p.longo ? el("textarea") : el("input"); if (p.longo) inp.rows = 5;
       inp.placeholder = p.dica || ""; inp.maxLength = p.max || 200; inp.value = sel[0] ?? ""; inp.setAttribute("aria-label", p.titulo);
-      inp.oninput = () => { estado.respostas[p.id] = inp.value.trim() ? [inp.value.trim()] : []; podeSeguir(); };
+      inp.oninput = () => { estado.respostas[p.id] = inp.value.trim() ? [inp.value.trim()] : []; podeSeguir(); agendarRascunho(); };
       inp.onkeydown = (ev) => { if (ev.key === "Enter" && (!p.longo || ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); avancar(); } };
       caixa.append(inp); meio.append(caixa);
       requestAnimationFrame(() => { try { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } catch { } });
@@ -2225,6 +2265,7 @@
       if (!estado.tarefa || !T[estado.tarefa]) return;
       const tela = estado.tela === "acompanhar" ? "fim" : estado.tela;
       if (!["guia", "fim"].includes(tela)) return;
+      lembrarPreenchido();
       const salvo = JSON.stringify({ v: 1, em: Date.now(), estado: { tela, area: estado.area, tarefa: estado.tarefa, passo: estado.passo, respostas: estado.respostas, campos: estado.campos }, texto: tela === "fim" ? promptEdit.texto : "",
         ...(tela === "fim" ? { editado: !!promptEdit.editado || (!promptEdit.modelo && promptEdit.texto !== promptEdit.base), modelo: !!promptEdit.modelo } : {}),
         formato: Object.fromEntries([...new Set([estado.tarefa, ...Object.keys(estado.campos || {})])].map((id) => [id, formatoDe(id)])) });
@@ -2324,7 +2365,7 @@
     if (!conectado) { st.className = "estado erro"; st.textContent = "O painel não se conectou ao Claude. Peça a Mesa de novo numa conversa nova."; return false; }
     try {
       const r = await app.sendMessage({ role: "user", content: [{ type: "text", text: texto }] });
-      if (r?.isError) { st.className = "estado erro"; st.textContent = "Não foi aceito. Tente de novo."; return false; }
+      if (r?.isError) { st.className = "estado erro"; st.textContent = r.motivo || "Não foi aceito. Tente de novo."; return false; }
       conversa = [...conversa, texto].slice(-6); rascunhoChat = "";
       registrar("conversa_continuada");
       return true;
@@ -2360,7 +2401,7 @@
       await app.callServerTool({ name: "mesa_andamento", arguments: { agora: "" } }).catch(() => {});
       await app.updateModelContext({ content: [{ type: "text", text: instrucao(t) }] }).catch(() => {});
       const r = await app.sendMessage({ role: "user", content: [{ type: "text", text: texto }] });
-      if (r?.isError) { st.className = "estado erro"; st.textContent = "Não foi aceito. Tente de novo."; return; }
+      if (r?.isError) { st.className = "estado erro"; st.textContent = r.motivo || "Não foi aceito. Tente de novo."; return; }
       if (app.getHostContext()?.displayMode !== "fullscreen" && app.getHostContext()?.availableDisplayModes?.includes("fullscreen")) {
         await app.requestDisplayMode({ mode: "fullscreen" }).catch(() => {}); aplicarHost();
       }

@@ -97,7 +97,7 @@ const PROTOCOLO = 'Você é o assistente dentro da janela da Mesa do Assessor. A
   'Quando o Resultado for "Texto no chat", a resposta final traz o TEXTO COMPLETO da entrega, pronto para copiar, e não só um resumo; as dúvidas e o que conferir vêm depois, em poucas linhas. ' +
   'ENTREGA COMPLETA: nunca entregue só a lista ou a descrição do que cada peça contém ("3 peças entregues: roteiro, resumo..."). O texto integral e pronto de cada peça vai na resposta final, cada um em sua marca <peca>; o cartão da entrega leva o mesmo conteúdo. ' +
   'REVISÃO: antes de entregar texto para cliente ou público, confira sem promessa nem projeção de retorno, sem "compre/venda/indico", com a identificação do profissional, e com [CONFERIR] em todo número sem fonte; corrija antes de entregar.';
-const VERSAO = '1.16.0';
+const VERSAO = '1.16.1';
 const MODELOS = [['', 'Padrão do Claude Code'], ['claude-fable-5-2', 'Fable 5.2'], ['claude-opus-5-5', 'Opus 5.5'], ['claude-sonnet-5-5', 'Sonnet 5.5'], ['claude-haiku-5-5', 'Haiku 5.5']];
 const ARQ_MODELO = path.join(PASTA_DADOS, 'modelo.json');
 let modeloEscolhido = ''; let modeloUsado = '';
@@ -437,10 +437,11 @@ function melhorarPedido(texto, pedido) {
 function lerGeracao() { try { return JSON.parse(readFileSync(ARQUIVO_GERACAO, 'utf8')); } catch { return null; } }
 function geracaoAtual() {
   const g = lerGeracao();
-  if (!g || g.em < sessaoInicio) return null;
+  if (!g || g.em < geracaoDesde) return null;
   return { tipo: g.tipo, titulo: g.titulo, imagens: (g.imagens || []).length, pdf: g.pdf ? path.basename(g.pdf) : '', em: g.em };
 }
 const sessaoInicio = Date.now() - 60 * 1000;
+let geracaoDesde = sessaoInicio;
 
 const urlSegura = (u) => { try { const x = new URL(u); return x.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(x.hostname); } catch { return false; } };
 const tentativasEntrar = [];
@@ -651,14 +652,14 @@ const servidor = http.createServer(async (req, res) => {
       }
       case '/api/novo':
         if (!estado.rodando) {
-          estado.sessao = null; estado.erro = '';
+          estado.sessao = null; estado.erro = ''; geracaoDesde = Date.now();
           if (estado.video && estado.video.usado !== false) estado.video = null;
           if (estado.turnos.length && estado.turnos[estado.turnos.length - 1].papel !== 'sistema') estado.turnos.push({ papel: 'sistema', texto: 'Nova tarefa' });
           guardarConversa();
         }
         return json(res, 200, { ok: true });
       case '/api/limpar':
-        if (!estado.rodando) { if (!corpo.descartar) arquivar(estado.turnos, estado.sessao, estado.meta, estado.video); estado.sessao = null; estado.turnos = []; estado.erro = ''; estado.meta = null; estado.video = null; guardarConversa(); }
+        if (!estado.rodando) { if (!corpo.descartar) arquivar(estado.turnos, estado.sessao, estado.meta, estado.video); estado.sessao = null; estado.turnos = []; estado.erro = ''; estado.meta = null; estado.video = null; geracaoDesde = Date.now(); guardarConversa(); }
         return json(res, 200, { ok: true });
       case '/api/diag': {
         return json(res, 200, { versao: VERSAO, modelo: modeloEscolhido || 'padrão', modeloUsado, plataforma: `${process.platform} ${os.release()}`, node: process.version, claude: !!CLAUDE, edvid: existsSync(EDVID_DIR),
@@ -679,7 +680,7 @@ const servidor = http.createServer(async (req, res) => {
         const [it] = h.splice(i, 1);
         gravarHist(h);
         arquivar(estado.turnos, estado.sessao, estado.meta, estado.video);
-        estado.turnos = it.turnos; estado.sessao = it.sessao || null; estado.meta = limpaMeta(it); estado.video = it.video || null; estado.erro = '';
+        estado.turnos = it.turnos; estado.sessao = it.sessao || null; estado.meta = limpaMeta(it); estado.video = it.video || null; estado.erro = ''; geracaoDesde = Date.now();
         guardarConversa();
         return json(res, 200, { ok: true, tarefa: it.tarefa, area: it.area, nome: it.nome, em: it.em });
       }
