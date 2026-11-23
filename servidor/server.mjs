@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, statSync, rmSync, realpathSync, chmodSync, copyFileSync } from 'node:fs';
 import os from 'node:os';
+import { lookup } from 'node:dns/promises';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -117,6 +118,16 @@ function lerChaveImagem() {
 const lerPedidoImagem = () => lerJson(ARQUIVO_PEDIDO_IMAGEM);
 const gravarPedidoImagem = (estado) => gravarSeguro(ARQUIVO_PEDIDO_IMAGEM, { estado, em: Date.now() });
 const dormir = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const ARQUIVO_USO_IMAGEM = path.join(PASTA_PERFIL, 'imagem-ia-uso.json');
+function reservarImagem() {
+  const agora = Date.now();
+  let l = lerJson(ARQUIVO_USO_IMAGEM);
+  l = Array.isArray(l) ? l.filter((t) => typeof t === 'number' && agora - t < 864e5) : [];
+  if (l.filter((t) => agora - t < 36e5).length >= 12) return { ok: false, motivo: 'Limite de 12 imagens por IA por hora atingido. Siga com mesa_buscar_imagem e avise o assessor em uma linha.' };
+  if (l.length >= 40) return { ok: false, motivo: 'Limite de 40 imagens por IA por dia atingido. Siga com mesa_buscar_imagem e avise o assessor em uma linha.' };
+  l.push(agora); gravarSeguro(ARQUIVO_USO_IMAGEM, l);
+  return { ok: true };
+}
 const PAINEL_URI = 'ui://mesa-do-assessor/painel';
 const SDK_PAINEL = readFileSync(createRequire(import.meta.url).resolve('@modelcontextprotocol/ext-apps/app-with-deps'), 'utf8')
   .replace(/export\s*\{([^}]*)\};?\s*$/, (_, lista) => 'globalThis.ExtApps={' + lista.split(',')
@@ -264,6 +275,8 @@ function copiarArquivosDaEntrega(andamento, guardada) {
   try {
     const f = andamento?.entrega?.arquivo ? arquivoDaEntrega(andamento) : null;
     if (!f || f.erro) return [];
+    const baseDocs = realpathSync(pastaBase());
+    if (!(f.real === baseDocs || f.real.startsWith(baseDocs + path.sep))) return [];
     const pasta = path.join(pastaBase(), 'Entregas', guardada.cliente);
     const raiz = String(guardada.nome).replace(/\.md$/i, '');
     const origens = [f.real];
@@ -280,6 +293,28 @@ function copiarArquivosDaEntrega(andamento, guardada) {
   } catch { return []; }
 }
 const HOST_PROIBIDO = /^(localhost$|127\.|10\.|0\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[|\d+\.\d+\.\d+\.\d+$)/i;
+const ipPrivado = (ip) => {
+  const x = String(ip || '').toLowerCase().replace(/^::ffff:/, '');
+  if (x.includes(':')) return x === '::1' || x === '::' || /^f[cd]/.test(x) || /^fe[89ab]/.test(x);
+  const p = x.split('.').map(Number);
+  if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
+  return p[0] === 0 || p[0] === 10 || p[0] === 127 || p[0] >= 224 || (p[0] === 169 && p[1] === 254) || (p[0] === 172 && p[1] >= 16 && p[1] <= 31) || (p[0] === 192 && p[1] === 168) || (p[0] === 100 && p[1] >= 64 && p[1] <= 127);
+};
+async function hostPublico(host) {
+  if (HOST_PROIBIDO.test(host)) return false;
+  try { const r = await lookup(host, { all: true }); return r.length > 0 && r.every((a) => !ipPrivado(a.address)); } catch { return false; }
+}
+async function baixarImagemSegura(url) {
+  let atual = url;
+  for (let salto = 0; salto < 4; salto++) {
+    const u = new URL(atual);
+    if (u.protocol !== 'https:' || !(await hostPublico(u.hostname))) return null;
+    const d = await fetch(atual, { redirect: 'manual', signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'MesaDoAssessor/1.0' } });
+    if ([301, 302, 303, 307, 308].includes(d.status)) { const l = d.headers.get('location'); if (!l) return null; atual = new URL(l, atual).href; continue; }
+    return d;
+  }
+  return null;
+}
 async function buscarImagensLivres(consulta, quantidade, orientacao, pasta) {
   const q = String(consulta || '').trim().slice(0, 100);
   if (q.length < 3) throw new Error('Diga o que a imagem deve mostrar.');
@@ -297,10 +332,12 @@ async function buscarImagensLivres(consulta, quantidade, orientacao, pasta) {
     try {
       const host = new URL(c.url).hostname;
       if (HOST_PROIBIDO.test(host)) continue;
-      const d = await fetch(c.url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'MesaDoAssessor/1.0' } });
+      const d = await baixarImagemSegura(c.url);
+      if (!d) continue;
       const tipo = String(d.headers.get('content-type') || '').toLowerCase();
       const ext = tipo.includes('image/jpeg') ? '.jpg' : tipo.includes('image/png') ? '.png' : '';
       if (!d.ok || !ext) continue;
+      if (Number(d.headers.get('content-length') || 0) > 6 * 1024 * 1024) continue;
       const bytes = Buffer.from(await d.arrayBuffer());
       if (bytes.length < 30000 || bytes.length > 6 * 1024 * 1024) continue;
       const nome = 'web-' + base + '-' + (saida.length + 1) + ext;
@@ -863,6 +900,8 @@ function buildServer() {
           return resp({ ok: false, semChave: true, motivo: 'Sem chave de imagens por IA. Siga com mesa_buscar_imagem, avise em uma linha que as imagens por IA ficam para depois e não peça a chave no chat.' });
         }
       }
+      const reserva = reservarImagem();
+      if (!reserva.ok) return resp({ ok: false, limite: true, motivo: reserva.motivo });
       try {
         const r = await gerarImagemIA({ ...c, descricao, orientacao: orientacao ?? 'horizontal', pasta: path.join(pastaBase(), 'Minhas imagens') });
         return resp({ ok: true, imagem: r, aviso: 'Imagem gerada por IA: diga ao assessor, em uma linha, em quais páginas entrou, para ele poder trocar. Não use para provar fato, pessoa ou resultado.' });
