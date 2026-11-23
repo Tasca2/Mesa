@@ -409,7 +409,7 @@ function svgLinhaSlide(d, cores, m, LARG, ALTO) {
 const LAYOUTS = {
   capa(s, m) {
     const para = m.cliente ? `<div><span class="r">Preparado para</span><b>${lim(m.cliente)}</b></div>` : '';
-    const base = `<div class="base">${m.nome ? `<div><b>${lim(m.nome)}</b>${lim(m.cargo || '')}</div>` : ''}${m.escritorio && m.logo ? `<div><b>${lim(m.escritorio)}</b></div>` : ''}${para}${s.texto ? `<div><b>${lim(s.texto)}</b></div>` : ''}</div>`;
+    const base = `<div class="base">${m.nome ? `<div><b>${lim(m.nome)}</b>${lim(m.cargo || '')}</div>` : ''}${para}${s.texto ? `<div><b>${lim(s.texto)}</b></div>` : ''}</div>`;
     if (m.pv) {
       const inicial = (m.nome || m.escritorio || '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
       const lado = m.foto

@@ -10,7 +10,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { acharClaude, precisaShell, ARQUIVO_MOTOR, FERRAMENTAS_WEB, PASTA_DADOS } from './comum.mjs';
 import { openSync, readSync, closeSync } from 'node:fs';
-import { MAX_ANEXOS, PASTA_ANEXOS, PASTA_FONTES, tipoDoAnexo, assinaturaConfere, erroDeTamanho, dentroDe, destinoDoAnexo, argsDeFerramentas, blocoDeAnexos, pastaCofre, regrasDaMesa, argsDeMelhorar, AVISO_ARQUIVOS, ANEXO_NO_VIDEO, ANEXO_NO_VIDEO_ENVIO } from './anexos.mjs';
+import { converterParaTexto } from './converter.mjs';
+import { MAX_ANEXOS, PASTA_ANEXOS, PASTA_FONTES, tipoDoAnexo, assinaturaConfere, erroDeTamanho, dentroDe, destinoDoAnexo, argsDeFerramentas, blocoDeAnexos, pastaCofre, regrasDaMesa, argsDeMelhorar, AVISO_ARQUIVOS, ANEXO_NO_VIDEO, ANEXO_NO_VIDEO_ENVIO, MSG_TIPOS } from './anexos.mjs';
 import { cortarMensagem, cortarFim, paraExibir } from './corte.mjs';
 const LIMITE_MENSAGEM = 40000, LIMITE_CONTEXTO = 4000, LIMITE_EXIBIR = 4000;
 
@@ -97,7 +98,7 @@ const PROTOCOLO = 'Você é o assistente dentro da janela da Mesa do Assessor. A
   'Quando o Resultado for "Texto no chat", a resposta final traz o TEXTO COMPLETO da entrega, pronto para copiar, e não só um resumo; as dúvidas e o que conferir vêm depois, em poucas linhas. ' +
   'ENTREGA COMPLETA: nunca entregue só a lista ou a descrição do que cada peça contém ("3 peças entregues: roteiro, resumo..."). O texto integral e pronto de cada peça vai na resposta final, cada um em sua marca <peca>; o cartão da entrega leva o mesmo conteúdo. ' +
   'REVISÃO: antes de entregar texto para cliente ou público, confira sem promessa nem projeção de retorno, sem "compre/venda/indico", com a identificação do profissional, e com [CONFERIR] em todo número sem fonte; corrija antes de entregar.';
-const VERSAO = '1.16.1';
+const VERSAO = '1.18.8';
 const MODELOS = [['', 'Padrão do Claude Code'], ['claude-fable-5-2', 'Fable 5.2'], ['claude-opus-5-5', 'Opus 5.5'], ['claude-sonnet-5-5', 'Sonnet 5.5'], ['claude-haiku-5-5', 'Haiku 5.5']];
 const ARQ_MODELO = path.join(PASTA_DADOS, 'modelo.json');
 let modeloEscolhido = ''; let modeloUsado = '';
@@ -302,7 +303,7 @@ function receberAnexo(req, res) {
   const recusar = (cod, erro) => { req.resume(); return json(res, cod, { erro }); };
   if (modoVideo()) return recusar(409, ANEXO_NO_VIDEO);
   if (anexosPendentes.length >= MAX_ANEXOS) return recusar(400, `Até ${MAX_ANEXOS} arquivos por mensagem. Envie estes antes de anexar mais.`);
-  if (!t) return recusar(415, 'Anexe PDF ou imagem (PNG, JPG ou WEBP).');
+  if (!t) return recusar(415, MSG_TIPOS);
   const declarado = Number(req.headers['content-length'] || 0);
   if (declarado > t.limite) return recusar(413, erroDeTamanho(t.ext, declarado));
   const base = pastaAnexos(), d = destinoDoAnexo(base, nomeOrig, new Date());
@@ -321,12 +322,21 @@ function receberAnexo(req, res) {
     if (erroTam) return falha(recebido ? 413 : 400, erroTam);
     let inicio = Buffer.alloc(0);
     try { const fd = openSync(parcial, 'r'); try { const b = Buffer.alloc(16); inicio = b.subarray(0, readSync(fd, b, 0, 16, 0)); } finally { closeSync(fd); } } catch {   }
-    if (!assinaturaConfere(t.ext, inicio)) return falha(415, t.tipo === 'pdf' ? 'Esse arquivo não parece ser um PDF de verdade.' : 'Esse arquivo não parece ser uma imagem PNG, JPG ou WEBP de verdade.');
+    if (!assinaturaConfere(t.ext, inicio)) return falha(415, ({ pdf: 'Esse arquivo não parece ser um PDF de verdade.', imagem: 'Esse arquivo não parece ser uma imagem PNG, JPG ou WEBP de verdade.', texto: 'Esse arquivo não parece ser um texto simples.', documento: 'Esse arquivo não parece ser um Word (.docx) de verdade.', planilha: 'Esse arquivo não parece ser um Excel (.xlsx) de verdade.' })[t.tipo]);
     if (!dentroDe(base, d.arquivo)) return falha(400, 'Nome de arquivo inválido.');
     try { renameSync(parcial, d.arquivo); } catch { return falha(500, 'Não consegui concluir o anexo.'); }
-    const a = { id: crypto.randomBytes(8).toString('hex'), nome: d.nome, original: original || d.nome, tipo: t.tipo, kb: Math.max(1, Math.round(recebido / 1024)), caminho: d.arquivo };
-    anexosPendentes.push(a);
-    json(res, 200, { ok: true, anexo: { ...anexoParaTela(a), caminho: a.caminho } });
+    const concluir = (caminho, nome) => {
+      const a = { id: crypto.randomBytes(8).toString('hex'), nome, original: original || nome, tipo: t.tipo, kb: Math.max(1, Math.round(recebido / 1024)), caminho };
+      anexosPendentes.push(a);
+      json(res, 200, { ok: true, anexo: { ...anexoParaTela(a), caminho: a.caminho } });
+    };
+    if (!t.converte) return concluir(d.arquivo, d.nome);
+    converterParaTexto(d.arquivo, t.ext, original).then((texto) => {
+      const destinoTxt = d.arquivo + '.txt';
+      writeFileSync(destinoTxt, texto, 'utf8');
+      try { rmSync(d.arquivo, { force: true }); } catch {   }
+      concluir(destinoTxt, d.nome + '.txt');
+    }).catch((e) => { try { rmSync(d.arquivo, { force: true }); } catch {   } falha(422, (e && e.message) || 'Não consegui ler esse arquivo.'); });
   });
   req.pipe(out);
 }
@@ -517,6 +527,12 @@ async function entrarComSenha(email, senha) {
   } finally { token = ''; }
 }
 
+function estadoImagemIA() {
+  let configurada = false, pedindo = false;
+  try { configurada = existsSync(path.join(PASTA_DADOS, 'imagem-ia.json')); } catch {   }
+  try { const p = JSON.parse(readFileSync(path.join(PASTA_DADOS, 'pedir-chave-imagem.json'), 'utf8')); pedindo = !configurada && p?.estado === 'pedindo' && Date.now() - p.em < 300_000; } catch {   }
+  return { configurada, pedindo };
+}
 let ultimoPing = Date.now(), houvePing = false;
 const lerCorpo = (req) => new Promise((ok, no) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 2e6) { no(new Error('grande')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { ok({}); } }); });
 const json = (res, cod, obj) => { res.writeHead(cod, { ...CABECALHOS, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(obj)); };
@@ -642,6 +658,16 @@ const servidor = http.createServer(async (req, res) => {
         if (!email || !senha) return json(res, 400, { status: 'erro', mensagem: 'Escreva o e-mail e a senha.' });
         return json(res, 200, await entrarComSenha(email, senha));
       }
+      case '/api/chave-imagem': {
+        const acao = String(corpo.acao || '');
+        if (!['guardar', 'dispensar', 'remover', 'status'].includes(acao)) return json(res, 400, { erro: 'ação inválida' });
+        const args = { acao, segredo: SEGREDO_LOCAL };
+        if (acao === 'guardar') { args.provedor = String(corpo.provedor || ''); args.chave = String(corpo.chave || '').trim().slice(0, 400); }
+        corpo.chave = '';
+        const r = await (await cliente()).callTool({ name: 'mesa_chave_imagem', arguments: args });
+        args.chave = '';
+        return json(res, 200, r.structuredContent || { status: 'erro', mensagem: 'Não consegui guardar a chave agora.' });
+      }
       case '/api/modelo': {
         if (typeof corpo.modelo === 'string') {
           if (!MODELOS.some((x) => x[0] === corpo.modelo)) return json(res, 400, { erro: 'Modelo desconhecido.' });
@@ -710,7 +736,7 @@ const servidor = http.createServer(async (req, res) => {
         if (dentroDe(pastaAnexos(), a.caminho)) { try { rmSync(a.caminho, { force: true }); } catch {   } }
         return json(res, 200, { ok: true });
       }
-      case '/api/estado': return json(res, 200, { videos: videosAtuais(), videoAtivo: !!estado.video?.ativo, geracao: geracaoAtual(), rodando: estado.rodando, segundos: estado.rodando ? Math.round((Date.now() - estado.inicio) / 1000) : 0, turnos: estado.turnos, erro: estado.erro, anexos: anexosPendentes.map(anexoParaTela) });
+      case '/api/estado': return json(res, 200, { imagemIA: estadoImagemIA(), videos: videosAtuais(), videoAtivo: !!estado.video?.ativo, geracao: geracaoAtual(), rodando: estado.rodando, segundos: estado.rodando ? Math.round((Date.now() - estado.inicio) / 1000) : 0, turnos: estado.turnos, erro: estado.erro, anexos: anexosPendentes.map(anexoParaTela) });
       case '/api/melhorar': {
         const bruto = String(corpo.texto || ''), pedidoBruto = String(corpo.pedido || '');
         const texto = bruto.slice(0, 40000), pedido = pedidoBruto.slice(0, 1000);
@@ -731,12 +757,55 @@ const servidor = http.createServer(async (req, res) => {
         spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).unref();
         return json(res, 200, { ok: true });
       }
+      case '/api/clientes': {
+        const base = path.join(pastaBase(), 'Entregas');
+        let lista = [];
+        try {
+          lista = readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => {
+            const arqs = readdirSync(path.join(base, d.name)).filter((n) => n.toLowerCase().endsWith('.md')).sort().reverse();
+            return { nome: d.name, entregas: arqs.length, ultima: arqs.length ? statSync(path.join(base, d.name, arqs[0])).mtimeMs : 0 };
+          }).filter((c) => c.entregas).sort((a, b) => b.ultima - a.ultima);
+        } catch {}
+        return json(res, 200, { clientes: lista });
+      }
+      case '/api/cliente': {
+        const base = path.join(pastaBase(), 'Entregas');
+        try {
+          const nome = readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).find((n) => n === String(corpo.nome || ''));
+          if (!nome) return json(res, 404, { erro: 'cliente não encontrado' });
+          const entregas = readdirSync(path.join(base, nome)).filter((n) => n.toLowerCase().endsWith('.md')).sort().reverse().map((arquivo) => ({ arquivo, em: statSync(path.join(base, nome, arquivo)).mtimeMs }));
+          return json(res, 200, { entregas });
+        } catch { return json(res, 404, { erro: 'cliente não encontrado' }); }
+      }
+      case '/api/cliente/ler': {
+        const base = path.join(pastaBase(), 'Entregas');
+        try {
+          const nome = readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).find((n) => n === String(corpo.nome || ''));
+          const arquivo = nome ? readdirSync(path.join(base, nome)).find((n) => n === String(corpo.arquivo || '') && n.toLowerCase().endsWith('.md')) : null;
+          if (!arquivo) return json(res, 404, { erro: 'entrega não encontrada' });
+          return json(res, 200, { texto: readFileSync(path.join(base, nome, arquivo), 'utf8').slice(0, 60000) });
+        } catch { return json(res, 404, { erro: 'entrega não encontrada' }); }
+      }
+      case '/api/abrir-arquivo': {
+        const base = path.join(pastaBase(), 'Entregas');
+        try {
+          const cliente = readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).find((n) => n === String(corpo.cliente || ''));
+          const nome = cliente ? readdirSync(path.join(base, cliente)).find((n) => n === String(corpo.nome || '') && /\.(pdf|pptx|md)$/i.test(n)) : null;
+          if (!nome) return json(res, 404, { erro: 'arquivo não encontrado' });
+          const alvo = path.join(base, cliente, nome);
+          const cmd = process.platform === 'win32' ? ['explorer.exe', [alvo]] : process.platform === 'darwin' ? ['open', [alvo]] : ['xdg-open', [alvo]];
+          spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref();
+          return json(res, 200, { ok: true });
+        } catch { return json(res, 404, { erro: 'arquivo não encontrado' }); }
+      }
       case '/api/abrir-entregas': {
         const base = path.join(pastaBase(), 'Entregas'); mkdirSync(base, { recursive: true });
         const cliente = path.basename(String(corpo.cliente || '').slice(0, 60));
         const alvo = cliente && cliente !== '.' && cliente !== '..' && existsSync(path.join(base, cliente)) ? path.join(base, cliente) : base;
-        const cmd = process.platform === 'win32' ? ['explorer.exe', [alvo]] : process.platform === 'darwin' ? ['open', [alvo]] : ['xdg-open', [alvo]];
-        spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref();
+        const arq = corpo.nome ? path.join(alvo, path.basename(String(corpo.nome))) : '';
+        const selecionar = arq && alvo !== base && existsSync(arq) && /\.(pdf|pptx|md)$/i.test(arq);
+        const cmd = process.platform === 'win32' ? (selecionar ? ['explorer.exe', ['/select,"' + arq + '"']] : ['explorer.exe', [alvo]]) : process.platform === 'darwin' ? (selecionar ? ['open', ['-R', arq]] : ['open', [alvo]]) : ['xdg-open', [alvo]];
+        spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).unref();
         return json(res, 200, { ok: true });
       }
       case '/api/escolher-video': {
@@ -800,4 +869,4 @@ servidor.listen(PORTA, '127.0.0.1', () => {
   console.log(`Mesa do Assessor em http://127.0.0.1:${PORTA}/`);
 });
 
-setInterval(() => { if (houvePing && !estado.rodando && Date.now() - ultimoPing > 60000) process.exit(0); if (!houvePing && Date.now() - ultimoPing > 120000) process.exit(0); }, 5000);
+setInterval(() => { if (houvePing && !estado.rodando && Date.now() - ultimoPing > 150000) process.exit(0); if (!houvePing && Date.now() - ultimoPing > 120000) process.exit(0); }, 5000);

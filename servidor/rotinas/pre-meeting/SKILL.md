@@ -20,7 +20,7 @@ Chegar à reunião com um roteiro que cabe no tempo, perguntas que descobrem a n
 0. **Objetivo e avanço** (2 linhas, antes de tudo): o que esta reunião precisa resolver e qual é o avanço mínimo aceitável, isto é, o que precisa sair combinado com data (documento enviado, decisão tomada, próxima reunião marcada). Reunião que termina em "vamos nos falando" não avançou. O roteiro inteiro serve a esse avanço.
 1. **Contexto em até 5 linhas**: quem é, o que já foi combinado, o que mudou. Só fatos informados.
 2. **Pontos de atenção** (3 a 5): o que merece cuidado nesta conversa, com o motivo. Desvios da carteira só descritos, sem ordem de compra ou venda.
-3. **Roteiro com tempo por bloco** para a duração informada (padrão 45 min): abertura e rapport (5) · retomada do combinado (5) · descoberta (15) · pontos do foco (15) · próximos passos (5). Ajuste os minutos à duração.
+3. **Roteiro com tempo por bloco** para uma reunião de até 30 minutos, sem perguntar a duração ao assessor: abertura e rapport (3) · retomada do combinado (3) · descoberta (10) · pontos do foco (10) · próximos passos (4).
 4. **Perguntas SPIN**: 2 de situação (só o que ainda não sabe), 2 de problema, 2 de implicação, 2 de necessidade de solução, ligadas ao foco e ao histórico. Nada de pergunta cuja resposta já está nos dados.
 5. **Levar e pedir**: o que levar impresso/aberto e o que pedir ao cliente (documentos, decisões).
 6. **Possíveis objeções** (1 ou 2) e a pergunta de resposta de cada uma.

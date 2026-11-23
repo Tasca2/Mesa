@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const TEMAS = {
   escuro: { fundo: '0E0E10', painel: '17171A', tinta: 'F2EDE4', suave: '9C9CA3', cor: 'C9A24B', linha: '2E2E33' },
@@ -8,6 +8,24 @@ const TEMAS = {
 };
 const LARG = 13.333, ALT = 7.5, MX = 0.75, UTIL = LARG - 2 * MX;
 const IMAGEM_OK = ['.png', '.jpg', '.jpeg', '.gif'];
+function dimensoes(arq) {
+  try {
+    const b = readFileSync(arq);
+    if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+    if (b[0] === 0xff && b[1] === 0xd8) {
+      let i = 2;
+      while (i + 9 < b.length) {
+        if (b[i] !== 0xff) { i++; continue; }
+        const m = b[i + 1];
+        if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7) };
+        i += 2 + b.readUInt16BE(i + 2);
+      }
+    }
+    if (b.subarray(0, 3).toString('latin1') === 'GIF') return { w: b.readUInt16LE(6), h: b.readUInt16LE(8) };
+  } catch {   }
+  return null;
+}
+const caber = (arq, bw, bh) => { const d = dimensoes(arq); if (!d || !d.w || !d.h) return { w: bw, h: bh }; const k = Math.min(bw / d.w, bh / d.h); return { w: d.w * k, h: d.h * k }; };
 const txt = (x) => String(x ?? '').trim();
 const num2 = (i) => String(i + 1).padStart(2, '0');
 
@@ -83,7 +101,12 @@ export async function gerarPptx(a, marca, destino) {
     for (const l of linhas) rows.push(l.map((c) => ({ text: txt(c), options: { color: t.tinta, border: borda } })));
     if (rows.length) sl.addTable(rows, { x: MX, y: y0, w: UTIL, fontFace: fCorpo, fontSize: 13, valign: 'middle', margin: 0.08 });
   };
-  const figura = (sl, arq, x, y, w, h) => sl.addImage({ path: arq, x, y, w, h, sizing: { type: 'cover', w, h } });
+  const figura = (sl, arq, x, y, w, h) => {
+    const d = dimensoes(arq);
+    if (!d) return sl.addImage({ path: arq, x, y, w, h });
+    const k = Math.max(w / d.w, h / d.h), iw = d.w * k, ih = d.h * k;
+    return sl.addImage({ path: arq, x, y, w: iw, h: ih, sizing: { type: 'crop', x: (iw - w) / 2, y: (ih - h) / 2, w, h } });
+  };
 
   slides.forEach((s, i) => {
     const sl = pptx.addSlide();
@@ -91,12 +114,12 @@ export async function gerarPptx(a, marca, destino) {
     const itens = itensDe(s);
     switch (s.layout) {
       case 'capa': {
-        if (logo) sl.addImage({ path: logo, x: MX, y: 0.55, w: 2.2, h: 0.9, sizing: { type: 'contain', w: 2.2, h: 0.9 } });
+        if (logo) { const d = caber(logo, 2.2, 0.9); sl.addImage({ path: logo, x: MX, y: 0.55 + (0.9 - d.h) / 2, w: d.w, h: d.h }); }
         const larg = foto ? 7.4 : UTIL;
         if (txt(s.etiqueta)) sl.addText(txt(s.etiqueta).toUpperCase(), { x: MX, y: 2.0, w: larg, h: 0.35, fontFace: fCorpo, fontSize: 12, bold: true, color: cor, charSpacing: 3 });
         sl.addText(txt(s.titulo), { x: MX, y: 2.4, w: larg, h: 1.9, fontFace: fTitulo, fontSize: 44, color: t.tinta, valign: 'top', fit: 'shrink' });
         if (txt(s.subtitulo) || txt(s.texto)) sl.addText(txt(s.subtitulo) || txt(s.texto), { x: MX, y: 4.35, w: larg, h: 0.9, fontFace: fCorpo, fontSize: 18, color: t.suave, valign: 'top', fit: 'shrink' });
-        const quem = [marca.nome, marca.cargo, marca.escritorio].map(txt).filter(Boolean).join(' · ');
+        const quem = [marca.nome, marca.cargo, logo ? '' : marca.escritorio].map(txt).filter(Boolean).join(' · ');
         if (quem) sl.addText(quem, { x: MX, y: 5.6, w: larg, h: 0.4, fontFace: fCorpo, fontSize: 14, color: cor });
         if (foto) figura(sl, foto, 8.9, 1.2, 3.7, 4.9);
         break;
@@ -153,7 +176,7 @@ export async function gerarPptx(a, marca, destino) {
         grade(sl, itens, y, { numerar: ['etapas', 'agenda'].includes(s.layout) });
       }
     }
-    rodape(sl, s, i);
+    if (s.layout !== 'capa') rodape(sl, s, i);
   });
   await pptx.writeFile({ fileName: destino });
   return { pptx: destino, avisos };

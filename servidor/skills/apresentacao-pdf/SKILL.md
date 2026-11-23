@@ -11,10 +11,10 @@ Entregar um PDF que pareça feito por um designer do escritório: poucas palavra
 ## Antes de gerar
 1. Chame `mesa_perfil` e olhe o campo `marca` (tema, estilo, cor, logo, foto, rodapé).
 2. Marca vazia: faça **uma** pergunta ao assessor, com tudo junto: "Quer o PDF com a sua marca? Me diga o caminho do arquivo do logo e da sua foto (se tiver), a cor do escritório e se prefere fundo escuro, claro ou azul-marinho". Salve a resposta com `mesa_perfil` (`salvar.marca`) para nunca perguntar de novo. Se ele não tiver ou não quiser, siga sem logo e foto (a capa usa o nome do escritório e o perfil usa as iniciais) e avise que dá para acrescentar depois.
-3. O rodapé de todas as páginas leva a identificação do profissional e o aviso de compliance ("Material informativo. Não constitui oferta nem recomendação. [Nome], [atuação] vinculado a [escritório]."). Use o `rodape` da marca ou monte pelo perfil.
+3. O rodapé de todas as páginas (menos a capa) leva o aviso curto "Material informativo. Não constitui oferta nem recomendação." mais o nome e a atuação, sem `[CONFERIR]`. A identificação completa (nome, atuação, registro, escritório) vai na capa pela marca e no `fechamento`; não repita em outro lugar.
 
 ## Escolha do layout (varie; nunca o mesmo layout em duas páginas seguidas)
-- `capa`: sempre a primeira. Título forte de até 10 palavras, subtítulo com o tipo de reunião, `texto` com a data.
+- `capa`: sempre a primeira. Título forte de até 10 palavras (a promessa da conversa); `subtitulo` só com o tipo de reunião e a data; `texto` opcional, uma frase que não repita o título. Nome, cargo e escritório já saem pela marca: não escreva no subtítulo.
 - `perfil`: quem é a pessoa ou o assessor. Até 5 itens `rotulo` + `texto` (atuação, tempo de mercado, certificações, público).
 - `numeros`: só número que o assessor informou, com `fonte` e data. Sem número confirmado, não use este layout.
 - `pilares`: 2 a 4 ideias paralelas (soluções, frentes de trabalho, 3 pontos do porquê).
@@ -51,9 +51,10 @@ Entregar um PDF que pareça feito por um designer do escritório: poucas palavra
 - Em `pilares`, `etapas`, `lista` e `diagrama`, cada item pode ter `icone`. Biblioteca (traço fino, na cor da marca): investimentos, alocacao, cambio, previdencia, sucessao, credito, planejamento, juridico, equipe, pessoa, empresa, imovel, exterior, carteira, protecao, documento, prazo, calendario, conversa, custodia, instituicao, confirmar, seta.
 - Escolha o ícone pelo sentido do item (câmbio → `cambio`, jurídico → `juridico`); sem ícone que faça sentido, deixe sem. Ícone decorativo, que não representa a ideia, fica de fora.
 - **Imagens e ícones do próprio assessor:** ele guarda os arquivos (PNG, JPG, WEBP ou SVG, até 6 MB) na pasta **Documentos › Mesa do Assessor › Minhas imagens** e você cita só o nome do arquivo (`icone: "meu-icone.png"`, `imagem: "escritorio.jpg"`). Caminho completo também vale. O resultado de `mesa_apresentacao` traz `minhasImagens` com a pasta: diga onde ela fica se o assessor quiser usar as dele.
-- Nunca use imagem ou logo de terceiros sem autorização do assessor.
+- Imagens da internet só pela ferramenta `mesa_buscar_imagem` (licença livre). Imagens originais por IA pela ferramenta `mesa_gerar_imagem` (2 a 4 por apresentação, sem dado pessoal nem texto na descrição; sem chave, ela mesma abre a janelinha para o assessor colar, nunca peça a chave no chat). Logo ou marca de terceiros só com autorização do assessor.
 
 ## Como escrever cada campo
+- Nunca escreva `[CONFERIR]` nos campos das páginas: sem o dado, omita o item e avise o assessor no chat.
 - **Título é a conclusão da página**, não o assunto: "Primeiro entender a sua vida, depois falar de produto" e não "Como eu trabalho". Até 12 palavras.
 - Texto de apoio: uma ideia, até 2 linhas. Quem fala é o assessor, a página só sustenta.
 - `etiqueta` curta e fixa por seção ("Quem sou", "Escritório", "Raio-X").

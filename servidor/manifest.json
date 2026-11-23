@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "mesa-do-assessor",
   "display_name": "Mesa do Assessor",
-  "version": "1.16.1",
+  "version": "1.18.8",
   "description": "Painel que guia o assessor de investimentos pelas rotinas do dia, pelo mercado e pelos posts, com a base do segundo cérebro e a Análise de Ativo do CaptaMais.",
   "author": {
     "name": "Mesa do Assessor"

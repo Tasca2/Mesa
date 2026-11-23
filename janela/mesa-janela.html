@@ -237,7 +237,14 @@
   }
   class App {
     constructor() { this._c = { displayMode: "inline", availableDisplayModes: ["inline"] }; }
-    async connect() { await api("/api/ping"); setInterval(() => api("/api/ping").catch(() => {}), 10000); montarConversa(); atualizar(); }
+    async connect() {
+      await api("/api/ping");
+      let falhas = 0;
+      const avisoCaiu = () => { if (document.getElementById("motorCaiu")) return; const d = document.createElement("div"); d.id = "motorCaiu"; d.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:200;max-width:min(560px,92vw);padding:12px 16px;border-radius:14px;background:#2a1612;border:1px solid #c9654f;color:#ffd9cf;font:14px/1.4 system-ui;box-shadow:0 10px 30px rgba(0,0,0,.5)"; d.textContent = "A Mesa foi desligada e esta janela ficou sem conexão. Feche a janela e abra a Mesa de novo (pelo ícone ou digitando /mesa)."; document.body.append(d); };
+      const bater = () => api("/api/ping").then(() => { falhas = 0; document.getElementById("motorCaiu")?.remove(); }).catch(() => { if (++falhas >= 2) avisoCaiu(); });
+      setInterval(bater, 10000); document.addEventListener("visibilitychange", () => { if (!document.hidden) bater(); });
+      montarConversa(); atualizar();
+    }
     getHostContext() { return this._c; }
     async callServerTool({ name, arguments: a }) { return api("/api/tool", { name, arguments: a || {} }); }
     async updateModelContext({ content }) { ctxPendente = (content || []).map((c) => c.text).join("\n"); await api("/api/novo"); }
@@ -256,9 +263,12 @@
       return r.texto;
     }
     async entrarComSenha(email, senha) { return api("/api/entrar", { email, senha }); }
+    async chaveImagem(acao, extra) { return api("/api/chave-imagem", { acao, ...(extra || {}) }); }
     async requestDisplayMode() { return { mode: "inline" }; }
     async openLink({ url }) { await api("/api/open", { url }); return {}; }
     async abrirPasta() { return api("/api/abrir-pasta"); }
+    async abrirArquivo(cliente, nome) { return api("/api/abrir-arquivo", { cliente, nome }); }
+    async abrirPastaCliente(cliente, nome) { return api("/api/abrir-entregas", { cliente, nome }); }
     async escolherVideo() { return api("/api/escolher-video"); }
     async listarVideos() { return api("/api/videos"); }
     async usarVideo(pasta) { return api("/api/usar-video", { pasta }); }
@@ -414,7 +424,7 @@
     const baixar = (b, rotulo) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([limpo()], { type: "text/plain;charset=utf-8" })); a.download = slug(p.titulo || p.tipo) + ".txt"; document.body.append(a); a.click(); a.remove(); b.textContent = "Baixado"; setTimeout(() => (b.textContent = rotulo), 1600); };
     if (p.tipo === "whatsapp") {
       botao("Abrir no WhatsApp", async (b, rotulo) => { const u = "https://wa.me/?text=" + encodeURIComponent(zap()); if (u.length > 1800) { try { await navigator.clipboard.writeText(zap()); } catch {   } abrir("https://wa.me/"); b.textContent = "Texto longo: copiado, cole no WhatsApp"; setTimeout(() => (b.textContent = rotulo), 3200); } else abrir(u); }, true);
-      botao("Copiar para WhatsApp", copiar(zap));
+      botao("Copiar", copiar(zap), true);
     } else if (p.tipo === "email") {
       const m = p.texto.match(/^\s*assunto:\s*(.+)$/im), assunto = m ? m[1].trim() : "", corpoEmail = () => limpo().replace(/^\s*assunto:.*\n?/im, "").trim();
       botao("Abrir e-mail", async (b, rotulo) => { const u = "mailto:?subject=" + encodeURIComponent(assunto) + "&body=" + encodeURIComponent(corpoEmail()); if (u.length > 1800) { try { await navigator.clipboard.writeText(limpo()); } catch {   } abrir("mailto:?subject=" + encodeURIComponent(assunto)); b.textContent = "Texto longo: copiado, cole no e-mail"; setTimeout(() => (b.textContent = rotulo), 3200); } else abrir(u); }, true);
@@ -423,8 +433,6 @@
       botao("Copiar nota", copiar(limpo), true);
     } else {
       botao("Copiar", copiar(limpo), true);
-      botao("Baixar", baixar);
-      if (["roteiro-ligacao", "roteiro-reuniao", "roteiro-video", "legenda", "entrega"].includes(p.tipo)) botao("Copiar para WhatsApp", copiar(zap));
     }
     c.append(cab, corpo, ac);
     return c;
@@ -487,7 +495,9 @@
     x.send(f);
   }
 
-  const TIPOS_ANEXO = { pdf: 20, png: 10, jpg: 10, jpeg: 10, webp: 10 }, MAX_ANEXOS = 6;
+  const TIPOS_ANEXO = { pdf: 20, png: 10, jpg: 10, jpeg: 10, webp: 10, txt: 5, md: 5, csv: 5, vtt: 5, srt: 5, docx: 10, xlsx: 10 }, MAX_ANEXOS = 6;
+  const TIPO_UI = { pdf: "pdf", png: "imagem", jpg: "imagem", jpeg: "imagem", webp: "imagem", txt: "texto", md: "texto", csv: "texto", vtt: "texto", srt: "texto", docx: "documento", xlsx: "planilha" };
+  const ROT_UI = { pdf: "PDF", imagem: "IMAGEM", texto: "TEXTO", documento: "WORD", planilha: "EXCEL" };
   let anexosUI = [], avisoAnexoTimer = null;
   const idsProntos = () => anexosUI.filter((a) => a.estado === "pronto" && a.id).map((a) => a.id);
   const anexoSubindo = () => anexosUI.some((a) => a.estado === "enviando");
@@ -504,7 +514,7 @@
     box.textContent = ""; box.hidden = !anexosUI.length;
     for (const a of anexosUI) {
       const c = document.createElement("span"); c.className = "chip" + (a.estado === "enviando" ? " enviando" : "");
-      const tp = document.createElement("b"); tp.textContent = a.tipo === "pdf" ? "PDF" : "IMAGEM";
+      const tp = document.createElement("b"); tp.textContent = ROT_UI[a.tipo] || "ARQUIVO";
       const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = a.original; nm.title = a.original;
       const tm = document.createElement("small"); tm.textContent = a.estado === "enviando" ? "enviando… " + (a.progresso || 0) + "%" : tamanhoAnexo(a.kb);
       const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.title = "Tirar este anexo"; x.setAttribute("aria-label", "Tirar o anexo " + a.original);
@@ -512,6 +522,7 @@
       c.append(tp, nm, tm, x); box.append(c);
     }
     atualizarBotao();
+    window.dispatchEvent(new CustomEvent("mesa-anexos"));
   }
   function tirarEnviados(ids) { if (!ids || !ids.length) return; anexosUI = anexosUI.filter((a) => !ids.includes(a.id)); pintarAnexos(); }
   function avisoDeEnvio(e, anexos) {
@@ -526,11 +537,11 @@
   }
   function subirAnexo(f) {
     const ext = String(f.name || "").split(".").pop().toLowerCase(), limite = TIPOS_ANEXO[ext];
-    if (!limite || !/\./.test(f.name || "")) { avisoAnexo((f.name || "Esse arquivo") + ": anexe PDF ou imagem (PNG, JPG ou WEBP)."); return; }
+    if (!limite || !/\./.test(f.name || "")) { avisoAnexo((f.name || "Esse arquivo") + ": anexe PDF, imagem, texto (TXT, CSV), Word ou Excel."); return; }
     if (f.size > limite * 1048576) { avisoAnexo(f.name + ": o arquivo passa de " + limite + " MB."); return; }
     if (!f.size) { avisoAnexo(f.name + ": o arquivo está vazio."); return; }
     if (anexosUI.length >= MAX_ANEXOS) { avisoAnexo("Até " + MAX_ANEXOS + " arquivos por mensagem."); return; }
-    const a = { original: f.name, tipo: ext === "pdf" ? "pdf" : "imagem", kb: Math.max(1, Math.round(f.size / 1024)), estado: "enviando", progresso: 0 };
+    const a = { original: f.name, tipo: TIPO_UI[ext] || "pdf", kb: Math.max(1, Math.round(f.size / 1024)), estado: "enviando", progresso: 0 };
     const x = new XMLHttpRequest(); a.xhr = x;
     x.open("POST", "/api/anexo?nome=" + encodeURIComponent(f.name));
     x.setRequestHeader("x-mesa-token", TOKEN); x.setRequestHeader("content-type", "application/octet-stream");
@@ -549,6 +560,7 @@
   }
   function subirAnexos(lista) { for (const f of Array.from(lista || [])) subirAnexo(f); }
   function anexarArquivo() { const inp = raiz && raiz.querySelector("#cvArquivo"); if (!inp) return; inp.value = ""; inp.click(); }
+  window.__mesaAnexos = { anexar: anexarArquivo, subir: (l) => subirAnexos(l), lista: () => anexosUI.map((a) => ({ original: a.original, tipo: a.tipo, kb: a.kb, estado: a.estado })), remover: (i) => { const a = anexosUI[i]; if (a) removerAnexo(a); }, limpar: () => { for (const a of [...anexosUI]) removerAnexo(a); } };
   function sincronizarAnexos(lista, pedidoEm) {
     if (!Array.isArray(lista)) return;
     const ids = new Set(lista.map((a) => a.id)); let mudou = false;
@@ -592,7 +604,7 @@
     s.innerHTML = '<div class="cv-painel" id="cvPainel"><div class="cv-cab"><span>Conversa com o Claude</span><button type="button" id="cvNova" title="Guarda esta conversa no Histórico e começa do zero">Nova interação</button></div><div class="cv-corpo" id="cvCorpo"></div>'
       + '<div class="estado-cv" id="cvEstado" role="status" aria-live="polite"></div><div class="ajustes" id="cvAjustes"></div></div>'
       + '<div class="caixa" id="cvCaixa"><div class="anexos" id="cvAnexos" aria-label="Arquivos anexados" hidden></div><textarea id="cvTxt" rows="1" placeholder="Peça ao Claude: ajustar este pedido, criar uma tarefa, buscar dados…" aria-label="Mensagem para o Claude"></textarea>'
-      + '<input type="file" id="cvArquivo" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" hidden>'
+      + '<input type="file" id="cvArquivo" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.vtt,.srt,.docx,.xlsx,application/pdf,image/png,image/jpeg,image/webp" hidden>'
       + '<div class="barra"><button type="button" class="ic" id="cvMais" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções">' + ICONE_MAIS + '</button><button type="button" class="ic" id="cvAnexar" aria-label="Anexar arquivo (PDF ou imagem)" title="Anexar arquivo: PDF ou imagem (PNG, JPG, WEBP)">' + ICONE_CLIPE + '</button><button type="button" class="modelo" id="cvModelo" aria-haspopup="menu" title="Versão da Mesa e modelo do Claude em uso. Clique para trocar.">Mesa · Claude</button><button type="button" class="ic env" id="cvEnv" aria-label="Enviar" disabled>' + ICONE_ENVIAR + '</button></div></div>'
       + '<div class="menu" id="cvMenu" role="menu" hidden></div>';
     palco.append(s); raiz = s; painelEl = s.querySelector("#cvPainel"); corpoEl = s.querySelector("#cvCorpo"); estadoEl = s.querySelector("#cvEstado"); ajustesEl = s.querySelector("#cvAjustes"); txt = s.querySelector("#cvTxt"); botaoEnviar = s.querySelector("#cvEnv");
@@ -712,21 +724,18 @@
     reabertaAgora = false;
     try {
       await api("/api/limpar"); feitos.clear(); ultimo = null; esperandoAcao = false; zerarAoEntrar = false;
-      const c1 = window.__mesaContexto ? window.__mesaContexto() : null;
-      if (c1 && c1.tarefaId && c1.tarefaId !== "editar-reels" && (c1.tela === "guia" || c1.tela === "fim")) {
-        const anterior = ((await api("/api/historico")).itens || []).find((it) => it.tarefa === c1.tarefaId);
-        if (anterior) { await api("/api/historico/abrir", { id: anterior.id }); feitos.clear(); ultimo = null; }
-      }
+      if (window.__mesaZerarAndamento) window.__mesaZerarAndamento();
       atualizar();
     } catch {   }
   }
   setInterval(vigiarTarefa, 600);
   async function novaInteracao() {
     if (rodando) { alert("O Claude ainda está respondendo. Espere terminar ou clique em parar na caixa de baixo."); return; }
-    try { await api("/api/limpar"); feitos.clear(); ultimo = null; esperandoAcao = false; zerarAoEntrar = false; atualizar(); if (txt) txt.focus(); } catch {   }
+    try { await api("/api/limpar"); feitos.clear(); ultimo = null; esperandoAcao = false; zerarAoEntrar = false; if (window.__mesaZerarAndamento) window.__mesaZerarAndamento(); atualizar(); if (txt) txt.focus(); } catch { alert("A Mesa perdeu a conexão com o motor. Feche esta janela e abra a Mesa de novo."); }
   }
   document.addEventListener("click", (ev) => { if (ev.target && ev.target.id === "cvNova") novaInteracao(); });
   window.__mesaParar = () => api("/api/parar");
+  window.__mesaNovaDemanda = async () => { if (rodando) return; try { await api("/api/limpar"); feitos.clear(); ultimo = null; esperandoAcao = false; zerarAoEntrar = false; if (window.__mesaZerarAndamento) window.__mesaZerarAndamento(); atualizar(); } catch {   } };
   window.__mesaEncerrar = async () => {
     try { await api("/api/parar"); } catch {   }
     await api("/api/limpar");
@@ -737,6 +746,10 @@
     async abrir(id) { const r = await api("/api/historico/abrir", { id }); ultimo = null; feitos.clear(); esperandoAcao = false; zerarAoEntrar = false; atualizar(); return r; },
     fixar() { const c = window.__mesaContexto ? window.__mesaContexto() : null; tarefaVista = c ? (c.tarefa || "") : tarefaVista; telaVista = c ? (c.tela || "") : telaVista; zerarAoEntrar = false; },
     async apagar(id) { await api("/api/historico/apagar", id ? { id } : { todos: true }); },
+    async clientes() { return (await api("/api/clientes")).clientes || []; },
+    async entregasDe(nome) { return (await api("/api/cliente", { nome })).entregas || []; },
+    async lerEntrega(nome, arquivo) { return (await api("/api/cliente/ler", { nome, arquivo })).texto || ""; },
+    async abrirPasta(nome) { await api("/api/abrir-entregas", { cliente: nome }); },
   };
   window.addEventListener("mesa-entrega", () => { if (corpoEl) atualizar(); });
 
@@ -807,6 +820,7 @@
     const pedidoEm = Date.now();
     let e; try { e = await api("/api/estado"); } catch { return; }
     sincronizarAnexos(e.anexos, pedidoEm);
+    if (e.imagemIA && e.imagemIA.pedindo && window.__mesaPedirChaveImagem) { try { window.__mesaPedirChaveImagem(); } catch {   } }
     rodando = e.rodando; segundosCv = e.segundos || 0;
     const ult = e.turnos[e.turnos.length - 1];
     const ctx = window.__mesaContexto ? window.__mesaContexto() : null;
@@ -841,9 +855,6 @@
         const copiar = (btn, rotulo, texto) => async () => { try { await navigator.clipboard.writeText(texto()); btn.textContent = "Copiado"; } catch { btn.textContent = "Não copiou"; } setTimeout(() => (btn.textContent = rotulo), 1500); };
         c.onclick = copiar(c, "Copiar", plano);
         ac.append(c);
-        const cw = document.createElement("button"); cw.type = "button"; cw.className = "bt"; cw.textContent = "Copiar para WhatsApp";
-        cw.onclick = copiar(cw, "Copiar para WhatsApp", () => (window.__mesaMd ? window.__mesaMd.whatsapp(tirarMarcas(t.texto)) : tirarMarcas(t.texto)));
-        ac.append(cw);
         const nov = t.texto.match(PEDIDO_RE);
         if (nov) {
           const ap = document.createElement("button"); ap.type = "button"; ap.className = "bt ouro"; ap.textContent = "Aplicar no pedido da tela";
@@ -861,14 +872,7 @@
       const jaNaConversa = e.turnos.some((t) => t.papel === "claude" && comparavel(t.texto).includes(alvo));
       if (!jaNaConversa) { const b = document.createElement("div"); b.className = "ia md"; b.append(cartaoPeca({ tipo: "entrega", titulo: ent.titulo || "", texto: entTexto })); corpo.append(b); }
     }
-    if (ent && ent.guardada) {
-      const g = document.createElement("div"); g.className = "acoes guardada";
-      const s = document.createElement("span"); s.className = "nota"; s.textContent = "✓ Guardada em Documentos › Mesa do Assessor › Entregas › " + ent.guardada.cliente;
-      const b = document.createElement("button"); b.type = "button"; b.className = "bt"; b.textContent = "Abrir a pasta";
-      b.onclick = () => api("/api/abrir-entregas", { cliente: ent.guardada.cliente }).catch(() => {});
-      g.append(s, b); corpo.append(g);
-    }
-    if (e.geracao) {
+    if (e.geracao && !(e.geracao.tipo !== "carrossel" && ent && ent.guardada && ent.guardada.arquivos && ent.guardada.arquivos.length)) {
       const gr = e.geracao, caixa = document.createElement("div"); caixa.className = "galeria";
       const rotulo = document.createElement("div"); rotulo.className = "esp";
       rotulo.textContent = gr.tipo === "carrossel" ? "Imagens geradas: " + gr.titulo : "PDF gerado: " + gr.titulo; caixa.append(rotulo);
@@ -893,8 +897,9 @@
         if (!vw || !vh) return;
         const medir = () => {
           if (!pl.isConnected) { window.removeEventListener("resize", medir); return; }
+          if (pl.dataset.corte) return;
           const larg = Math.max(200, caixa.clientWidth || 600);
-          const alt = Math.max(240, Math.round(window.innerHeight * 0.78));
+          const alt = Math.max(240, Math.round(window.innerHeight - 210));
           const e = Math.min(larg / vw, alt / vh);
           pl.style.width = Math.floor(vw * e) + "px"; pl.style.height = Math.floor(vh * e) + "px";
         };
@@ -902,6 +907,62 @@
       };
       const pl = document.createElement("video"); pl.controls = true; pl.preload = "metadata"; pl.style.cssText = "display:block;width:100%;height:64vh;object-fit:contain;border-radius:12px;background:#000;margin:6px auto 0";
       pl.addEventListener("loadedmetadata", () => ajustarPlayer(pl, caixa));
+      const sondaBordas = (url) => new Promise((ok) => {
+        const v = document.createElement("video"); v.muted = true; v.preload = "auto"; v.src = url;
+        const c = document.createElement("canvas"), res = [], pontos = [0.15, 0.5, 0.85]; let i = 0, feito = false;
+        const fim = () => { if (feito) return; feito = true; clearTimeout(tempo); v.removeAttribute("src"); try { v.load(); } catch {   } ok(res.length === pontos.length ? { t: Math.min(...res.map((r) => r.t)), b: Math.min(...res.map((r) => r.b)) } : null); };
+        const tempo = setTimeout(fim, 9000);
+        const medirQuadro = () => {
+          if (feito) return;
+          try {
+            const W = 160, H = Math.max(2, Math.round(160 * v.videoHeight / v.videoWidth));
+            c.width = W; c.height = H; const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(v, 0, 0, W, H);
+            const d = x.getImageData(0, 0, W, H).data;
+            const preta = (y) => { let max = 0, soma = 0; for (let k = 0; k < W; k++) { const o = (y * W + k) * 4, l = (d[o] + d[o + 1] + d[o + 2]) / 3; soma += l; if (l > max) max = l; } return soma / W < 14 && max < 45; };
+            let t = 0; while (t < H && preta(t)) t++;
+            let b = 0; while (b < H - t && preta(H - 1 - b)) b++;
+            res.push({ t: t / H, b: b / H });
+          } catch { return fim(); }
+          i++; if (i >= pontos.length) fim(); else v.currentTime = v.duration * pontos[i];
+        };
+        v.addEventListener("seeked", medirQuadro);
+        v.addEventListener("loadedmetadata", () => { v.currentTime = v.duration * pontos[0]; });
+        v.addEventListener("error", () => { feito = true; clearTimeout(tempo); ok(null); });
+      });
+      const aplicarCorte = (pl, r) => {
+        const vw = pl.videoWidth, vh = pl.videoHeight; if (!vw || !vh || !pl.isConnected) return;
+        const chCorte = vh * (1 - r.t - r.b), topoCorte = vh * r.t; let tudo = false;
+        pl.dataset.corte = "1"; pl.controls = false;
+        const cena = document.createElement("div"); cena.style.cssText = "position:relative;overflow:hidden;background:#000;border-radius:12px;margin:6px auto 0;cursor:pointer";
+        pl.style.cssText = "position:absolute;left:0;display:block;margin:0;border-radius:0;background:#000;object-fit:fill";
+        pl.parentNode.insertBefore(cena, pl); cena.append(pl);
+        const barra = document.createElement("div"); barra.style.cssText = "display:flex;align-items:center;gap:10px;margin:8px auto 0;max-width:100%";
+        const bPlay = document.createElement("button"); bPlay.type = "button"; bPlay.className = "bt"; bPlay.textContent = "▶";
+        const seek = document.createElement("input"); seek.type = "range"; seek.min = "0"; seek.max = "1000"; seek.value = "0"; seek.style.cssText = "flex:1;min-width:120px;accent-color:#E8C88E"; seek.setAttribute("aria-label", "Posição do vídeo");
+        const tempoTxt = document.createElement("span"); tempoTxt.className = "dica"; tempoTxt.style.cssText = "visibility:visible;white-space:nowrap";
+        const bTela = document.createElement("button"); bTela.type = "button"; bTela.className = "bt"; bTela.textContent = "Tela cheia";
+        const bFaixas = document.createElement("button"); bFaixas.type = "button"; bFaixas.className = "bt"; bFaixas.textContent = "Mostrar as faixas pretas";
+        barra.append(bPlay, seek, tempoTxt, bTela, bFaixas); pl.parentNode.after(barra);
+        const fmt = (n) => { n = Math.max(0, Math.floor(n || 0)); return Math.floor(n / 60) + ":" + String(n % 60).padStart(2, "0"); };
+        const medir = () => {
+          if (!cena.isConnected) { window.removeEventListener("resize", medir); return; }
+          const tela = document.fullscreenElement === cena;
+          const larg = tela ? window.innerWidth : Math.max(200, caixa.clientWidth || 600), alt = tela ? window.innerHeight : Math.max(240, Math.round(window.innerHeight - 250));
+          const ch = tudo ? vh : chCorte, topo = tudo ? 0 : topoCorte, e2 = Math.min(larg / vw, alt / ch);
+          cena.style.width = Math.floor(vw * e2) + "px"; cena.style.height = Math.floor(ch * e2) + "px";
+          pl.style.width = Math.floor(vw * e2) + "px"; pl.style.height = Math.floor(vh * e2) + "px"; pl.style.top = -Math.floor(topo * e2) + "px"; barra.style.width = cena.style.width;
+        };
+        const atualizarTempo = () => { tempoTxt.textContent = fmt(pl.currentTime) + " / " + fmt(pl.duration); if (!seek.matches(":active") && pl.duration) seek.value = String(Math.round(1000 * pl.currentTime / pl.duration)); bPlay.textContent = pl.paused ? "▶" : "❚❚"; };
+        const alternar = () => { if (pl.paused) pl.play().catch(() => {}); else pl.pause(); };
+        cena.onclick = alternar; bPlay.onclick = alternar;
+        seek.oninput = () => { if (pl.duration) pl.currentTime = pl.duration * Number(seek.value) / 1000; };
+        pl.addEventListener("timeupdate", atualizarTempo); pl.addEventListener("play", atualizarTempo); pl.addEventListener("pause", atualizarTempo);
+        bTela.onclick = () => { if (document.fullscreenElement === cena) document.exitFullscreen(); else if (cena.requestFullscreen) cena.requestFullscreen().catch(() => {}); };
+        bFaixas.onclick = () => { tudo = !tudo; bFaixas.textContent = tudo ? "Cortar as faixas pretas" : "Mostrar as faixas pretas"; medir(); };
+        document.addEventListener("fullscreenchange", medir);
+        window.addEventListener("resize", medir); medir(); atualizarTempo();
+      };
+      pl.addEventListener("loadedmetadata", () => { sondaBordas(pl.src).then((r) => { if (r && r.t + r.b >= 0.08 && 1 - r.t - r.b >= 0.2) aplicarCorte(pl, r); }); }, { once: true });
       pl.src = "/api/video?f=" + qual + "&t=" + TOKEN + "&v=" + inf.em; caixa.append(pl);
       const b = document.createElement("button"); b.type = "button"; b.className = "bt"; b.textContent = "Abrir a pasta";
       b.onclick = () => api("/api/abrir-pasta", { video: true }).catch(() => {});
@@ -909,7 +970,7 @@
       dl.href = "/api/video?f=" + qual + "&t=" + TOKEN + "&baixar=1"; dl.download = ""; dl.style.cssText = "text-decoration:none;display:inline-block;margin-right:8px";
       const ed = document.createElement("button"); ed.type = "button"; ed.className = "bt"; ed.textContent = "Abrir a Edição Mesa"; ed.style.cssText = "margin-right:8px;border-color:rgba(232,200,142,.6);color:#e8c88e";
       ed.onclick = async () => { ed.textContent = "Abrindo o editor…"; try { await api("/api/editor"); ed.textContent = "Abrir a Edição Mesa"; } catch (er) { ed.textContent = "Abrir a Edição Mesa"; alert(er && er.message ? er.message : "Não consegui abrir o editor."); } };
-      const acV = document.createElement("div"); acV.style.cssText = "margin-top:10px"; acV.append(ed, dl, b); caixa.append(acV);
+      const acV = document.createElement("div"); acV.style.cssText = "margin:2px 0 4px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"; ed.style.marginRight = "0"; dl.style.marginRight = "0"; acV.append(ed, dl, b); caixa.insertBefore(acV, pl);
       corpo.append(caixa);
     }
     if (e.erro) { const w = document.createElement("div"); w.className = "err"; w.textContent = e.erro; corpo.append(w); }
@@ -966,6 +1027,18 @@
     opcoes: [{ t: "Assessor de investimento", d: "Vinculado a um escritório" }, { t: "Consultor de valores mobiliários", d: "Registro na CVM" }, { t: "Planejador financeiro", d: "Certificação de planejamento" }] };
   const RESULTADO = { id: "resultado", curto: "Resultado", titulo: "Como você quer o resultado?",
     opcoes: [{ t: "PDF", d: "Arquivo para salvar ou imprimir" }, { t: "Texto no chat", d: "Para ler e copiar aqui" }] };
+  const AC_COMPLETO = "Entender a fundo (completo)", AC_MULT = "Analisar múltiplos", AC_BAL = "Analisar balanço e DRE", AC_FATOS = "Fatos e teses (relatórios técnicos)", AC_MSG = "Mensagem sobre a ação para cliente";
+  const ACAO_ESCOPO = { id: "uso", curto: "Análise", titulo: "O que você quer saber desta ação?", ajuda: "A análise completa reúne tudo; as outras são uma parte dela, mais rápida e focada.",
+    opcoes: [{ t: AC_COMPLETO, d: "Negócio, múltiplos, balanço, casas, riscos e glossário" }, { t: AC_MULT, d: "P/L, EV/EBITDA, dividendos e ROE contra o histórico e os pares" }, { t: AC_BAL, d: "Últimos trimestres: receita, resultado, caixa, dívida e qualidade do lucro" }, { t: AC_FATOS, d: "O que as casas de research dizem: teses, riscos e alvos" }, { t: AC_MSG, d: "WhatsApp curto, pronto para enviar, sem recomendação" }] };
+  const FT_RECENTES = "Ver os fatos recentes (últimos 3 dias)", FT_COMPLETO = "Entender o fato a fundo (completo)", FT_IMPACTO = "Impacto nos números", FT_MSG = "Mensagem sobre o fato para cliente";
+  const ESC_FATO = { id: "uso", curto: "Fato", titulo: "O que você quer ver do fato relevante?", ajuda: "Os fatos recentes vêm da conexão com o CaptaMais, até 3 dias atrás. Depois você escolhe um para analisar.",
+    opcoes: [{ t: FT_RECENTES, d: "Lista dos comunicados mais novos e qual vale abrir" }, { t: FT_COMPLETO, d: "Resumo do comunicado, tamanho, premissas e glossário" }, { t: FT_IMPACTO, d: "Quanto pesa na empresa e o que muda nas premissas" }, { t: FT_MSG, d: "WhatsApp curto, pronto para enviar" }] };
+  const ST_COMPLETO = "Comparar a fundo (completo)", ST_MULT = "Múltiplos lado a lado", ST_BAL = "Balanço e resultado lado a lado", ST_CASAS = "Casas de research lado a lado", ST_MSG = "Mensagem sobre o setor para cliente";
+  const ESC_SETOR = { id: "uso", curto: "Comparação", titulo: "O que você quer comparar no setor?", ajuda: "A comparação completa reúne tudo; as outras são uma parte dela, mais rápida e focada.",
+    opcoes: [{ t: ST_COMPLETO, d: "Indicadores, múltiplos, resultado, casas e sinais de atenção" }, { t: ST_MULT, d: "P/L, EV/EBITDA, dividendos e ROE, com a média do grupo" }, { t: ST_BAL, d: "Receita, resultado, margens, caixa e dívida" }, { t: ST_CASAS, d: "Teses, riscos e alvos de cada empresa" }, { t: ST_MSG, d: "WhatsApp curto, sem eleger a melhor" }] };
+  const FI_COMPLETO = "Entender a fundo (completo)", FI_PRECO = "Preço, múltiplos e rendimento", FI_CARTEIRA = "Carteira e operação do fundo", FI_FATOS = "Fatos e teses (relatórios técnicos)", FI_MSG = "Mensagem sobre o fundo para cliente";
+  const ESC_FII = { id: "uso", curto: "Fundo", titulo: "O que você quer saber deste fundo?", ajuda: "A análise completa reúne tudo; as outras são uma parte dela, mais rápida e focada.",
+    opcoes: [{ t: FI_COMPLETO, d: "Tipo, carteira, preço, rendimentos, casas e riscos" }, { t: FI_PRECO, d: "P/VP, rendimento e comparação com o IFIX e os pares" }, { t: FI_CARTEIRA, d: "Imóveis ou devedores, vacância, inadimplência, contratos" }, { t: FI_FATOS, d: "O que as casas dizem e os fatos recentes" }, { t: FI_MSG, d: "WhatsApp curto, pronto para enviar, sem recomendação" }] };
   const USO_MERCADO = { id: "uso", curto: "Uso", titulo: "Para que você vai usar esta leitura?", ajuda: "Muda o formato da entrega; os dados e as fontes são os mesmos.",
     opcoes: [{ t: "Conversa de WhatsApp", d: "Mensagens curtas, prontas para enviar" }, { t: "Entender a fundo", d: "Explicação, onde pesquisar e glossário" }, { t: "Material para o cliente", d: "Texto completo para enviar ou apresentar" }] };
 
@@ -1018,8 +1091,8 @@
       { id: "programar", curto: "Programar", titulo: "Como você vai programar?", opcoes: [{ t: "Meta Business Suite", d: "Com o passo a passo da Central de Ajuda da Meta" }, { t: "Conector ligado ao Claude", d: "No Claude Desktop, com o conector já ligado" }, { t: "Só quero a pasta", d: "Imagens e legendas prontas; você programa como quiser" }] } ] },
     "editar-reels": { nome: "Editar um vídeo (Reels)", linha: "Escolha o vídeo no computador e a Edição Mesa faz a edição.", ref: "", acao: "Escolher o vídeo e editar", perguntas: [
       { id: "objetivo", curto: "Objetivo", titulo: "Qual o objetivo do vídeo?", opcoes: [{ t: "Captar novos clientes" }, { t: "Educar iniciantes" }, { t: "Relacionamento com clientes" }, { t: "Bastidores do escritório" }] } ] },
-    "cliente-novo": { nome: "Cliente novo", linha: "Ficha de entrada e o que pedir ao cliente.", ref: "rotina prospect-intake", acao: "Abrir a ficha", perguntas: [
-      { id: "ponto", curto: "Momento", titulo: "Em que ponto está esse cliente?", opcoes: [{ t: "Antes da primeira conversa", d: "O que perguntar e pedir a ele" }, { t: "Já tenho notas ou documentos", d: "Extratos, IR ou carteira" }] } ] },
+    "cliente-novo": { nome: "Cliente novo", linha: "Antes e depois da primeira reunião: preparo, relatório da carteira e mensagem.", ref: "rotina prospect-intake", acao: "Preparar o cliente novo", perguntas: [
+      { id: "ponto", curto: "Momento", titulo: "O que você precisa agora?", ajuda: "Antes da conversa você não precisa ter nenhuma informação dele.", opcoes: [{ t: "Chegar preparado à primeira conversa", d: "Como abordar, postura, assuntos do dia e roteiro" }, { t: "Relatório para a segunda reunião", d: "Ele mandou as posições: analisar os ativos dele" }, { t: "Mensagem de pós-reunião", d: "Resumo ou transcrição da conversa vira WhatsApp" }] } ] },
     "pre-reuniao": { nome: "Pré-reunião (cliente atual)", linha: "Para reunião com quem já é cliente: roteiro, pontos de atenção e perguntas.", ref: "rotina pre-meeting", acao: "Montar a pré-reunião", perguntas: [
       { id: "foco", curto: "Foco", titulo: "Qual é o foco da conversa?", opcoes: [{ t: "Revisão de carteira" }, { t: "Novo aporte" }, { t: "Resgate ou liquidez" }, { t: "Sucessão e patrimônio" }] } ] },
     "pos-reuniao": { nome: "Pós-reunião", linha: "Próximos passos e a mensagem de retorno.", ref: "rotina post-meeting", acao: "Fechar a reunião", perguntas: [
@@ -1044,14 +1117,14 @@
     "macro": { nome: "Juros, inflação e câmbio", linha: "Painel do dia: juros, inflação, dólar, expectativas e agenda.", ref: "skill macro-brasil", acao: "Montar o panorama", perguntas: [USO_MERCADO,
       { id: "situacoes", curto: "Situações", titulo: "Que situações de cliente o painel deve cobrir?", ajuda: "Marque quantas quiser. Para cada uma, o painel diz o que o dado de hoje mexe e a pergunta para abrir a conversa.", multi: true,
         opcoes: [{ t: "Reserva em pós-fixado" }, { t: "Prefixado ou IPCA+" }, { t: "Dólar ou exterior" }, { t: "Aluguel ou contrato reajustado por índice" }, { t: "Vai financiar imóvel" }] } ] },
-    "fato": { nome: "Fato relevante", linha: "Resumo do comunicado e o que muda na tese.", ref: "skill resumo-de-fato-relevante", acao: "Resumir o fato", perguntas: [USO_MERCADO] },
+    "fato": { nome: "Fato relevante", linha: "Os fatos mais recentes (até 3 dias, pelo CaptaMais) e a análise do comunicado que você escolher.", ref: "skill resumo-de-fato-relevante", acao: "Ver os fatos", perguntas: [ESC_FATO] },
     "grafico": { nome: "Leitura de gráfico", linha: "Descrição de preço e indicadores, sem previsão.", ref: "skill leitura-grafica", acao: "Ler o gráfico", perguntas: [USO_MERCADO] },
-    "acao": { nome: "Analisar uma ação", linha: "Uma empresa pelo método: números, critérios e lacunas.", ref: "skill fundamentalista-metodo", acao: "Analisar a ação", perguntas: [USO_MERCADO] },
-    "setor": { nome: "Comparar o setor", linha: "Empresas lado a lado, na mesma base.", ref: "skill comparativo-setorial", acao: "Comparar", perguntas: [USO_MERCADO] },
-    "fii": { nome: "Fundo imobiliário", linha: "Imóveis, crédito, P/VP e origem dos rendimentos.", ref: "skill analise-fii", acao: "Analisar o fundo", perguntas: [USO_MERCADO] },
+    "acao": { nome: "Analisar uma ação", linha: "Uma empresa pelo método, completa ou só uma parte: múltiplos, balanço, relatórios técnicos ou mensagem ao cliente.", ref: "skill fundamentalista-metodo", acao: "Analisar a ação", perguntas: [ACAO_ESCOPO] },
+    "setor": { nome: "Comparar o setor", linha: "Empresas lado a lado, na mesma base: completo ou só múltiplos, resultado, casas ou mensagem.", ref: "skill comparativo-setorial", acao: "Comparar", perguntas: [ESC_SETOR] },
+    "fii": { nome: "Fundo imobiliário", linha: "Imóveis, crédito, P/VP e origem dos rendimentos: completo ou só preço, carteira, relatórios ou mensagem.", ref: "skill analise-fii", acao: "Analisar o fundo", perguntas: [ESC_FII] },
     "raio-x": { nome: "Raio-X de produto", linha: "O que é, como paga, quanto custa e o que pode dar errado, a partir do material.", ref: "skills produto-raio-x e leitura-de-lamina", acao: "Fazer o raio-X", perguntas: [
       { id: "produto", curto: "Produto", titulo: "Que produto é?", ajuda: "Muda o que a análise procura no material: garantia, cenários de pagamento, custos ou regras da oferta.",
-        opcoes: [{ t: "CDB, LCI ou LCA", d: "Banco emissor, com ou sem FGC" }, { t: "Crédito privado (CRI, CRA, debênture)", d: "Empresa emissora, sem FGC" }, { t: "Fundo ou previdência", d: "Gestor, taxas e regras de resgate" }, { t: "COE ou estruturado", d: "Cenários, barreira e teto" }, { t: "Oferta pública", d: "Prospecto, lâmina e calendário" }, { t: "Outro", d: "Título público, poupança, câmbio" }] },
+        opcoes: [{ t: "CDB, LCI ou LCA", d: "Banco emissor, com ou sem FGC" }, { t: "Crédito privado (CRI, CRA, debênture)", d: "Empresa emissora, sem FGC" }, { t: "Fundo ou previdência", d: "Gestor, taxas e regras de resgate" }, { t: "COE ou estruturado", d: "Cenários, barreira e teto" }, { t: "Oferta pública", d: "Prospecto, lâmina e calendário" }, { t: "Ação", d: "Empresa listada: múltiplos, resultado e riscos" }, { t: "Fundo imobiliário (FII)", d: "Gestor, P/VP, carteira e origem dos rendimentos" }, { t: "Outro", d: "Título público, poupança, câmbio" }] },
       USO_MERCADO] },
     "rf": { nome: "Comparar produtos", linha: "Renda fixa, fundos e títulos lado a lado, líquidos de imposto.", antes: "Renda fixa", ref: "skill comparacao-renda-fixa", acao: "Comparar os produtos", perguntas: [USO_MERCADO] },
     "pauta": { nome: "Ideias para postar hoje", linha: "5 ideias ranqueadas e a primeira já aberta, com gancho, roteiro e legenda.", ref: "skill pauta-de-conteudo", acao: "Montar a pauta", perguntas: [
@@ -1073,6 +1146,75 @@
     if (/Reels/i.test(f)) return ["3 opções de gancho para os primeiros 3 segundos", "Roteiro de vídeo em tabela: cena, tempo, fala e texto na tela (30 a 45 segundos), em peça separada", "Imagem da capa pronta, gerada com a ferramenta mesa_carrossel (1 slide, formato stories)", "Legenda do post", ...fim];
     return ["3 opções de gancho para a primeira linha", `Imagem da arte pronta (PNG e PDF), gerada com a ferramenta mesa_carrossel com 1 slide: frase de impacto e apoio, ${rodape}`, "Legenda do post", "Se eu quiser foto ou ilustração de fundo, um prompt de imagem para gerar fora", ...fim];
   };
+
+  const CN_PREPARO = "Chegar preparado à primeira conversa", CN_RELATORIO = "Relatório para a segunda reunião", CN_POS = "Mensagem de pós-reunião";
+  const cnPonto = (ponto) => { const x = ponto ?? ((estado.respostas.ponto ?? [])[0] ?? ""); return x === CN_RELATORIO ? "relatorio" : x === CN_POS ? "pos" : "preparo"; };
+  function cnVariante(ponto) {
+    const v = cnPonto(ponto);
+    if (v === "relatorio") return {
+      obj: "Montar o relatório da carteira dele para a segunda reunião, a partir das posições que ele mandou, e deixar pronta a base da apresentação da segunda reunião.",
+      fonte: "Para os ativos listados, chame analise_ativo e cite fonte e data de cada número. Use o segundo cérebro do assessor (consultar_cofre) para o método de leitura de carteira. O que não estiver nas posições enviadas entra como sem dado, sem preencher de memória.",
+      entrega: [
+        "Resumo em 3 linhas: o que ele tem, onde está concentrado e o que ainda falta saber",
+        "Resumo do que cada documento trouxe (extrato, relatório de performance, transcrição), uma linha por arquivo, e o que ficou ilegível",
+        "Carteira atual em UMA tabela, uma linha por investimento (Ativo | Classe | Instituição | Valor | % do total | Rentabilidade no período | Período e data-base | Liquidez | Vencimento), só do que veio nos documentos; estimativa leva [CONFERIR]. Entregue também em peça separada (tipo relatorio, título Carteira atual) e diga em uma linha que a Segunda reunião vai usá-la como base de comparação",
+        "Análise dos ativos dele: para cada posição, os números principais da Análise de Ativo do CaptaMais, com fonte e data; descritivo, sem recomendar compra, venda ou troca",
+        "Concentração, liquidez e custos em até 5 linhas",
+        "O que ainda preciso pedir a ele, em ordem de prioridade, cada item com o motivo em linguagem de cliente",
+        "Como este relatório entra na segunda reunião: quais páginas o material precisa ter e que o próximo passo é a tarefa Segunda reunião, com este relatório",
+        "Nota para o CRM (até 8 linhas), em peça separada",
+      ],
+    };
+    if (v === "pos") return {
+      obj: "Fechar a primeira reunião com uma mensagem ao cliente: agradecer, explicar os pontos principais e dizer o que será apresentado na segunda reunião.",
+      fonte: "Só o resumo ou a transcrição que eu enviar. Use o segundo cérebro do assessor (consultar_cofre) para o tom da mensagem. Não invente o que o cliente disse.",
+      entrega: [
+        "Resumo da reunião em até 6 linhas, só com o que consta no resumo ou na transcrição; o que faltar fica [CONFERIR]",
+        "WhatsApp de pós-reunião (até 6 linhas): agradecimento, 2 ou 3 pontos explicados em linguagem simples, o que será apresentado na segunda reunião e a data, se eu informei, em peça separada",
+        "Versão por e-mail, mais completa, em peça separada",
+        "Próximos passos com responsável e prazo (só prazo que foi dito; o resto como [CONFERIR])",
+        "Dúvidas e oportunidades que o cliente deixou, cada uma com a frase dele",
+        "Nota para o CRM (até 8 linhas), em peça separada",
+      ],
+    };
+    return {
+      obj: "Chegar preparado à primeira conversa com um possível cliente, mesmo sem nenhuma informação dele: como abordar, como se comportar e do que conversar.",
+      fonte: "Use o segundo cérebro do assessor (consultar_cofre) com os temas primeira reunião, rapport, postura e oratória. Mercado do dia: painel_macro, e busque o Morning Call do dia na internet, com fonte e data; se não achar, use só o painel_macro e diga isso. Pesquise o nome dele na internet somente se eu autorizei. Nada de recomendação de ativo.",
+      entrega: [
+        "Em 3 linhas: o que eu sei e o que ainda não sei dele; o que não sei fica como pergunta, nunca como suposição",
+        "Se eu autorizei a pesquisa: o que achou na internet, com link e data, só o que for claramente sobre ele; na dúvida de homônimo, deixe de fora e me pergunte",
+        "Como abordar, conforme o que eu sei (profissão, momento de vida, perfil provável): 3 aberturas de conversa e o que evitar, em peça separada",
+        "Postura e preparo: chegar com antecedência, vestimenta adequada ao perfil e à cidade, linguagem corporal, rapport nos primeiros 5 minutos, ouvir mais do que falar; se o encontro for online: enquadramento, luz, áudio e olhar para a câmera",
+        "Oratória: como abrir, ritmo e pausas, e como fechar com próximo passo e data marcada",
+        "Assuntos do dia para conversar, em até 5 linhas, escolhidos pelo perfil dele (por exemplo, empresário: tributação, dólar, juros), com fonte e data",
+        "Roteiro de 30 minutos (conexão, descoberta, o que eu faço, próximo passo com data) e 5 perguntas de descoberta",
+        "WhatsApp de confirmação do encontro (até 4 linhas), em peça separada, sem pedir documentos",
+        "Follow-up: mensagem de agradecimento para o mesmo dia e quando falar de novo, em peça separada",
+        "Nota curta para o CRM (origem, o que sei, próximo passo), em peça separada",
+      ],
+    };
+  }
+  function cnCampos(ponto) {
+    const v = cnPonto(ponto);
+    if (v === "relatorio") return [
+      { rotulo: "Apelido do cliente (sem nome nem CPF)", dica: "Ex.: Cliente A, empresário, 45 anos" },
+      { rotulo: "Posições que ele mandou (cole o texto ou diga que vai anexar)", dica: "Ex.: extrato do banco X e carteira da corretora Y", longo: true },
+      { rotulo: "O que ele disse na primeira reunião (opcional)", opcional: true, dica: "Ex.: quer aposentar em 10 anos e tem medo de renda variável", longo: true },
+      { rotulo: "Data da segunda reunião (opcional)", opcional: true, dica: "Ex.: quinta, 15h" },
+    ];
+    if (v === "pos") return [
+      { rotulo: "Apelido do cliente (sem nome nem CPF)", dica: "Ex.: Cliente A, empresário, 45 anos" },
+      { rotulo: "Resumo ou transcrição da reunião (cole ou diga que vai anexar)", dica: "Cole aqui o que foi dito", longo: true },
+      { rotulo: "O que vou apresentar na segunda reunião (opcional)", opcional: true, dica: "Ex.: diagnóstico e proposta de carteira", longo: true },
+      { rotulo: "Data da segunda reunião (opcional)", opcional: true, dica: "Ex.: quinta, 15h" },
+    ];
+    return [
+      { rotulo: "Apelido do possível cliente (opcional)", opcional: true, dica: "Ex.: dono de padaria indicado pelo Marcos" },
+      { rotulo: "O que eu já sei dele (opcional)", opcional: true, dica: "Ex.: empresário, 45 anos, Campinas, 2 filhos. Se não sei nada, deixe em branco.", longo: true },
+      { rotulo: "Formato do encontro", opcoes: ["Presencial", "Online", "Ainda não sei"], padrao: "Ainda não sei" },
+      { rotulo: "Posso pesquisar sobre ele na internet?", opcoes: ["Sim, pesquisar", "Não pesquisar"], padrao: "Não pesquisar" },
+    ];
+  }
   const PEDIDO = {
     "relacionamento": {
       "obj": "Deixar o relacionamento com a carteira organizado, com contatos úteis e pedido de indicação sem constrangimento.",
@@ -1124,10 +1266,10 @@
       ]
     },
     "primeira-reuniao": {
-      "obj": "Gerar a apresentação da minha primeira reunião (uma R1 padrão, de cerca de 45 minutos) em PDF e em PowerPoint editável, apresentando quem sou, meu escritório e minhas soluções para pessoa física e para empresas, para eu descobrir o que a pessoa precisa e sair com a segunda reunião marcada.",
+      "obj": "Gerar a apresentação da minha primeira reunião (uma R1 padrão, de até 30 minutos) em PDF e em PowerPoint editável, apresentando quem sou, meu escritório e minhas soluções para pessoa física e para empresas, para eu descobrir o que a pessoa precisa e sair com a segunda reunião marcada.",
       "entrega": [
-        "Apresentação de 12 a 16 páginas gerada com mesa_apresentacao, que entrega o PDF e o PowerPoint editável juntos: história própria, centrada em mim e nas minhas soluções (pessoa física e empresas), com a minha foto e o logo do escritório quando eu enviei, ilustrações e uma frase que liga cada página à próxima",
-        "Gere direto, sem me fazer perguntas antes: o que eu pulei ou não informei fica fora da página ou marcado com [CONFERIR]",
+        "Apresentação de 10 a 12 páginas gerada com mesa_apresentacao, que entrega o PDF e o PowerPoint editável juntos: história própria, centrada em mim e nas minhas soluções (pessoa física e empresas), com a minha foto e o logo do escritório quando eu enviei, imagens livres da internet (mesa_buscar_imagem) em pelo menos metade das páginas, de 2 a 4 imagens criadas por IA (mesa_gerar_imagem; a Mesa pede a chave numa janelinha na primeira vez), ilustrações quando não houver imagem que combine, e uma frase que liga cada página à próxima. Nenhuma página só com título; sem identificação repetida na capa",
+        "Gere direto, sem me fazer perguntas antes: o que eu pulei ou não informei fica fora da página, sem [CONFERIR] escrito nela, e você me diz depois o que faltou",
         "Se escolhi pesquisar na internet: procure o meu nome junto com o escritório, mostre na conversa o que achou, com o link, e só leve para a apresentação o que for claramente sobre mim, com fonte e ano; na dúvida de ser outra pessoa com o mesmo nome, deixe de fora e me pergunte",
         "Na conversa, depois de gerar: onde ficaram o PDF e o PowerPoint, e que o PowerPoint abre no PowerPoint, no Google Slides ou importado no Canva para eu editar; as peças abaixo vêm escritas por inteiro na conversa, não só no cartão da entrega",
         "Roteiro de fala página a página (uma ou duas frases por página), em peça separada",
@@ -1146,7 +1288,7 @@
       "obj": "Devolver ao cliente o que ouvi na primeira reunião, mostrar a proposta de trabalho em um material em PDF e em PowerPoint editável e sair com a decisão ou o próximo passo com data.",
       "entrega": [
         "Material para o cliente gerado com mesa_apresentacao, que entrega o PDF e o PowerPoint editável juntos, página a página (objetivos, cenário, raio-X da carteira, proposta de melhoria, plano de execução, próximos passos e nota de compliance), com a minha foto e o logo guardados no perfil",
-        "Gere direto com o que informei: o que eu pulei fica fora da página ou marcado com [CONFERIR], e nunca invente o que o cliente disse",
+        "Gere direto com o que informei: o que eu pulei fica fora da página, sem [CONFERIR] escrito nela, e você me diz depois o que faltou, e nunca invente o que o cliente disse",
         "Na conversa, depois de gerar: onde ficaram o PDF e o PowerPoint, e que o PowerPoint abre no PowerPoint, no Google Slides ou importado no Canva para eu editar; as peças abaixo vêm escritas por inteiro na conversa, não só no cartão da entrega",
         "Roteiro minuto a minuto da segunda reunião, em peça separada",
         "As 3 objeções mais prováveis para esse perfil, cada uma com a pergunta de resposta, em peça separada",
@@ -1258,19 +1400,9 @@
       "fonte": "Os prints das estatísticas do Instagram que anexei, ou os números do conector de redes sociais, se estiver ligado. Sem número, não avalie o post."
     },
     "cliente-novo": {
-      "obj": "Abrir a ficha de um cliente novo e saber o que ainda preciso pedir a ele.",
-      "entrega": [
-        "Resumo do que chegou e do que falta, em 3 linhas",
-        "Nota para o CRM (ficha em até 12 linhas, com origem do contato e próximo passo), em peça separada",
-        "WhatsApp pedindo os documentos e dizendo o que esperar (até 5 linhas), em peça separada",
-        "Nota ao analista, em peça separada",
-        "Se ainda não houve a primeira conversa: diga em uma linha que a tarefa Primeira reunião monta o roteiro e a apresentação com esta ficha"
-      ],
-      "insumos": [
-        "Apelido do cliente (sem nome nem CPF)",
-        "Perfil e objetivo dele, em poucas linhas",
-        "Documentos que já tenho (extratos, IR, carteira): cole o texto ou diga que vou anexar"
-      ]
+      get obj() { return cnVariante().obj; },
+      get fonte() { return cnVariante().fonte; },
+      entrega: () => cnVariante().entrega,
     },
     "pre-reuniao": {
       "obj": "Chegar preparado à reunião, com roteiro e perguntas que descobrem o que o cliente precisa.",
@@ -1278,7 +1410,7 @@
         "Objetivo da reunião e o avanço mínimo: o que precisa sair combinado, com data",
         "Contexto do cliente (até 5 linhas, só o que eu informei)",
         "Pontos de atenção",
-        "Roteiro da reunião minuto a minuto, para a duração que eu informar (peça: roteiro da reunião)",
+        "Roteiro da reunião minuto a minuto, para uma reunião de até 30 minutos (peça: roteiro da reunião)",
         "Perguntas de descoberta (SPIN), ligadas ao foco e ao histórico",
         "O que levar e o que pedir ao cliente",
         "Objeções prováveis e a pergunta de resposta",
@@ -1448,7 +1580,7 @@
         "Minha tese ou o motivo de acompanhar a empresa",
         "Se o cliente tem o papel"
       ],
-      "fonte": "Se colei o texto ou anexei o PDF, esse é o documento. Se informei só a empresa, chame documentos_cvm pelo nome ou CNPJ (a analise_ativo traz os dois), com as categorias Fato Relevante e Comunicado ao Mercado: use a lista para a ficha e a sequência e baixe pelo protocolo o documento escolhido para ler o texto integral. A base da CVM é atualizada uma vez por semana: se o comunicado for de hoje e não estiver na lista, diga isso e me peça o texto, o link ou o PDF. Se o texto integral não abrir, não resuma por notícia: diga isso na primeira linha, entregue só a ficha e me peça o texto ou o PDF. Para o tamanho e as premissas, chame analise_ativo com tipo acoes e pesquisa=true (balancosTrimestrais, multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias). Não complete trecho do comunicado de memória."
+      "fonte": "Se colei o texto ou anexei o PDF, esse é o documento. Se informei só a empresa, chame documentos_cvm pelo nome ou CNPJ (a analise_ativo traz os dois), com as categorias Fato Relevante e Comunicado ao Mercado: use a lista para a ficha e a sequência e baixe pelo protocolo o documento escolhido para ler o texto integral. A base aberta da CVM é atualizada uma vez por semana: se o comunicado for de hoje e não estiver na lista, procure no site da CVM (www.rad.cvm.gov.br, Consulta de Documentos) e só se também não achar lá me peça o texto, o link ou o PDF. Se o texto integral não abrir, não resuma por notícia: diga isso na primeira linha, entregue só a ficha e me peça o texto ou o PDF. Para o tamanho e as premissas, chame analise_ativo com tipo acoes e pesquisa=true (balancosTrimestrais, multiplosEIndicadores, precoAlvoPorCasa, ajustesDeAlvoEm30Dias). Não complete trecho do comunicado de memória."
     },
     "grafico": {
       "obj": "Descrever o gráfico com medidas: onde o preço está, o que fez no período, os níveis que o mercado respeitou e o que mudaria a leitura.",
@@ -1486,14 +1618,11 @@
         "Atenção em UMA tabela (Sinal | Status | Dado): só o que foi encontrado ou ficou parcial (▼ encontrado, ● parcial, – sem dado); os descartados vão numa linha única abaixo. Lucro sem caixa, item não recorrente, dívida curta ou em moeda estrangeira, queda de margem, concentração e divergência entre fontes",
         "Monitorar em UMA tabela de até 5 linhas (Indicador | Hoje | Muda a leitura se | Quando sai o dado)",
         "Cliente: leitura em 3 a 5 frases, sem recomendação, e as 3 perguntas mais difíceis com a resposta em uma frase cada",
-        "O que atende ao método (só se eu informei indicadores e faixas); sem faixas, proponha de 3 a 5 critérios em uma linha",
         "Se eu pedir na conversa: mini-apresentação com mesa_apresentacao (5 a 7 slides), sem refazer a pesquisa",
         "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (dados que faltam, divergências entre fontes e o que abrir no RI ou na CVM), sem repetir o que já aparece acima"
       ],
       "insumos": [
         "Empresa (ticker)",
-        "Meu método: indicadores e faixas (se eu não tiver, escreva \"sem método\" e defina comigo)",
-        "Documentos que tenho (ITR, DFP, release)"
       ],
       "fonte": "Chame analise_ativo com tipo acoes e pesquisa=true e use todos os blocos que voltarem, não só o histórico: multiplosEIndicadores, balancosTrimestrais, precoAlvoPorCasa, ajustesDeAlvoEm30Dias, declaradoNosRelatorios, ultimosRelatorios (aFavor e riscos), resumoPorIA e lacunas. Chame também com tipo indice e IBOV na mesma janela. Complete o que faltar com fontes oficiais (CVM e RI da empresa) e só me peça o que não achar. Se um bloco vier vazio, diga qual e siga com o resto, sem inventar."
     },
@@ -1544,7 +1673,7 @@
       "entrega": [
         "Em uma frase (negrito): o que é o produto, quem emite ou gere, quanto paga e por quanto tempo",
         "Ficha em UMA tabela (Condição | O que diz o material | Onde está): emissor ou gestor, indexador e taxa, prazo e vencimento, carência e liquidez, garantia, tributação, aplicação mínima, público-alvo, custos, classificação de risco e data do material",
-        "Como paga em UMA tabela (Cenário | Condição | O que o cliente recebe), com os cenários que o próprio material define; em renda fixa simples, o fluxo de juros e amortização",
+        "Como paga em UMA tabela (Cenário | Condição | O que o cliente recebe), com os cenários que o próprio material define; em renda fixa simples, o fluxo de juros e amortização; em ação, de onde vem o retorno (resultado, dividendos e preço, sem prometer nada); em fundo imobiliário, a origem dos rendimentos mensais (recorrente, não repetível ou reserva)",
         "Na mesma base em UMA tabela (Produto | Taxa do material | Bruto ao ano | Líquido de imposto no prazo | Equivale a % do CDI | Título público de prazo parecido), com a conta numa nota curta e a data das taxas; CDI e IPCA futuros são hipótese rotulada",
         "Quem está por trás em UMA tabela de até 5 linhas (Indicador | Valor | Data | Fonte): números públicos do emissor ou do gestor",
         "Encaixe em UMA tabela (Situação do cliente | Encaixe ▲ ● ▼ | Motivo), para as situações que marquei",
@@ -1555,7 +1684,7 @@
         "Monitorar em UMA tabela de até 4 linhas (O que acompanhar | Hoje | Muda a leitura se | Quando sai)",
         "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens. Em arquivo para o cliente ficam de fora o Conferir, o Próximo passo e o que é orientação para mim (vale no lugar da regra geral do PDF)"
       ],
-      "fonte": "O material que anexei ou colei é a fonte das condições: cite a página ou o trecho. Emissor de capital aberto: analise_ativo (tipo acoes, pesquisa=true) e documentos_cvm. Fundo: analise_ativo (tipo fundo, CNPJ). Comparação: painel_macro (CDI, Selic, IPCA esperado) e taxas_tesouro (título público de prazo parecido, com a data base). Imposto, IOF e FGC: fonte primária, com a data da consulta. O que não está no material entra como sem dado, sem preencher de memória."
+      "fonte": "O material que anexei ou colei é a fonte das condições: cite a página ou o trecho. Emissor de capital aberto: analise_ativo (tipo acoes, pesquisa=true) e documentos_cvm. Fundo: analise_ativo (tipo fundo, CNPJ). Comparação: painel_macro (CDI, Selic, IPCA esperado) e taxas_tesouro (título público de prazo parecido, com a data base). Imposto, IOF e FGC: fonte primária, com a data da consulta. O que não está no material entra como sem dado, sem preencher de memória. Se o produto for ação ou fundo imobiliário, chame analise_ativo (tipo acoes ou fii, com pesquisa=true) e use múltiplos, balanços, casas de research, relatórios e fatos; garantia e FGC não se aplicam (diga isso em uma linha) e o risco é o de mercado, de resultado e, no fundo, de vacância ou inadimplência."
     },
     "rf": {
       "obj": "Comparar produtos de renda fixa, fundos e títulos públicos na mesma base, com imposto e liquidez.",
@@ -1641,7 +1770,7 @@
   };
   ["macro", "fato", "grafico", "estudo", "acao", "setor", "fii", "rf", "raio-x"].forEach((id) => {
     const p = PEDIDO[id]; if (!p) return;
-    if (id !== "estudo") p.entrega = USO_ENTREGA(Array.isArray(p.entrega) ? p.entrega : [], NA_MENSAGEM[id]); // o Estudo é sempre material para o cliente: não tem a pergunta de uso
+    if (!["estudo", "acao", "fato", "setor", "fii"].includes(id)) p.entrega = USO_ENTREGA(Array.isArray(p.entrega) ? p.entrega : [], NA_MENSAGEM[id]); // o Estudo é sempre material para o cliente: não tem a pergunta de uso
     p.fonte = (p.fonte ? p.fonte + " " : "") + "Onde pesquisar, nesta ordem: " + ONDE_PESQUISAR[id] + " Cite a fonte e a data de cada número.";
     if (["estudo", "acao", "setor", "fii", "grafico"].includes(id)) p.fonte += " Índice de comparação na mesma janela: analise_ativo com tipo indice (IFIX para FII, IBOV para ações, CDI para renda fixa).";
   });
@@ -1725,11 +1854,7 @@
       { rotulo: "Números dos posts (ou anexe os prints)", longo: true, dica: "Alcance, salvamentos, envios, comentários e seguidores de cada post, ou os prints das estatísticas anexados na conversa" },
       { rotulo: "Período", dica: "Ex.: semana de 17 a 21/11", padrao: "Últimos 7 dias" },
     ],
-    "cliente-novo": [
-      { rotulo: "Apelido do cliente (sem nome nem CPF)", dica: "Ex.: Cliente A, empresário, 45 anos" },
-      { rotulo: "Perfil e objetivo, em poucas linhas", dica: "Ex.: aposentadoria em 10 anos, perfil moderado, patrimônio de R$ 500 mil", longo: true },
-      { rotulo: "Documentos que já tenho", opcoes: ["Ainda não tenho", "Vou anexar na conversa", "Colei aqui"], padrao: "Ainda não tenho" },
-    ],
+    "cliente-novo": (ponto) => cnCampos(ponto),
     "pre-reuniao": [
       { rotulo: "Cliente (apelido), data da reunião e tempo de relacionamento", dica: "Ex.: Cliente A, quinta às 15h, cliente há 2 anos" },
       { rotulo: "Resumo da carteira ou da situação atual", dica: "Ex.: 60% renda fixa, 25% ações, 15% fundos; reserva de 6 meses", longo: true },
@@ -1793,8 +1918,6 @@
     ],
     "acao": [
       { rotulo: "Empresa (ticker)", dica: "Ex.: WEGE3" },
-      { rotulo: "Meu método: indicadores e faixas", longo: true, opcional: true, dica: "Ex.: ROE acima de 15%, dívida líquida/EBITDA abaixo de 2. Sem método, deixe em branco e eu defino com você" },
-      { rotulo: "Documentos que tenho (ITR, DFP, release)", opcional: true },
     ],
     "setor": [
       { rotulo: "Empresas (tickers) ou setor", dica: "Ex.: ITUB4, BBDC4, SANB11 ou «bancos»" },
@@ -1807,7 +1930,7 @@
       { rotulo: "Para que cliente ou pergunta estou olhando", opcional: true, dica: "Ex.: cliente quer renda mensal" },
     ],
     "raio-x": [
-      { rotulo: "Produto (nome e, se tiver, ticker, código ou CNPJ)", dica: "Ex.: Tesouro IPCA+ 2032; debênture AXIA 15ª emissão; fundo e CNPJ" },
+      { rotulo: "Produto (nome e, se tiver, ticker, código ou CNPJ)", dica: "Ex.: Tesouro IPCA+ 2032; debênture AXIA 15ª emissão; fundo e CNPJ; ação ou FII: o ticker (WEGE3, HGLG11)" },
       { rotulo: "Material do produto (lâmina, termo ou e-mail da mesa)", longo: true, opcional: true, dica: "Cole o texto aqui ou anexe o PDF pelo clipe. Sem material, uso as fontes públicas e marco o que faltar" },
       { rotulo: "Situações de cliente que quero cobrir", padrao: "Reserva de emergência; objetivo com data marcada; renda mensal", dica: "Ex.: aposentadoria em 10 anos; caixa da empresa" },
       { rotulo: "Argumento que a casa passou (opcional)", opcional: true, longo: true, dica: "Ex.: taxa acima dos CDBs do mesmo prazo" },
@@ -1832,7 +1955,181 @@
       { rotulo: "Link desejado da página (opcional)", opcional: true, dica: "Ex.: henri-diagnostico (em branco, eu sugiro)" },
     ],
   };
-  const camposDe = (id) => CAMPOS[id] ?? (PEDIDO[id]?.insumos ?? []).map((rotulo) => ({ rotulo }));
+  const r1 = (id) => (estado.respostas[id] ?? [])[0] ?? "";
+  const linhaCom = (lista, inicio) => lista.findIndex((x) => x.startsWith(inicio));
+  const entregaPor = (tarefa, fn) => {
+    const p = PEDIDO[tarefa]; if (!p || !Array.isArray(p.entrega)) throw new Error("sem entrega: " + tarefa);
+    const base = p.entrega.slice(); p.entrega = () => fn(base);
+  };
+  const trocar = (lista, inicio, nova) => { const i = linhaCom(lista, inicio); if (i < 0) throw new Error("linha nao achada: " + inicio); const l = lista.slice(); l[i] = nova; return l; };
+  const sem = (lista, inicio) => { const i = linhaCom(lista, inicio); if (i < 0) throw new Error("linha nao achada: " + inicio); return lista.filter((_, j) => j !== i); };
+  const apos = (lista, inicio, nova) => { const i = linhaCom(lista, inicio); if (i < 0) throw new Error("linha nao achada: " + inicio); const l = lista.slice(); l.splice(i + 1, 0, nova); return l; };
+
+  CAMPOS["segunda-reuniao"] = [
+    { rotulo: "Quem mais participa da decisão (opcional)", opcional: true, dica: "Ex.: a esposa, o sócio" },
+    { rotulo: "A decisão que espero sair da reunião (opcional)", opcional: true, dica: "Ex.: aprovar a proposta ou marcar a assinatura" },
+  ];
+  PEDIDO["segunda-reuniao"].entrega.push(
+    "Se informei quem mais participa da decisão e a decisão que espero: o material e o roteiro já consideram os dois",
+    "Se a carteira atual ainda não foi analisada: diga em uma linha que a tarefa Revisão de carteira, ou o relatório da tarefa Cliente novo, deve vir antes"
+  );
+
+  entregaPor("pre-reuniao", (b) => {
+    const foco = {
+      "Revisão de carteira": "Foco da revisão: desvios da carteira só descritos, sem ordem de compra ou venda; o que mudou no mercado e que o cliente vai perguntar (painel_macro, com data)",
+      "Novo aporte": "Foco do aporte: de onde vem o dinheiro, prazo, objetivo e a liquidez que ele quer manter; perguntas para entender antes de qualquer sugestão; nada de indicar ativo",
+      "Resgate ou liquidez": "Foco do resgate: quanto, quando e para quê; o que a carteira tem de líquido e os prazos de resgate informados; o que muda ao resgatar, sem calcular imposto (isso é com o contador ou a fonte oficial)",
+      "Sucessão e patrimônio": "Foco em sucessão: abra o assunto com as perguntas da tarefa Conversa sobre sucessão e diga o que precisa de advogado e contador",
+    }[r1("foco")];
+    return foco ? apos(b, "Perguntas de descoberta (SPIN)", foco) : b;
+  });
+
+  PEDIDO["pos-reuniao"].entrega.push("Se foi a primeira reunião: diga em uma linha que a tarefa Segunda reunião usa este resumo");
+
+  Object.assign(CAMPOS.carteira[1], { rotulo: "Política de investimento do cliente, com as bandas (opcional)", opcional: true, dica: "Sem política escrita? Diga o perfil (conservador, moderado ou arrojado): uso bandas de modelo, marcadas como hipótese" });
+  PEDIDO.carteira.obj = "Ver onde a carteira se afasta da política de investimento do cliente (ou, sem política escrita, de bandas de modelo do perfil informado, marcadas como hipótese), sem ordem de compra, venda nem imposto.";
+  PEDIDO.carteira.entrega.unshift(
+    "Antes de tudo: confira se as posições somam o total informado ou 100%; se não fechar, diga quanto falta ou sobra e siga com [CONFERIR]",
+    "Sem política escrita: use o perfil informado com bandas de modelo, rotuladas como hipótese a confirmar com o cliente; se também não há perfil, me pergunte uma vez"
+  );
+
+  { const base = CAMPOS.comparador;
+    CAMPOS.comparador = (ponto) => {
+      if ((ponto ?? r1("comparar")) !== "A mesma carteira em duas datas") return base;
+      return base.map((c, i) => i === 0 ? { ...c, rotulo: "Carteira na data anterior: ativos ou classes, valores e data-base", dica: "Ex.: Renda fixa 55%, Ações 25%, FIIs 10%, Exterior 10% em 14/05/2026" }
+        : i === 1 ? { ...c, rotulo: "Carteira na data mais recente: ativos ou classes, valores e data-base", dica: "Ex.: Renda fixa 45%, Ações 30%, FIIs 10%, Exterior 15% em 14/11/2026" } : c);
+    };
+    entregaPor("comparador", (b) => r1("comparar") === "A mesma carteira em duas datas"
+      ? [...b, "Como a mesma carteira mudou entre as duas datas: entradas, saídas e variação de peso por classe, sem dizer se a mudança foi boa ou ruim"] : b);
+  }
+
+  CAMPOS.diagnostico = [
+    CAMPOS.diagnostico[0],
+    { rotulo: "Patrimônio e onde está", longo: true, dica: "Pode ser em faixas. Ex.: imóvel próprio R$ 600 mil; investimentos R$ 300–500 mil" },
+    { rotulo: "Dívidas (tipo, saldo e parcela)", longo: true, dica: "Se não há, escreva nenhuma. Ex.: financiamento do carro, R$ 40 mil, parcela de R$ 1.200" },
+    { rotulo: "Renda e gastos mensais", dica: "Ex.: renda R$ 20 mil; gastos R$ 12 mil" },
+    { rotulo: "Quem depende da renda (opcional)", opcional: true, dica: "Ex.: esposa e 2 filhos" },
+    CAMPOS.diagnostico[2],
+    CAMPOS.diagnostico[3],
+  ];
+  entregaPor("diagnostico", (b) => trocar(b, "Reserva de liquidez e proteção", "Reserva de liquidez em meses de gasto e comprometimento da renda com dívidas, cada um com a conta mostrada, separando o que eu informei do que é estimativa; proteção (seguros e dependentes)"));
+
+  PEDIDO["relatorio-mensal"].fonte = (PEDIDO["relatorio-mensal"].fonte ? PEDIDO["relatorio-mensal"].fonte + " " : "") + "Para a comparação do período: painel_macro (CDI, IPCA e Selic acumulados) e, se a carteira tiver ações, analise_ativo com tipo indice e IBOV na mesma janela; cite fonte e data.";
+  entregaPor("relatorio-mensal", (b) => { const l = b.slice(); l.splice(1, 0, "Comparação descritiva com CDI, IPCA e, se houver ações, IBOV no mesmo período, em uma tabela curta (Referência | Período | Variação), sem dizer se foi bom ou ruim"); return l; });
+
+  CAMPOS.proposta.push({ rotulo: "Validade da proposta e data do primeiro follow-up (opcional)", opcional: true, dica: "Ex.: válida por 15 dias; volto a falar em 5 dias" });
+  PEDIDO.proposta.entrega.push("A validade da proposta e a data do primeiro follow-up, se eu informei; diga em uma linha que a tarefa Follow-up da proposta monta os toques");
+
+  entregaPor("followup", (b) => {
+    const t = r1("tempo");
+    let l = b;
+    if (t === "5 dias") l = trocar(b, "Três toques de follow-up", "Dois toques de follow-up (hoje, que é o dia 5, e o dia 10), cada um em peça de WhatsApp separada; o toque do dia 2 já passou, não escreva");
+    if (t === "10 dias ou mais") l = trocar(trocar(b, "Três toques de follow-up", "Um toque de reativação para hoje, em peça de WhatsApp separada; os toques do dia 2 e do dia 5 já passaram, não escreva"), "Roteiro de ligação", "Roteiro de ligação de 60 segundos para usar no lugar do toque de reativação, em peça separada");
+    return [...l, "Ajuste o tom ao que o cliente disse (preço, cônjuge, tempo), sem pressão nem culpa"];
+  });
+
+  entregaPor("relacionamento", (b) => {
+    const f = r1("foco");
+    if (f === "Pedir indicação a um cliente") return [
+      "Em uma linha: o melhor momento para pedir (depois de um resultado, de um elogio ou de uma entrega boa) e o que não fazer",
+      "Roteiro do pedido em 3 partes (reconhecer o que ele já disse de bom, pedir com leveza, deixar fácil dizer não), em peça separada",
+      "WhatsApp pronto de pedido de indicação, em peça separada",
+      "Mensagem de agradecimento para quando ele indicar alguém, em peça separada",
+      b[b.length - 1],
+    ];
+    if (f === "Abordar contador ou advogado") return [
+      "Em 3 linhas: o que eu ofereço ao parceiro e o que ele oferece aos clientes dele, sem prometer indicação e sem combinar remuneração (confira a regra com o compliance da casa)",
+      "Roteiro da primeira conversa com o parceiro (abertura, como trabalhamos, como podemos nos ajudar, próximo passo com data), em peça separada",
+      "E-mail ou WhatsApp de apresentação ao parceiro, em peça separada",
+      "Como manter o contato: quando falar de novo e o que compartilhar",
+      b[b.length - 1],
+    ];
+    return b;
+  });
+
+  { const o = T.explicar.perguntas[0].opcoes; o.splice(o.length - 1, 0, { t: "Juros compostos" }, { t: "Come-cotas" }, { t: "FGC e o seu limite" }, { t: "Imposto de renda na renda fixa" }, { t: "Inflação e juros reais" }); }
+  PEDIDO.explicar.entrega.push("Se o conceito envolve imposto ou regra (come-cotas, imposto de renda, FGC): confira a regra atual em fonte oficial e cite a data da consulta");
+
+  entregaPor("sucessorio", (b) => {
+    const m = r1("momento");
+    if (m === "Abrir o assunto") return [
+      "Como abrir o assunto sem assustar: uma frase de abertura e 2 formas de ligar ao que ele já disse, em peça separada",
+      "3 a 4 perguntas leves para ver se ele quer aprofundar e o encerramento marcando nova data, em peça separada",
+      b[2], b[3],
+    ];
+    if (m === "Aprofundar") return [
+      b[0],
+      "Glossário em linguagem simples (testamento, doação com usufruto, holding, previdência e seguro de vida), com a ressalva de que a estrutura é decisão de advogado e contador",
+      "Como registrar as respostas dele para o resumo do advogado e do contador",
+      b[3],
+    ];
+    if (m === "Encaminhar") return [
+      b[1],
+      "Mensagem ao advogado ou ao contador apresentando o caso, sem nome nem CPF, em peça separada",
+      "WhatsApp ao cliente explicando o encaminhamento, em peça separada",
+      b[3],
+    ];
+    return b;
+  });
+
+  CAMPOS.abordagem.push(
+    { rotulo: "O que já sei dele: cidade, idade, empresa, família (opcional)", opcional: true, longo: true, dica: "Se não sei nada, deixe em branco" },
+    { rotulo: "Posso pesquisar sobre ele na internet?", opcoes: ["Sim, pesquisar", "Não pesquisar"], padrao: "Não pesquisar" }
+  );
+  entregaPor("abordagem", (b) => trocar(b, "Pontos de contexto público", "Se autorizei a pesquisa: pontos de contexto público que valem citar, com link e data, só o que for claramente sobre ele; na dúvida de homônimo, deixe de fora e me pergunte. Sem pesquisa, use só o que eu informei"));
+
+  CAMPOS.ligacao.push({ rotulo: "Tipo de ligação", opcoes: ["Fria (ele não me conhece)", "Morna (indicação ou já nos falamos)"], padrao: "Fria (ele não me conhece)" });
+  PEDIDO.ligacao.entrega.push(
+    "Se a ligação for morna: abra citando quem indicou ou o último contato, em vez da apresentação de ligação fria",
+    "Se atender outra pessoa (cônjuge, secretária) ou cair na caixa postal: o que dizer e o que deixar, em peça separada",
+    "Voz nos 10 primeiros segundos: ritmo, sorriso e volume, em 2 linhas"
+  );
+
+  CAMPOS.sequencia.push({ rotulo: "Canais", opcoes: ["Só WhatsApp", "WhatsApp e ligação", "WhatsApp, ligação e e-mail"], padrao: "Só WhatsApp" });
+  entregaPor("sequencia", (b) => [...trocar(b, "Tabela curta", "Tabela curta: toque, data (o toque 1 é hoje, " + hojeBR() + "), canal, objetivo"),
+    "Se escolhi ligação ou e-mail além do WhatsApp (campo Canais): indique o canal de cada toque e escreva o toque de ligação como roteiro de 30 segundos e o de e-mail com assunto e 5 linhas, cada um em peça separada"]);
+
+  { const o = T.pitch.perguntas[0].opcoes; o.splice(1, 0, { t: "Pitch de 30 segundos", d: "Para evento ou networking" }); }
+  entregaPor("pitch", (b) => {
+    const f = r1("formato");
+    const pitch1 = b[0], email = b[1];
+    const extra = ["Entonação: onde fazer pausa e qual palavra enfatizar, em 3 linhas"];
+    if (f === "Pitch de 30 segundos") return ["Pitch de 30 segundos (quem sou, para quem trabalho e o convite), em peça separada", "Frase de uma linha para quando perguntarem o que você faz", ...extra];
+    if (f === "E-mail com 3 assuntos") return [email];
+    if (f === "Os dois") return [pitch1, email, ...extra];
+    return [pitch1, "Como a pessoa pode te apresentar quando indicar você, em 2 frases, em peça separada", ...extra];
+  });
+
+  entregaPor("retomada", (b) => {
+    const t = r1("parado");
+    if (t === "Menos de 30 dias") return [
+      b[0],
+      "Gancho: um motivo leve para voltar ao assunto (a promessa pendente ou algo novo), sem parecer cobrança, e o canal principal, com o porquê",
+      "WhatsApp: os textos prontos dos toques 1 e 3, cada um em peça separada",
+      b[3],
+      "Sequência curta de 3 toques em 7 a 10 dias (toque, dia, canal, objetivo) e quando parar",
+    ];
+    if (t === "Mais de 3 meses") return [
+      b[0],
+      "Gancho de reaparecimento: uma novidade ou um fato novo que justifique voltar, sem fingir que a conversa não parou, e o canal principal, com o porquê",
+      b[2], b[3],
+      "E-mail com assunto e 5 linhas, em peça separada",
+      b[5],
+    ];
+    return sem(b, "E-mail com assunto");
+  });
+
+  PEDIDO["segunda-reuniao"].entrega.push(
+    "Comparativo carteira atual × carteira proposta em UMA tabela (Classe | Atual % | Proposta % | Diferença), com a rentabilidade histórica de cada uma na mesma janela, fonte e data-base; rentabilidade passada não garante resultado futuro; a proposta é minha, então descreva as diferenças e não recomende",
+    "A carteira atual vem da tabela do relatório de Cliente novo guardada no histórico do cliente (mesa_historico_cliente), se existir; se eu anexei a carteira proposta, leia o arquivo; para ativos listados, use analise_ativo para a rentabilidade na mesma janela"
+  );
+  const marcarPerfil = (tarefa, inicio, campo, max) => { const c = (CAMPOS[tarefa] || []).find((x) => x.rotulo.startsWith(inicio)); if (!c) throw new Error("campo nao achado: " + inicio); c.perfilCampo = campo; c.max = max; };
+  marcarPerfil("calendario", "Meu nicho", "nicho", 120);
+  marcarPerfil("calendario", "Meu público final", "publico", 200);
+  marcarPerfil("calendario", "Como eu gravo", "modoGravacao", 200);
+  marcarPerfil("proposta", "O que o serviço inclui", "servicoPadrao", 800);
+
+  const camposDe = (id, fixo) => { const c = CAMPOS[id]; return typeof c === "function" ? c(fixo ? "" : undefined) : (c ?? (PEDIDO[id]?.insumos ?? []).map((rotulo) => ({ rotulo }))); };
   const perfisDasReferencias = () => {
     const r = String(perfil?.referencias ?? "").trim();
     const arrobas = [...new Set((r.match(/@[A-Za-z0-9._]{1,30}/g) ?? []).map((x) => x.replace(/\.+$/, "")))].slice(0, 10);
@@ -1842,7 +2139,7 @@
   const nichoDasReferencias = () => (String(perfil?.referencias ?? "").split(/\r?\n/).map((l) => l.trim().match(NICHO_RE)?.[1]).find(Boolean) ?? "").trim().slice(0, 140);
   const PADROES = { "@hoje": () => hojeBR(), "@referencias": perfisDasReferencias, "@nicho": nichoDasReferencias, "@publico": () => String(perfil?.publico ?? "").trim() };
   const padraoDe = (f) => (PADROES[f.padrao] ? PADROES[f.padrao]() : f.padrao ?? "");
-  const valorBruto = (id, i) => estado.campos?.[id]?.[i] ?? padraoDe(camposDe(id)[i] ?? {});
+  const valorBruto = (id, i) => { const v = estado.campos?.[id]?.[i]; if (v != null) return v; const c = camposDe(id)[i] ?? {}; const doPerfil = c.perfilCampo ? String(perfil?.[c.perfilCampo] ?? "").trim() : ""; return doPerfil || padraoDe(c); };
   const setValor = (id, i, v) => { estado.campos ??= {}; estado.campos[id] ??= []; estado.campos[id][i] = v; };
   const textoCampo = (f, v) => {
     const x = String(v ?? "").trim();
@@ -1929,6 +2226,286 @@
     },
   };
 
+  const acEscopo = (x) => { const v = x ?? ((estado.respostas.uso ?? [])[0] ?? ""); return v === AC_MULT ? "mult" : v === AC_BAL ? "bal" : v === AC_FATOS ? "fatos" : v === AC_MSG ? "msg" : "completo"; };
+  const ACAO0 = { obj: PEDIDO.acao.obj, entrega: PEDIDO.acao.entrega, fonte: PEDIDO.acao.fonte };
+  const SUF_ACAO = ACAO0.fonte.slice(ACAO0.fonte.indexOf(" Onde pesquisar"));
+  const AC_CONFERIR = "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (dados que faltam, divergências entre fontes e o que abrir no RI ou na CVM), sem repetir o que já aparece acima";
+  const AC_CLIENTE = "Cliente: leitura em 3 a 5 frases, sem recomendação, e as 3 perguntas mais difíceis com a resposta em uma frase cada";
+  const AC_VARIANTES = {
+    completo: {
+      obj: ACAO0.obj,
+      fonte: ACAO0.fonte,
+      entrega: [...ACAO0.entrega, "Seções recolhidas ao final, cada uma com título começando por + e sem repetir nada do que já está acima: + Como funciona (o que move o resultado desta empresa em 5 passos, com um exemplo numérico sintético e identificado); + Onde pesquisar (de 3 a 5 fontes primárias, na ordem em que vale abrir, com o que procurar e o endereço); + Glossário (só os termos que aparecem na resposta, no máximo 8, uma linha cada)"],
+    },
+    mult: {
+      obj: "Ler os múltiplos da empresa contra o próprio histórico e contra os pares, sem chamar de barato ou caro.",
+      fonte: "Chame analise_ativo com tipo acoes e pesquisa=true e use multiplosEIndicadores (e o histórico dos múltiplos, se vier). Para os pares, chame o mesmo para 3 a 5 empresas do mesmo setor, na mesma data-base, e chame tipo indice com IBOV. Se um bloco vier vazio, diga qual e siga com o resto, sem inventar." + SUF_ACAO,
+      entrega: [
+        "Em uma frase (negrito): onde os múltiplos estão hoje contra o histórico da própria empresa e o ponto que mais pesa",
+        "Múltiplos em UMA tabela (Indicador | Hoje | Média de 5 anos | Mínimo e máximo | Pares do setor | Leitura): P/L, P/VP, EV/EBITDA, dividend yield, ROE e, se vier, ROIC; período e data-base no rodapé; sem chamar de barato ou caro",
+        "Contra os pares, em UMA tabela curta (Empresa | P/L | EV/EBITDA | Dividend yield | ROE): a empresa e de 3 a 5 pares do mesmo setor, na mesma data-base",
+        "O que explica o múltiplo hoje, em até 3 linhas: lucro que mudou, preço que mudou ou evento que não se repete",
+        "Quando o múltiplo engana, só o que vale para esta empresa: lucro cíclico ou não recorrente, dívida alta, reestruturação",
+        AC_CLIENTE,
+        AC_CONFERIR,
+      ],
+    },
+    bal: {
+      obj: "Ler o último balanço e a DRE da empresa: o que cresceu, o que pressionou o resultado e a qualidade do lucro.",
+      fonte: "Chame analise_ativo com tipo acoes e pesquisa=true e use balancosTrimestrais e lacunas. Confirme os números na DFP e no ITR da CVM e no release do RI; os documentos que eu anexei valem mais que a busca. Se as fontes divergirem, mostre as duas. Se um bloco vier vazio, diga qual e siga, sem inventar." + SUF_ACAO,
+      entrega: [
+        "Em uma frase (negrito): como foi o último trimestre e o ponto que mais pesa",
+        "DRE em UMA tabela (Linha | Trimestre atual | Anterior | Mesmo trimestre do ano anterior | Δ t/t | Δ a/a): receita líquida, lucro bruto, resultado operacional, resultado financeiro, lucro líquido e as margens, com a fonte no rodapé",
+        "Balanço em UMA tabela de 5 trimestres (Trimestre | Caixa | Dívida bruta | Dívida líquida | Patrimônio líquido | Dívida líquida sobre resultado operacional)",
+        "O que explicou o trimestre, em até 4 linhas: o que mexeu na receita, na margem e no resultado financeiro",
+        "Qualidade do lucro em UMA tabela (Sinal | Status | Dado): lucro sem caixa, item não recorrente, dívida curta ou em moeda estrangeira, queda de margem e concentração (▼ encontrado, ● parcial, – sem dado)",
+        "Monitorar em UMA tabela de até 5 linhas (Indicador | Hoje | Muda a leitura se | Quando sai o dado)",
+        AC_CLIENTE,
+        AC_CONFERIR,
+      ],
+    },
+    fatos: {
+      obj: "Mostrar o que os relatórios técnicos (casas de research) dizem da empresa: tese, riscos e alvos, como opinião delas e não minha, junto com os fatos relevantes recentes.",
+      fonte: "Chame analise_ativo com tipo acoes e pesquisa=true e use precoAlvoPorCasa, ajustesDeAlvoEm30Dias, declaradoNosRelatorios, ultimosRelatorios (aFavor e riscos) e resumoPorIA. Fatos e comunicados: documentos_cvm e o RI da empresa. Sem a pesquisa das casas, diga isso e entregue só fatos e riscos com fonte oficial; nunca invente alvo nem recomendação." + SUF_ACAO,
+      entrega: [
+        "Em uma frase (negrito): o que as casas pensam da empresa e onde elas mais divergem",
+        "Casas de research em UMA tabela (Casa | Data | Recomendação | Alvo | Tese em uma linha) e uma linha com mediana, dispersão e os ajustes dos últimos 30 dias; opinião delas, nunca minha",
+        "Teses a favor em UMA tabela de até 4 linhas (Tese | Quem defende | Dado que sustenta)",
+        "Riscos apontados em UMA tabela de até 4 linhas (Risco | Quem aponta | O que observar)",
+        "Onde as casas divergem, em até 3 linhas, e o que cada lado precisaria ver acontecer",
+        "Fatos relevantes e comunicados dos últimos 90 dias em UMA tabela (Data | Fato | Efeito na tese)",
+        AC_CLIENTE,
+        AC_CONFERIR,
+      ],
+    },
+    msg: {
+      obj: "Preparar a mensagem que eu mando ao cliente sobre esta ação, sem recomendação de compra ou venda.",
+      fonte: "Antes, pesquise o que a análise da empresa pede (analise_ativo com tipo acoes e pesquisa=true: último resultado, múltiplos, casas e fatos recentes) e use só o que sustenta a conversa." + SUF_ACAO,
+      entrega: [
+        "Antes, pesquise tudo o que a análise da empresa pede (dados, fontes e datas), mas entregue só o que eu vou mandar e o que preciso para sustentar a conversa",
+        "Resumo para mim em 2 linhas: o que aconteceu com a empresa e o que muda na conversa com o cliente",
+        "Mensagem principal de WhatsApp, pronta para colar, em peça separada (tipo whatsapp): 3 a 5 linhas, começa pelo que importa para a pessoa, traduz o termo técnico e usa uma analogia do dia a dia",
+        "Na mensagem não pode faltar: o que a empresa é e fez no último resultado, um número que importa e o que ainda é risco; sem dizer comprar, vender ou manter",
+        "Versão de 2 linhas, em peça separada, para quando o cliente só quer saber o essencial",
+        "Resposta pronta, em peça separada, para as 2 perguntas que o cliente mais provavelmente fará depois",
+        "Uma pergunta aberta no fim da mensagem para continuar a conversa e entender a situação dele",
+        "Fora das mensagens, em 2 linhas: fonte e data de cada número e o que eu devo conferir antes de enviar",
+      ],
+    },
+  };
+  Object.defineProperties(PEDIDO.acao, {
+    obj: { get() { return AC_VARIANTES[acEscopo()].obj; }, configurable: true, enumerable: true },
+    fonte: { get() { return AC_VARIANTES[acEscopo()].fonte; }, configurable: true, enumerable: true },
+    entrega: { value: () => AC_VARIANTES[acEscopo()].entrega, writable: true, configurable: true, enumerable: true },
+  });
+  const AC_EMPRESA = { rotulo: "Empresa (ticker)", dica: "Ex.: WEGE3" };
+  CAMPOS["acao"] = (x) => {
+    const v = acEscopo(x);
+    if (v === "mult") return [AC_EMPRESA, { rotulo: "Comparar com", opcoes: ["Histórico e pares do setor", "Só o histórico", "Só os pares"], padrao: "Histórico e pares do setor" }];
+    if (v === "bal") return [AC_EMPRESA, { rotulo: "Período", opcoes: ["Últimos 5 trimestres", "Últimos 8 trimestres", "Últimos 3 anos"], padrao: "Últimos 5 trimestres" }];
+    if (v === "fatos") return [AC_EMPRESA, { rotulo: "Foco", opcoes: ["Geral", "Teses a favor", "Riscos", "Alvos das casas"], padrao: "Geral", opcional: true }, { rotulo: "Minha tese ou dúvida", longo: true, opcional: true, dica: "Ex.: tese de dividendos; quero saber se o resultado muda isso" }];
+    if (v === "msg") return [AC_EMPRESA, { rotulo: "O cliente tem o papel?", opcoes: ["Tem, posição relevante", "Tem, posição pequena", "Não tem, está olhando", "Não sei"], opcional: true }, { rotulo: "O que quero dizer a ele", longo: true, opcional: true, dica: "Ex.: saiu o resultado do trimestre e ele perguntou" }];
+    return [AC_EMPRESA];
+  };
+
+  function escopos(id, { chaves, variantes, campos }) {
+    const p = PEDIDO[id];
+    const base = { obj: p.obj, entrega: p.entrega, fonte: p.fonte };
+    const i = base.fonte.indexOf(" Onde pesquisar"), suf = i < 0 ? "" : base.fonte.slice(i);
+    const V = {};
+    for (const [k, v] of Object.entries(variantes)) V[k] = {
+      obj: v.obj ?? base.obj,
+      entrega: typeof v.entrega === "function" ? v.entrega(base) : (v.entrega ?? base.entrega),
+      fonte: typeof v.fonte === "function" ? v.fonte(base) : (v.fonte ? v.fonte + suf : base.fonte),
+    };
+    const chave = (x) => { const e = x ?? ((estado.respostas.uso ?? [])[0] ?? ""); return chaves[e] ?? "completo"; };
+    Object.defineProperties(p, {
+      obj: { get() { return V[chave()].obj; }, configurable: true, enumerable: true },
+      fonte: { get() { return V[chave()].fonte; }, configurable: true, enumerable: true },
+      entrega: { value: () => V[chave()].entrega, writable: true, configurable: true, enumerable: true },
+    });
+    const orig = CAMPOS[id];
+    CAMPOS[id] = (x) => campos[chave(x)] ?? campos.completo ?? orig;
+  }
+  const recolhido = (como) => "Seções recolhidas ao final, cada uma com título começando por + e sem repetir nada do que já está acima: + Como funciona (" + como + ", em passos, com um exemplo numérico sintético e identificado); + Onde pesquisar (de 3 a 5 fontes primárias, na ordem em que vale abrir, com o que procurar e o endereço); + Glossário (só os termos que aparecem na resposta, no máximo 8, uma linha cada)";
+  const WHATS = (naMensagem) => [
+    "Antes, pesquise tudo o que a rotina pede (dados, fontes e datas), mas entregue só o que eu vou mandar e o que preciso para sustentar a conversa",
+    "Resumo para mim em 2 linhas: o que aconteceu e o que muda na conversa com o cliente",
+    "Mensagem principal de WhatsApp, pronta para colar, em peça separada (tipo whatsapp): 3 a 5 linhas, começa pelo que importa para a pessoa, traduz o termo técnico e usa uma analogia do dia a dia",
+    naMensagem,
+    "Versão de 2 linhas, em peça separada, para quando o cliente só quer saber o essencial",
+    "Resposta pronta, em peça separada, para as 2 perguntas que o cliente mais provavelmente fará depois",
+    "Uma pergunta aberta no fim da mensagem para continuar a conversa e entender a situação dele",
+    "Fora das mensagens, em 2 linhas: fonte e data de cada número e o que eu devo conferir antes de enviar",
+  ];
+  const DIZER = { rotulo: "O que quero dizer a ele", longo: true, opcional: true, dica: "Ex.: saiu o resultado e ele perguntou" };
+
+  const FT_LISTA_CAPTA = "Para listar os comunicados recentes, comece pela lista de arquivos da CVM que a analise_ativo (com pesquisa=true) traz do CaptaMais: ela cobre até 3 dias atrás, mais recente que a base semanal da CVM. Complete com documentos_cvm (Fato Relevante e Comunicado ao Mercado) e, para o texto integral, baixe pelo protocolo. Se ainda não achar, consulte direto o site da CVM (www.rad.cvm.gov.br, Consulta de Documentos: filtre a empresa e as categorias Fato Relevante e Comunicado ao Mercado, que mostra o que foi entregue no dia), cite o link e a data da consulta (a página é um formulário: se você não conseguir preenchê-lo, me dê o link da Consulta de Documentos e os filtros a usar: empresa, categoria e período), e só se também não achar lá me peça o texto, o link ou o PDF. ";
+  const FT_QUAL = { rotulo: "Qual comunicado", opcoes: ["O mais recente", "Quero escolher na lista dos últimos 3 dias", "Vou colar o texto", "Vou anexar o PDF"], padrao: "O mais recente", dica: "Para o PDF, anexe o arquivo na conversa antes de enviar o pedido" };
+  const FT_EMPRESA = { rotulo: "Empresa (nome ou ticker)", dica: "Ex.: PETR4" };
+  const FT_TEXTO = { rotulo: "Texto ou link do comunicado", longo: true, opcional: true, dica: "Só se o comunicado é de hoje ou você já tem o texto. Em branco, busco no CaptaMais e na CVM" };
+  const FT_TESE = { rotulo: "Minha tese ou motivo de acompanhar a empresa", opcional: true, dica: "Ex.: tese de dividendos" };
+  const FT_PAPEL = { rotulo: "O cliente tem o papel?", opcoes: ["Tem, posição relevante", "Tem, posição pequena", "Não tem, está olhando", "Não sei"], opcional: true };
+  escopos("fato", {
+    chaves: { [FT_RECENTES]: "recentes", [FT_COMPLETO]: "completo", [FT_IMPACTO]: "impacto", [FT_MSG]: "msg" },
+    variantes: {
+      recentes: {
+        obj: "Mostrar os fatos relevantes e comunicados mais recentes das empresas que eu indicar (até 3 dias atrás) e apontar qual vale abrir primeiro.",
+        fonte: "Para cada empresa, chame analise_ativo com pesquisa=true e use a lista de arquivos da CVM que ele traz do CaptaMais: ela cobre até 3 dias atrás, mais recente que a base semanal da CVM. Complete com documentos_cvm (Fato Relevante e Comunicado ao Mercado) só para o que faltar. Se ainda não achar, consulte direto o site da CVM (www.rad.cvm.gov.br, Consulta de Documentos: filtre a empresa e as categorias Fato Relevante e Comunicado ao Mercado, que mostra o que foi entregue no dia), cite o link e a data da consulta (a página é um formulário: se você não conseguir preenchê-lo, me dê o link da Consulta de Documentos e os filtros a usar: empresa, categoria e período), e só se também não achar lá me peça o texto, o link ou o PDF. Entra na lista apenas o que tiver data, tipo, assunto e protocolo ou link. Não resuma o conteúdo de um comunicado que você não abriu: aqui vai só o que consta da ficha. Se uma empresa não tiver nada na janela, diga isso em uma linha.",
+        entrega: [
+          "Em uma frase (negrito): quantos fatos e comunicados saíram na janela e qual merece abrir primeiro",
+          "Fatos recentes em UMA tabela, do mais novo para o mais antigo (Data | Empresa | Tipo | Assunto | Protocolo ou link), só com o que consta na ficha, no máximo 15 linhas; empresa sem fato na janela entra em uma linha única abaixo da tabela",
+          "Qual abrir primeiro, em até 3 linhas: o motivo de cada um, só com o que o assunto da ficha permite dizer",
+          "Aviso em uma linha: o que for de hoje pode ainda não estar na lista; se faltar o que você esperava, me diga e eu colo o texto",
+          "Próximo passo: escolher um da lista para a análise completa; faça uma pergunta que, respondida, escolhe qual",
+          "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (empresa sem dado, data que não bate, documento que falta abrir)",
+        ],
+      },
+      completo: { fonte: (b) => FT_LISTA_CAPTA + b.fonte, entrega: (b) => [...b.entrega, recolhido("o mecanismo do que foi comunicado")] },
+      impacto: {
+        obj: "Medir quanto um comunicado pesa na empresa e o que muda nas premissas.",
+        fonte: (b) => FT_LISTA_CAPTA + b.fonte,
+        entrega: [
+          "Em uma frase (negrito): o que a empresa comunicou, com o número principal e a data",
+          "Ficha do documento em UMA tabela de 1 linha (Empresa | Tipo | Entregue em | Assunto | Protocolo | Link)",
+          "O que foi divulgado em UMA tabela (Item | Número ou condição | Trecho do documento), só o que está escrito; a interpretação vai numa linha separada, marcada como interpretação",
+          "Tamanho em UMA tabela (Número do comunicado | Comparado com | Equivale a): contra receita, lucro, dívida líquida e valor de mercado, com data-base e a conta mostrada",
+          "O que muda em UMA tabela (Premissa | Antes | Depois do comunicado | Efeito): receita, margem, dívida, proventos e governança; se informei minha tese, use as premissas dela",
+          "O que as casas diziam antes do comunicado, em UMA linha (mediana do alvo, recomendação mais comum e data), e se alguma já revisou depois",
+          "Monitorar em UMA tabela de até 4 linhas (O que acompanhar | Hoje | Muda a leitura se | Quando sai)",
+          "Cliente: leitura em 3 frases simples, ajustada ao que marquei sobre a posição dele",
+          "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens",
+        ],
+      },
+      msg: {
+        obj: "Preparar a mensagem que eu mando ao cliente sobre este comunicado, sem recomendação.",
+        fonte: (b) => FT_LISTA_CAPTA + b.fonte,
+        entrega: WHATS("Na mensagem não pode faltar: o que a empresa comunicou, o número principal e o que ainda depende de aprovação"),
+      },
+    },
+    campos: {
+      recentes: [{ rotulo: "Empresas (tickers)", dica: "Uma ou várias, separadas por vírgula. Ex.: PETR4, VALE3, ITUB4" }, { rotulo: "Janela", opcoes: ["Hoje", "Últimos 3 dias"], padrao: "Últimos 3 dias" }],
+      completo: [FT_EMPRESA, FT_QUAL, FT_TEXTO, FT_TESE, FT_PAPEL],
+      impacto: [FT_EMPRESA, FT_QUAL, FT_TEXTO, FT_TESE],
+      msg: [FT_EMPRESA, FT_QUAL, FT_TEXTO, FT_PAPEL, DIZER],
+    },
+  });
+
+  const ST_EMP = { rotulo: "Empresas (tickers) ou setor", dica: "Ex.: ITUB4, BBDC4, SANB11 ou «bancos»" };
+  const ST_PER = { rotulo: "Período", opcoes: ["12 meses", "24 meses", "36 meses"], padrao: "12 meses" };
+  const ST_FONTE_BASE = "Chame analise_ativo com tipo acoes e pesquisa=true uma vez por empresa (de 3 a 4; se eu só falei do setor, proponha as empresas e espere eu confirmar), na mesma data-base, e chame tipo indice com IBOV na mesma janela. ";
+  const ST_FECHA = ["Cliente: em que cada empresa difere, sem eleger a melhor, e a resposta pronta para quando ele perguntar qual escolher", "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens, sem repetir o que já aparece acima"];
+  escopos("setor", {
+    chaves: { [ST_COMPLETO]: "completo", [ST_MULT]: "mult", [ST_BAL]: "bal", [ST_CASAS]: "casas", [ST_MSG]: "msg" },
+    variantes: {
+      completo: { entrega: (b) => [...b.entrega, recolhido("o que move o resultado deste setor")] },
+      mult: {
+        obj: "Comparar os múltiplos das empresas na mesma base, sem eleger vencedora.",
+        fonte: ST_FONTE_BASE + "Use multiplosEIndicadores e, se vier, o histórico dos múltiplos. Célula sem dado na mesma base fica não informado, com o motivo.",
+        entrega: [
+          "Em uma frase (negrito): o que mais diferencia as empresas nos múltiplos",
+          "Comparabilidade em 2 linhas: data-base, moeda, consolidação e definição de cada múltiplo",
+          "UMA tabela lado a lado (linhas: P/L, P/VP, EV/EBITDA, dividend yield, ROE e, se vier, ROIC; colunas: as empresas, a média do grupo e o IBOV), com data da cotação e fonte no rodapé; célula sem dado fica com –",
+          "Onde cada empresa foge do grupo em UMA tabela (Empresa | Indicador | Diferença | O que explica), só com fato",
+          ...ST_FECHA,
+        ],
+      },
+      bal: {
+        obj: "Comparar o último resultado das empresas lado a lado: crescimento, margens, caixa e dívida.",
+        fonte: ST_FONTE_BASE + "Use balancosTrimestrais e lacunas e confirme na DFP e no ITR da CVM e no release do RI. Se as fontes divergirem, mostre as duas.",
+        entrega: [
+          "Em uma frase (negrito): o que mais diferencia as empresas no último resultado",
+          "Comparabilidade em 2 linhas: trimestre, consolidação e o que foi ajustado",
+          "DRE lado a lado em UMA tabela (Linha | empresa A | empresa B …): receita líquida, resultado operacional, lucro líquido, margens e variação a/a; fonte no rodapé",
+          "Caixa e dívida lado a lado em UMA tabela (Linha | empresa A | empresa B …): caixa, dívida líquida e dívida líquida sobre resultado operacional",
+          "Qualidade do lucro em UMA tabela (Empresa | Sinais encontrados): lucro sem caixa, item não recorrente, dívida curta ou em moeda estrangeira, queda de margem",
+          ...ST_FECHA,
+        ],
+      },
+      casas: {
+        obj: "Mostrar o que as casas de research dizem de cada empresa do setor, como opinião delas e não minha.",
+        fonte: ST_FONTE_BASE + "Use precoAlvoPorCasa, ajustesDeAlvoEm30Dias, declaradoNosRelatorios, ultimosRelatorios (aFavor e riscos) e resumoPorIA. Nunca invente alvo nem recomendação.",
+        entrega: [
+          "Em uma frase (negrito): onde as casas mais concordam e onde mais divergem no setor",
+          "Casas por empresa em UMA tabela (Empresa | Casas | Recomendações | Alvo mediano | Dispersão | Data) e os ajustes dos últimos 30 dias; opinião delas",
+          "Teses e riscos em UMA tabela (Empresa | Teses a favor | Riscos apontados | Quem defende)",
+          "Onde as casas divergem, em até 3 linhas",
+          ...ST_FECHA,
+        ],
+      },
+      msg: {
+        obj: "Preparar a mensagem que eu mando ao cliente sobre este setor, sem eleger a melhor empresa.",
+        fonte: ST_FONTE_BASE + "Use só o que sustenta a conversa.",
+        entrega: WHATS("Na mensagem não pode faltar: no que as empresas diferem e a resposta para quando ele perguntar qual escolher, sem eleger a melhor"),
+      },
+    },
+    campos: {
+      completo: [ST_EMP, { rotulo: "Aspecto a comparar", opcoes: ["Rentabilidade", "Endividamento", "Crescimento", "Dividendos", "Geral"], padrao: "Geral" }, ST_PER],
+      mult: [ST_EMP, ST_PER],
+      bal: [ST_EMP, { rotulo: "Período", opcoes: ["Último trimestre", "Últimos 5 trimestres", "Últimos 3 anos"], padrao: "Último trimestre" }],
+      casas: [ST_EMP],
+      msg: [ST_EMP, DIZER],
+    },
+  });
+
+  const FI_FUNDO = { rotulo: "Fundo (ticker)", dica: "Ex.: HGLG11" };
+  const FI_CLIENTE = { rotulo: "Para que cliente ou pergunta estou olhando", opcional: true, dica: "Ex.: cliente quer renda mensal" };
+  const FI_FONTE_BASE = "Chame analise_ativo com tipo fii e pesquisa=true e use todos os blocos que voltarem; chame também tipo indice com IFIX na mesma janela. Se um bloco vier vazio, diga qual, sem inventar. ";
+  const FI_FECHA = ["Cliente: leitura em 3 a 5 frases, sem recomendação, e as 3 perguntas mais difíceis com a resposta em uma frase cada", "Conferir, sempre a última coisa da resposta, em texto simples e sem título, negrito ou tabela: até 5 itens (o que depende do relatório gerencial e onde achá-lo), sem repetir o que já aparece acima"];
+  escopos("fii", {
+    chaves: { [FI_COMPLETO]: "completo", [FI_PRECO]: "preco", [FI_CARTEIRA]: "carteira", [FI_FATOS]: "fatos", [FI_MSG]: "msg" },
+    variantes: {
+      completo: { entrega: (b) => [...b.entrega, recolhido("como este fundo ganha e distribui, em 5 passos")] },
+      preco: {
+        obj: "Ler o preço do fundo: P/VP, rendimento e como ele se compara ao IFIX e a fundos do mesmo segmento.",
+        fonte: FI_FONTE_BASE + "Use multiplosEIndicadores e, para os pares, chame o mesmo para 3 a 4 fundos do mesmo segmento, na mesma data-base. Distribuição é histórica, não retorno.",
+        entrega: [
+          "Em uma frase (negrito): que tipo de fundo é, o que ele paga e o ponto de preço que mais pesa agora",
+          "Preço e múltiplos em UMA tabela (Indicador | Valor | Referência | Leitura): P/VP (com as duas datas), distribuição dos últimos 12 meses sobre o preço datado, patrimônio, liquidez, rentabilidade e volatilidade contra o IFIX",
+          "Histórico em UMA tabela (Janela | Fundo | IFIX | Diferença) nas janelas de 12, 24 e 36 meses que os dados cobrirem",
+          "Contra os pares em UMA tabela (Fundo | P/VP | Rendimento 12 meses | Liquidez): o fundo e de 3 a 4 do mesmo segmento, na mesma data-base",
+          "Distribuições dos últimos 12 meses em uma tabela curta (por trimestre): valor e origem (recorrente, não repetível ou reserva)",
+          ...FI_FECHA,
+        ],
+      },
+      carteira: {
+        obj: "Entender o que está dentro do fundo e como ele está operando.",
+        fonte: FI_FONTE_BASE + "Composição, vacância, inadimplência e origem das distribuições vêm do relatório gerencial: se eu não colei, diga onde achar e siga com o resto.",
+        entrega: [
+          "Em uma frase (negrito): que tipo de fundo é, a concentração da carteira e o ponto que mais pesa na operação",
+          "Carteira em UMA tabela: os 5 maiores imóveis, devedores ou fundos investidos, com a participação, e uma linha sobre a concentração",
+          "Operação do segmento em UMA tabela de 4 a 6 linhas: tijolo (vacância física e financeira, inadimplência, vencimento de contratos); papel (indexadores, garantias, atrasos, provisões); fundo de fundos (camadas de custo)",
+          "Atenção em UMA tabela (Sinal | Status | Dado): só o encontrado ou parcial (▼ encontrado, ● parcial, – sem dado); descartados numa linha. Vacância ou inadimplência subindo, provisão crescente, concentração, alavancagem, ganho não recorrente pagando rendimento, emissão que dilui",
+          "Monitorar em UMA tabela de até 5 linhas (Indicador | Hoje | Muda a leitura se | Quando sai o dado)",
+          ...FI_FECHA,
+        ],
+      },
+      fatos: {
+        obj: "Mostrar o que os relatórios técnicos dizem do fundo, como opinião das casas e não minha, e os fatos recentes.",
+        fonte: FI_FONTE_BASE + "Use precoAlvoPorCasa, ajustesDeAlvoEm30Dias, declaradoNosRelatorios, ultimosRelatorios (aFavor e riscos), resumoPorIA e a lista de arquivos da CVM (do CaptaMais, até 3 dias atrás); o que faltar, procure no site da CVM (www.rad.cvm.gov.br, Consulta de Documentos). Nunca invente alvo nem recomendação.",
+        entrega: [
+          "Em uma frase (negrito): o que as casas pensam do fundo e onde divergem",
+          "Casas de research em UMA tabela (Casa | Data | Recomendação | Alvo | Tese em uma linha) e uma linha com mediana, dispersão e os ajustes dos últimos 30 dias; opinião delas",
+          "Fortes e riscos em UMA tabela de duas colunas, até 4 de cada, com quem aponta",
+          "Fatos relevantes e comunicados dos últimos 90 dias em UMA tabela (Data | Fato | Efeito na tese)",
+          ...FI_FECHA,
+        ],
+      },
+      msg: {
+        obj: "Preparar a mensagem que eu mando ao cliente sobre este fundo, sem recomendação de compra ou venda.",
+        fonte: FI_FONTE_BASE + "Use só o que sustenta a conversa.",
+        entrega: WHATS("Na mensagem não pode faltar: que tipo de fundo é, o que ele paga e de onde vem, e o principal risco; sem dizer comprar, vender ou manter"),
+      },
+    },
+    campos: {
+      completo: [FI_FUNDO, FI_CLIENTE],
+      preco: [FI_FUNDO, { rotulo: "Comparar com", opcoes: ["IFIX e fundos do mesmo segmento", "Só o IFIX"], padrao: "IFIX e fundos do mesmo segmento" }],
+      carteira: [FI_FUNDO],
+      fatos: [FI_FUNDO, { rotulo: "Foco", opcoes: ["Geral", "Teses a favor", "Riscos", "Alvos das casas"], padrao: "Geral", opcional: true }, { rotulo: "Minha tese ou dúvida", longo: true, opcional: true, dica: "Ex.: quero saber se o rendimento se sustenta" }],
+      msg: [FI_FUNDO, FI_CLIENTE, DIZER],
+    },
+  });
+
   let ajustes = { tarefas: {}, skills: {}, modelosMantidos: {} }, regrasGuardadas = {};
   const BASE_PERGUNTAS = {};
   const regrasLimpas = (x) => lista(x, 12, 200);
@@ -2004,7 +2581,7 @@
   const MUDOU_NA_VERSAO = { nome: "o nome da tarefa", obj: "o objetivo", itens: "a lista do que receber", opcao: "uma opção de resposta" };
   const oQueMudou = (tipos) => { const l = tipos.map((x) => MUDOU_NA_VERSAO[x]); return l.length > 1 ? `${l.slice(0, -1).join(", ")} e ${l[l.length - 1]}` : l[0] ?? ""; };
   const assinatura = (s) => { let h = 5381; for (const c of String(s)) h = (Math.imul(h, 33) ^ c.codePointAt(0)) >>> 0; return String(s).length.toString(36) + "-" + h.toString(36); };
-  const formatoDe = (id) => assinatura(JSON.stringify([camposDe(id).map((f) => [f.rotulo, f.opcoes ?? []]),
+  const formatoDe = (id) => assinatura(JSON.stringify([camposDe(id, true).map((f) => [f.rotulo, f.opcoes ?? []]),
     (BASE_PERGUNTAS[id] ?? T[id]?.perguntas ?? [RESULTADO]).map((p) => [p.id, (p.opcoes || []).map((o) => o.t)])]));
   const CAMPOS_MUDARAM_DESDE_113 = ["calendario", "carteira", "estudo", "macro", "fato", "grafico", "rf", "pauta"];
   const REGRAS_PESSOAIS_RE = /Minhas regras pessoais \(valem[^\n]*\n(?:- [^\n]*(?:\n|$))*/;
@@ -2227,6 +2804,8 @@
     } finally { escolhendoVideo = false; }
   }
   function ir(tela, extra = {}) {
+    if ((tela === "guia" || tela === "fim") && extra.tarefa && extra.tarefa !== estado.tarefa && window.__mesaAnexos) window.__mesaAnexos.limpar();
+    if ((tela === "guia" || tela === "fim" || tela === "inicio" || tela === "lista") && window.__mesaZerarAndamento && (tela === "inicio" || tela === "lista" || (extra.tarefa && extra.tarefa !== estado.tarefa))) window.__mesaZerarAndamento();
     if (tela === "guia") { const tid = extra.tarefa || estado.tarefa; if (tid && T[tid] && perguntasDe(T[tid]).length === 0) tela = "fim"; }
     if (tela === "guia" && extra.tarefa === "editar-reels" && !videoEscolhido) { escolherVideoPrimeiro(tela, extra); return; }
     if (tela === "inicio" || tela === "lista") videoEscolhido = "";
@@ -2250,6 +2829,19 @@
     tela.append(v);
     const chaveTela = `${estado.tela}|${estado.tarefa}|${estado.passo}`;
     if (chaveTela !== ultimaChaveTela) { tela.scrollTop = 0; ultimaChaveTela = chaveTela; }
+  }
+
+
+  let cerebroDispensado = false;
+  function avisoSegundoCerebro() {
+    const e = captamais?.estado ?? "sem_chave";
+    if (cerebroDispensado || !conectado || estado.tarefa === "editar-reels" || !["sem_chave", "chave_recusada"].includes(e)) return null;
+    const caixa = el("div", "dica"); caixa.style.cssText = "visibility:visible;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px";
+    caixa.append(el("span", "", "Não temos as informações do segundo cérebro da sua assessoria. Quer conectar o CaptaMais para ter mais dados e um pedido mais completo?"));
+    const sim = el("button", "mini", "Sim, conectar"); sim.onclick = () => abrirEntrar();
+    const nao = el("button", "mini", "Agora não"); nao.onclick = () => { cerebroDispensado = true; caixa.remove(); };
+    caixa.append(sim, nao);
+    return caixa;
   }
 
   function faixaCaptaMais() {
@@ -2562,6 +3154,7 @@
     const vidro = el("section", "vidro fim");
     vidro.append(el("div", "prog", `<span>Pronto</span><div class="trilha-prog"><i style="width:100%"></i></div>`));
     const meio = el("div", "meio"); vidro.append(meio);
+    { const av = avisoSegundoCerebro(); if (av) meio.append(av); }
     meio.append(el("div", "q", `<h2>Tudo certo para <em style="font-style:normal;color:var(--gold2)">${esc(t.acao.toLowerCase())}</em>.</h2><p class="ajuda">Preencha o que souber: o pedido se monta sozinho. O que faltar, o Claude pergunta.</p>`));
     const pr = promptAtual(t, ps);
     const area = el("textarea", "prompt"); area.value = pr.texto; area.spellcheck = false; area.setAttribute("aria-label", "Pedido ao Claude");
@@ -2582,7 +3175,7 @@
       const grade = el("div", "campos");
       defs.forEach((f, i) => {
         const caixa = el("div", "campo" + (f.longo ? " larga" : ""));
-        const rot = el("label"); rot.htmlFor = "cp" + i; rot.append(document.createTextNode(f.rotulo));
+        const rot = el("label"); rot.htmlFor = "cp" + i; rot.append(document.createTextNode(f.opcional ? f.rotulo.replace(/\s*\(opcional\)\s*$/i, "") : f.rotulo));
         if (f.opcional) rot.append(el("i", "", " (opcional)"));
         const inp = f.longo ? el("textarea") : el("input"); inp.id = "cp" + i; if (f.longo) inp.rows = 3; inp.placeholder = f.dica || ""; inp.value = valorBruto(estado.tarefa, i);
         caixa.append(rot, inp);
@@ -2598,6 +3191,7 @@
       });
       meio.append(grade);
     }
+    { const zd = zonaDocumentos(); if (zd) meio.append(zd); }
     area.oninput = () => { pr.texto = area.value; pr.editado = true; aviso.hidden = false; refazer.hidden = false; agendarRascunho(); };
     refazer.onclick = () => { pr.editado = false; aviso.hidden = true; refazer.hidden = true; sincronizar(); };
     const det = el("details", "detalhes-pedido"); det.open = !!(pr.editado || pr.modelo);
@@ -2686,7 +3280,7 @@
     voltar.onclick = () => (ps.length ? ir("guia", { passo: ps.length - 1 }) : ir("lista"));
     const enviar = el("button", "seguir", `${esc(t.acao)} <span>→</span>`);
     enviar.onclick = () => enviarPedido(t, ps);
-    rod.append(voltar, el("span", "dica", ""), enviar);
+    rod.append(voltar, el("span", "dica", "Ao enviar, começa uma conversa nova; a anterior vai para o Histórico."), enviar);
     vidro.append(rod, el("div", "estado", ""));
     guia.append(vidro, dossie(t, ps, true));
     v.append(guia);
@@ -2725,9 +3319,26 @@
     if (a?.entrega && (a.entrega.texto || a.entrega.arquivoNome || a.entrega.arquivoErro)) {
       const e = a.entrega, cart = el("div", "cartao");
       cart.append(el("h3", "", esc(e.titulo || "Entrega pronta")));
+      const g = e.guardada, arqs = (g && g.arquivos) || [];
       const ac = el("div", "linha-acoes"), stE = el("div", "estado", "");
-      if (e.arquivoNome) {
-        const b = el("button", "mini ouro", `Baixar ${esc(e.arquivoNome.split(".").pop().toUpperCase())}${e.arquivoKb ? ` · ${e.arquivoKb} KB` : ""}`);
+      if (emJanela && g && typeof app.abrirArquivo === "function") {
+        const ROT = { pdf: "PDF", pptx: "PowerPoint", md: "Texto" };
+        const lista = el("div", "arquivos"); lista.style.cssText = "display:flex;flex-direction:column;gap:8px;margin:10px 0 12px";
+        [...arqs, { nome: g.nome, tipo: "md" }].forEach((x) => {
+          const linha = el("div"); linha.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--line2);border-radius:12px";
+          const tam = x.kb ? " <small style=\"color:var(--mute)\">· " + (x.kb >= 1024 ? (x.kb / 1024).toFixed(1).replace(".", ",") + " MB" : x.kb + " KB") + "</small>" : "";
+          linha.append(el("span", "", "<b>" + esc(ROT[x.tipo] || x.tipo) + "</b>" + tam));
+          const ab = el("button", "mini" + (x.tipo === "pdf" ? " ouro" : ""), "Abrir");
+          ab.onclick = async () => { try { await app.abrirArquivo(g.cliente, x.nome); stE.className = "estado ok"; stE.textContent = "Abri o arquivo no seu computador."; } catch { stE.className = "estado erro"; stE.textContent = "Não consegui abrir o arquivo."; } };
+          linha.append(ab); lista.append(linha);
+        });
+        cart.append(lista);
+        const pasta = el("button", "mini", "Abrir a pasta");
+        pasta.onclick = async () => { try { await app.abrirPastaCliente(g.cliente, (arqs[0] || { nome: g.nome }).nome); stE.className = "estado ok"; stE.textContent = "Abri a pasta no seu computador."; } catch { stE.className = "estado erro"; stE.textContent = "Não consegui abrir a pasta."; } };
+        ac.append(pasta);
+        const onde = el("p", "ajuda"); onde.textContent = "Guardado em Documentos › Mesa do Assessor › Entregas › " + g.cliente; cart.append(onde);
+      } else if (e.arquivoNome) {
+        const b = el("button", "mini ouro", "Baixar " + esc(e.arquivoNome.split(".").pop().toUpperCase()) + (e.arquivoKb ? " · " + e.arquivoKb + " KB" : ""));
         b.onclick = () => baixarEntrega(stE); ac.append(b);
         if (typeof app.abrirPasta === "function") {
           const p = el("button", "mini", "Abrir a pasta");
@@ -2737,7 +3348,6 @@
       }
       if (e.texto) {
         const c = el("button", "mini", "Copiar texto"); c.onclick = () => botaoCopiar(c, window.__mesaMd.plano(e.texto), null, null); ac.append(c);
-        const w = el("button", "mini", "Copiar para WhatsApp"); w.onclick = () => botaoCopiar(w, window.__mesaMd.whatsapp(e.texto), null, null); ac.append(w);
         if (!emJanela) { const corpoTxt = el("div", "md texto-md"); corpoTxt.append(window.__mesaMd.html(e.texto)); cart.append(corpoTxt); }
       }
       cart.append(ac, stE);
@@ -2786,11 +3396,13 @@
   let andamento = null, vigia = null, enviadoEm = 0;
   window.__mesaConcluido = () => !!andamento?.concluido;
   window.__mesaEntrega = () => andamento?.entrega || null;
+  window.__mesaZerarAndamento = () => { andamento = null; };
   window.addEventListener("mesa-status", () => { if (estado.tela === "acompanhar") render(); });
   async function lerAndamento() {
     try {
       const r = await app.callServerTool({ name: "mesa_ler_andamento", arguments: {} });
       const novo = r?.structuredContent?.andamento ?? null;
+      if (novo && novo.em && novo.em < enviadoEm - 2000) return;
       if (JSON.stringify(novo) !== JSON.stringify(andamento) && estado.tela === "acompanhar") {
         const entregaMudou = JSON.stringify(novo?.entrega ?? null) !== JSON.stringify(andamento?.entrega ?? null);
         andamento = novo; render();
@@ -2861,6 +3473,57 @@
     "Você tem acesso ao ffmpeg, Python e Node neste computador. Se algo faltar (chave da transcrição, por exemplo), me explique em uma frase simples o que preciso fazer.",
   ].join("\n");
 
+  const COM_CLIENTE = new Set(["cliente-novo", "primeira-reuniao", "segunda-reuniao", "pre-reuniao", "pos-reuniao", "carteira", "comparador", "diagnostico", "relatorio-mensal", "proposta", "followup", "relacionamento", "sucessorio", "objecoes", "retomada", "ligacao", "sequencia", "abordagem"]);
+  function aprenderPerfil(t) {
+    if (!perfil || !conectado) return;
+    const novos = {};
+    camposDe(t.id).forEach((c, i) => {
+      if (!c.perfilCampo) return;
+      const v = String(valorBruto(t.id, i) ?? "").replace(/\s+/g, " ").trim().slice(0, c.max || 200);
+      if (v && v !== String(perfil[c.perfilCampo] ?? "").trim()) novos[c.perfilCampo] = v;
+    });
+    if (!Object.keys(novos).length) return;
+    Object.assign(perfil, novos);
+    app.callServerTool({ name: "mesa_perfil", arguments: { salvar: novos } }).catch(() => {});
+  }
+  const COM_DOCUMENTOS = new Set(["cliente-novo", "segunda-reuniao", "pre-reuniao", "pos-reuniao", "carteira", "comparador", "diagnostico", "relatorio-mensal", "raio-x", "rf", "proposta"]);
+  function dicaDocumentos() {
+    if (estado.tarefa === "cliente-novo") {
+      const p = cnPonto();
+      if (p === "relatorio") return "Suba o extrato, o relatório de performance dos ativos e a transcrição da primeira reunião. O Claude monta o resumo e uma tabela da carteira atual (ativo, classe, valor e rentabilidade), que fica guardada para comparar com a carteira proposta na segunda reunião.";
+      if (p === "pos") return "Suba a transcrição ou o resumo da reunião. O Claude escreve a mensagem de pós-reunião a partir dele.";
+      return null;
+    }
+    if (estado.tarefa === "segunda-reuniao") return "Suba a carteira proposta (planilha ou PDF) e a transcrição da primeira reunião, se tiver. Se a carteira atual do cliente já foi montada antes, o Claude usa a que está no histórico dele.";
+    return "Suba os documentos que o Claude deve ler: extrato, relatório de performance, transcrição ou planilha.";
+  }
+  function zonaDocumentos() {
+    if (!COM_DOCUMENTOS.has(estado.tarefa) || !window.__mesaAnexos) return null;
+    const dica = dicaDocumentos(); if (!dica) return null;
+    const z = el("div", "zona-docs"); z.style.cssText = "margin:14px 0 4px;padding:14px 16px;border:1px dashed var(--line2);border-radius:14px;display:flex;flex-direction:column;gap:8px";
+    z.append(el("div", "", '<b>Documentos</b> <span style="color:var(--mute)">(opcional)</span>'));
+    const p = el("div", "ajuda"); p.textContent = dica; z.append(p);
+    const lista = el("div"); lista.style.cssText = "display:flex;flex-wrap:wrap;gap:6px";
+    const b = el("button", "mini", "Anexar arquivos"); b.type = "button"; b.style.alignSelf = "flex-start"; b.onclick = () => window.__mesaAnexos.anexar();
+    const fmt = el("div", "ajuda"); fmt.textContent = "PDF, Excel, Word, texto (TXT, CSV) ou imagem. Até 6 arquivos. Também dá para arrastar para cá. Eles vão junto com o pedido.";
+    const pintar = () => {
+      lista.textContent = "";
+      window.__mesaAnexos.lista().forEach((a, i) => {
+        const c = el("span"); c.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line2);border-radius:999px;font-size:13px";
+        c.append(document.createTextNode(a.original + (a.estado === "enviando" ? " (enviando…)" : "")));
+        const x = el("button", "mini", "×"); x.type = "button"; x.title = "Tirar este arquivo"; x.style.cssText = "padding:0 6px"; x.onclick = () => window.__mesaAnexos.remover(i);
+        c.append(x); lista.append(c);
+      });
+    };
+    z.append(b, lista, fmt); pintar();
+    const ouvir = () => { if (!z.isConnected) { window.removeEventListener("mesa-anexos", ouvir); return; } pintar(); };
+    window.addEventListener("mesa-anexos", ouvir);
+    const tem = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+    z.addEventListener("dragover", (e) => { if (tem(e)) { e.preventDefault(); z.style.borderColor = "var(--gold)"; } });
+    z.addEventListener("dragleave", () => { z.style.borderColor = ""; });
+    z.addEventListener("drop", (e) => { if (!tem(e)) return; e.preventDefault(); e.stopPropagation(); z.style.borderColor = ""; window.__mesaAnexos.subir(e.dataTransfer.files); });
+    return z;
+  }
   function montarPedido(t, ps) {
     const a = AREAS.find((x) => x.id === estado.area);
     const c = PEDIDO[estado.tarefa] ?? {};
@@ -2877,6 +3540,7 @@
       ...linhasVoz(),
       `CaptaMais: ${captamais?.estado === "conectado" && captamais.ativos ? "conectado, Análise de Ativo liberada" : captamais?.estado === "conectado" ? "conectado, mas a Análise de Ativo não está disponível agora" : "não conectado (peça os dados ao assessor)"}`,
       ...(c.obj ? ["", `Objetivo: ${c.obj}`] : []),
+      ...(COM_CLIENTE.has(estado.tarefa) ? ["", "Histórico do cliente: se eu informei o cliente (apelido), chame mesa_historico_cliente antes de começar, use o que já foi entregue a ele (resuma, não copie, e cite a data) e não me peça de novo o que já consta; use o mesmo apelido que já existe. Sem histórico, siga normalmente."] : []),
       ...(c.fonte ? ["", `Fonte dos dados: ${c.fonte}`] : []),
       ...(ps.length ? ["", "Minhas escolhas:", ...ps.map((p) => `- ${p.curto}: ${respostaTexto(p)}`)] : []),
       ...(entrega.length ? ["", "O que preciso receber:", ...entrega.map((x) => `- ${x}`)] : []),
@@ -2941,6 +3605,66 @@
     btnBusca.style.top = btnHist.style.top; btnBusca.style.right = (dir + w + 8) + "px";
   }
   setInterval(posBusca, 400); window.addEventListener("resize", posBusca);
+
+  const btnCli = el("button", "fantasma"); btnCli.id = "btnCli"; btnCli.textContent = "Clientes"; btnCli.hidden = true;
+  btnCli.style.cssText = "position:fixed;z-index:40;font-size:13px;padding:6px 14px";
+  document.body.append(btnCli);
+  function posCli() {
+    const ok = !!window.__mesaHistorico && estado.tela === "inicio" && !btnBusca.hidden;
+    btnCli.hidden = !ok; if (!ok) { document.getElementById("modalCli")?.remove(); return; }
+    const dir = parseFloat(btnBusca.style.right) || 8, w = btnBusca.getBoundingClientRect().width || 120;
+    btnCli.style.top = btnBusca.style.top; btnCli.style.right = (dir + w + 8) + "px";
+  }
+  setInterval(posCli, 400); window.addEventListener("resize", posCli);
+  document.addEventListener("click", (ev) => { const m = document.getElementById("modalCli"); if (m && !m.contains(ev.target) && ev.target !== btnCli) m.remove(); });
+  const quandoEntrega = (nomeArq, ms) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2})(\d{2}) - /.exec(nomeArq);
+    const data = m ? m[3] + "/" + m[2] + "/" + m[1] + " " + m[4] + ":" + m[5] : new Date(ms).toLocaleString("pt-BR");
+    return { data, titulo: nomeArq.replace(/^\d{4}-\d{2}-\d{2} \d{4} - /, "").replace(/\.md$/i, "") };
+  };
+  async function abrirClientes() {
+    const antigo = document.getElementById("modalCli"); if (antigo) { antigo.remove(); return; }
+    const m = el("div"); m.id = "modalCli";
+    m.style.cssText = "position:fixed;right:" + btnCli.style.right + ";top:" + (btnCli.getBoundingClientRect().bottom + 10) + "px;z-index:60;width:min(460px,92vw);max-height:70vh;overflow:auto;padding:16px;border-radius:18px;background:rgba(14,14,17,.97);border:1px solid var(--line2);color:var(--ink);box-shadow:0 18px 50px rgba(0,0,0,.5);font-size:14px";
+    document.body.append(m);
+    const voltar = (txt, fn) => { const b = el("button", "fantasma", txt); b.style.cssText = "font-size:13px;padding:4px 10px;margin-bottom:10px"; b.onclick = fn; return b; };
+    const lista = async () => {
+      m.innerHTML = '<div style="font-weight:600">Clientes e o que você já fez com eles</div><div style="color:var(--mute);font-size:13px;margin-top:2px">Ficam guardados no seu computador, em Documentos › Mesa do Assessor › Entregas.</div>';
+      let cs = []; try { cs = await window.__mesaHistorico.clientes(); } catch { m.append(el("p", "", "Não consegui ler agora.")); return; }
+      if (!cs.length) { m.append(el("p", "", "Ainda não há entregas guardadas. Elas aparecem aqui quando uma rotina com cliente termina.")); return; }
+      cs.forEach((c) => {
+        const b = el("button", "fantasma"); b.style.cssText = "display:block;width:100%;text-align:left;margin-top:8px;padding:10px 12px;height:auto";
+        b.innerHTML = "<b>" + esc(c.nome) + "</b> <small style=\"color:var(--mute)\">· " + c.entregas + (c.entregas === 1 ? " entrega" : " entregas") + " · última em " + esc(new Date(c.ultima).toLocaleDateString("pt-BR")) + "</small>";
+        b.onclick = () => entregas(c.nome);
+        m.append(b);
+      });
+    };
+    const entregas = async (nome) => {
+      m.innerHTML = ""; m.append(voltar("‹ Clientes", lista), el("div", "", '<div style="font-weight:600">' + esc(nome) + "</div>"));
+      let es = []; try { es = await window.__mesaHistorico.entregasDe(nome); } catch { m.append(el("p", "", "Não consegui ler agora.")); return; }
+      es.forEach((e) => {
+        const q = quandoEntrega(e.arquivo, e.em);
+        const b = el("button", "fantasma"); b.style.cssText = "display:block;width:100%;text-align:left;margin-top:8px;padding:10px 12px;height:auto";
+        b.innerHTML = "<b>" + esc(q.titulo) + "</b><div style=\"color:var(--mute);font-size:13px\">" + esc(q.data) + "</div>";
+        b.onclick = () => ler(nome, e.arquivo);
+        m.append(b);
+      });
+      const ap = el("button", "fantasma", "Abrir a pasta no computador"); ap.style.cssText = "margin-top:12px;width:100%";
+      ap.onclick = () => window.__mesaHistorico.abrirPasta(nome).catch(() => {});
+      m.append(ap);
+    };
+    const ler = async (nome, arquivo) => {
+      m.innerHTML = ""; m.append(voltar("‹ " + nome, () => entregas(nome)));
+      let texto = ""; try { texto = await window.__mesaHistorico.lerEntrega(nome, arquivo); } catch { m.append(el("p", "", "Não consegui abrir agora.")); return; }
+      const pre = el("div"); pre.style.cssText = "white-space:pre-wrap;line-height:1.5;font-size:13.5px;max-height:48vh;overflow:auto"; pre.textContent = texto;
+      const cp = el("button", "fantasma", "Copiar texto"); cp.style.cssText = "margin-top:10px;width:100%";
+      cp.onclick = async () => { try { await navigator.clipboard.writeText(texto); cp.textContent = "Copiado"; } catch { cp.textContent = "Não deu para copiar"; } };
+      m.append(pre, cp);
+    };
+    lista();
+  }
+  btnCli.onclick = (ev) => { ev.stopPropagation(); abrirClientes(); };
+
   function abrirBusca() {
     if (document.getElementById("modalBusca")) { document.getElementById("modalBusca").remove(); return; }
     const todas = Object.keys(T).map((id) => ({ id, nome: T[id].nome, linha: T[id].linha || "", area: AREAS.find((a) => a.grupos.some((g) => g.tarefas.includes(id))) })).filter((t) => t.area);
@@ -3447,6 +4171,8 @@
       texto = inteiro.slice(0, cabe) + linha;
     }
     enviando = true; st.className = "estado"; st.textContent = "Enviando…";
+    try { aprenderPerfil(t); } catch {}
+    try { if (typeof window.__mesaNovaDemanda === "function") await window.__mesaNovaDemanda(); } catch {}
     try {
       app.callServerTool({ name: "mesa_registrar", arguments: (tarefasUsuario.some((x) => x.id === t.id) ? { evento: "tarefa_enviada", tarefa: "Tarefa própria", area: AREAS.find((x) => x.id === estado.area)?.nome, respostas: [] } : { evento: "tarefa_enviada", tarefa: t.nome, area: AREAS.find((x) => x.id === estado.area)?.nome, respostas: ps.flatMap((p) => estado.respostas[p.id] ?? []).slice(0, 8) }) }).catch(() => {});
       await app.callServerTool({ name: "mesa_andamento", arguments: { agora: "" } }).catch(() => {});
@@ -3569,6 +4295,52 @@
     document.body.append(fundo); mail.focus();
   }
   function entrarComCaptaMais() { return typeof app?.entrarComSenha === "function" ? abrirEntrar() : entrarNoNavegador(); }
+  const LINKS_IMAGEM = { gemini: "https://aistudio.google.com/apikey", openai: "https://platform.openai.com/api-keys" };
+  const NOMES_IMAGEM = { gemini: "Gemini (Google)", openai: "OpenAI" };
+  async function abrirChaveImagem(manual) {
+    if (document.getElementById("chaveImagem")) return;
+    let cfg = {}; try { cfg = (await app.chaveImagem("status")) || {}; } catch {   }
+    if (document.getElementById("chaveImagem")) return;
+    const fundo = el("div"); fundo.id = "chaveImagem"; fundo.tabIndex = -1;
+    fundo.style.cssText = "position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:20px;outline:none";
+    const cx = el("form"); cx.noValidate = true; cx.setAttribute("role", "dialog"); cx.setAttribute("aria-modal", "true"); cx.setAttribute("aria-labelledby", "chaveImagemTitulo");
+    cx.style.cssText = "max-width:430px;width:100%;background:#17181b;border:1px solid rgba(232,200,142,.45);border-radius:18px;padding:26px;box-shadow:0 30px 70px rgba(0,0,0,.7)";
+    const jaTem = cfg.configurada ? '<p style="margin:10px 0 0;font-size:14px;color:var(--gold2)">Já existe uma chave do ' + esc(cfg.provedor || "serviço") + ' neste computador. Cole outra para trocar.</p>' : "";
+    cx.innerHTML = '<h2 id="chaveImagemTitulo" style="font-size:20px;line-height:1.25;margin:0">Imagens por IA na sua apresentação</h2>'
+      + '<p style="color:var(--mute);margin:8px 0 0;font-size:15px;line-height:1.45">Para criar imagens originais, a Mesa usa um serviço de imagens com a sua chave. Escolha o serviço e cole a chave abaixo.</p>' + jaTem;
+    let prov = (cfg.provedor && /openai/i.test(cfg.provedor)) ? "openai" : "gemini";
+    const linha = el("div"); linha.style.cssText = "display:flex;gap:8px;margin-top:16px";
+    const bs = {};
+    const estiloBt = (ativo) => "flex:1;justify-content:center;text-align:center;padding:10px 8px;border-radius:11px;font:inherit;font-size:15px;cursor:pointer;color:var(--ink);background:" + (ativo ? "rgba(232,200,142,.16)" : "rgba(255,255,255,.04)") + ";border:1px solid " + (ativo ? "rgba(232,200,142,.7)" : "var(--line2)");
+    const ajuda = el("button", "fantasma"); ajuda.type = "button"; ajuda.style.cssText = "margin-top:10px;width:100%;justify-content:center;text-align:center";
+    const marcar = () => { for (const k of Object.keys(bs)) { bs[k].style.cssText = estiloBt(k === prov); bs[k].setAttribute("aria-pressed", String(k === prov)); } ajuda.textContent = "Como pegar a chave do " + NOMES_IMAGEM[prov]; };
+    const chave = el("input"); chave.type = "password"; chave.name = "chave"; chave.autocomplete = "off"; chave.spellcheck = false; chave.placeholder = "Cole aqui a chave"; chave.setAttribute("aria-label", "Chave do serviço de imagens");
+    chave.style.cssText = "width:100%;padding:11px 13px;margin-top:12px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--line2);color:var(--ink);font:inherit;font-size:15px";
+    for (const k of ["gemini", "openai"]) { const b = el("button", "", NOMES_IMAGEM[k]); b.type = "button"; b.onclick = () => { prov = k; marcar(); chave.focus(); }; bs[k] = b; linha.append(b); }
+    ajuda.onclick = () => abrirLink(LINKS_IMAGEM[prov]);
+    const msg = el("div"); msg.setAttribute("role", "alert"); msg.style.cssText = "min-height:20px;margin-top:10px;font-size:13px;line-height:1.4;color:#ff9d7a";
+    const salvar = botaoGrande(manual ? "Salvar chave" : "Salvar e criar as imagens", () => {}); salvar.type = "submit"; salvar.style.marginTop = "6px";
+    const fecharBt = el("button", "fantasma", manual ? "Fechar" : "Agora não"); fecharBt.type = "button"; fecharBt.style.cssText = "margin-top:10px;width:100%;justify-content:center;text-align:center";
+    const nota = el("p", "dica", "Cada imagem custa poucos centavos, cobrados na sua conta do serviço. A chave fica guardada protegida só neste computador, e nunca vai para a conversa."); nota.style.cssText = "visibility:visible;text-align:center;margin:12px 0 0;font-size:12px";
+    cx.append(linha, ajuda, chave, msg, salvar, fecharBt);
+    if (manual && cfg.configurada) { const rem = el("button", "fantasma", "Remover a chave salva"); rem.type = "button"; rem.style.cssText = "margin-top:8px;width:100%;justify-content:center;text-align:center"; rem.onclick = async () => { try { await app.chaveImagem("remover"); } catch {   } fundo.remove(); }; cx.append(rem); }
+    cx.append(nota); fundo.append(cx); marcar();
+    const fechar = async () => { if (!manual) { try { await app.chaveImagem("dispensar"); } catch {   } } fundo.remove(); };
+    fecharBt.onclick = fechar;
+    let ocupado = false;
+    cx.onsubmit = async (ev) => {
+      ev.preventDefault(); if (ocupado) return;
+      if (!chave.value.trim()) { msg.style.color = "#ff9d7a"; msg.textContent = "Cole a chave para continuar."; return; }
+      ocupado = true; salvar.disabled = true; msg.style.color = "var(--mute)"; msg.textContent = "Conferindo a chave…";
+      let r; try { r = await app.chaveImagem("guardar", { provedor: prov, chave: chave.value.trim() }); } catch { r = { status: "erro", mensagem: "Não consegui guardar a chave agora. Tente de novo." }; }
+      chave.value = ""; ocupado = false; salvar.disabled = false;
+      if (r && r.status === "guardada") { msg.style.color = "#8fd9a8"; msg.textContent = manual ? "Chave salva." : "Chave salva. Já estou criando as imagens."; setTimeout(() => fundo.remove(), 1300); return; }
+      msg.style.color = "#ff9d7a"; msg.textContent = (r && r.mensagem) || "Não consegui guardar a chave agora.";
+    };
+    fundo.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); fechar(); } });
+    document.body.append(fundo); chave.focus();
+  }
+  window.__mesaPedirChaveImagem = () => abrirChaveImagem(false);
   function menuConta() {
     const e = captamais?.estado; const m = painelConta("");
     if (e === "conectado") {
@@ -3577,6 +4349,8 @@
       const sair = el("button", "fantasma", "Desligar neste computador"); sair.style.cssText = "margin-top:8px;width:100%";
       sair.onclick = async () => { try { await app.callServerTool({ name: "mesa_conectar", arguments: { acao: "sair" } }); } catch {} fecharLogin(); recarregarConta(); };
       m.append(sair);
+      const imgIA = el("button", "fantasma", "Imagens por IA (chave)"); imgIA.style.cssText = "margin-top:8px;width:100%"; imgIA.onclick = () => { m.remove(); abrirChaveImagem(true); };
+      m.append(imgIA);
     } else entrarComCaptaMais();
   }
   $("#conta").onclick = () => { const aberto = document.getElementById("modalConta"); if (aberto) { aberto.remove(); return; } menuConta(); };
@@ -3625,7 +4399,7 @@
         captamais = r?.structuredContent?.captamais ?? null;
         carregarTarefasUsuario(perfil?.tarefas);
         carregarAjustes(perfil?.ajustes);
-        if (estado.tela === "inicio" && perfil?.rascunho) restaurarRascunho(true);
+        if (perfil?.rascunho) { perfil.rascunho = null; app.callServerTool({ name: "mesa_perfil", arguments: { rascunho: null } }).catch(() => {}); }
         atualizarConta();
         if (estado.tela === "inicio") render();
         avisoDados();

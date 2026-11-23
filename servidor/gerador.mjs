@@ -395,6 +395,42 @@ export function revisarDocumento(a, termosConfirmados = a?.termosConfirmados) {
   return achados;
 }
 
+const PEND_RE = /(?:\s+(?:até|em|para|no|na|às|ao))?\s*\[CONFERIR[^\]]*\]/gi;
+const SO_PEND_RE = /^\s*\[CONFERIR[^\]]*\]\s*[.;:]?\s*$/i;
+const motivoPend = (t) => ((/\[CONFERIR:?\s*([^\]]*)\]/i.exec(String(t)) || [])[1] || 'dado a confirmar').trim();
+const GENERICO_RE = /^(gen[eé]rica|sem cliente|cliente|prospect|lead)$/i;
+function limparPendencias(slides, a) {
+  const faltas = [];
+  const texto = (t, onde) => {
+    if (typeof t !== 'string' || !/\[CONFERIR/i.test(t)) return t;
+    faltas.push(onde + ': ' + motivoPend(t));
+    return t.replace(PEND_RE, '').replace(/\s{2,}/g, ' ').replace(/\s+([.,;:])/g, '$1').trim();
+  };
+  const vazio = (x) => typeof x !== 'string' || !x.trim();
+  slides.forEach((s, i) => {
+    const onde = 'página ' + (i + 1);
+    for (const k of ['titulo', 'subtitulo', 'texto', 'ponte', 'fonte', 'etiqueta']) if (typeof s[k] === 'string') s[k] = texto(s[k], onde);
+    if (Array.isArray(s.itens)) {
+      s.itens = s.itens.filter((it) => {
+        const campos = [it.texto, it.valor, it.valor2].filter((x) => !vazio(x));
+        if (campos.length && campos.every((x) => SO_PEND_RE.test(x))) { faltas.push(onde + ': ' + (it.titulo || it.rotulo || 'item') + ' (' + motivoPend(campos[0]) + ')'); return false; }
+        return true;
+      });
+      for (const it of s.itens) for (const k of ['titulo', 'rotulo', 'texto', 'valor', 'valor2', 'fonte']) if (typeof it[k] === 'string') it[k] = texto(it[k], onde);
+    }
+    for (const k of ['passos', 'contato']) {
+      if (!Array.isArray(s[k])) continue;
+      s[k] = s[k].map((x) => (typeof x === 'string' ? texto(x, onde) : x)).filter((x) => typeof x !== 'string' || (x.trim() && !/^\d+\.\s*$/.test(x.trim())));
+    }
+  });
+  if (a) {
+    if (typeof a.rodape === 'string') a.rodape = texto(a.rodape, 'rodapé');
+    if (typeof a.subtitulo === 'string') a.subtitulo = texto(a.subtitulo, 'subtítulo');
+    if (typeof a.cliente === 'string' && GENERICO_RE.test(a.cliente.trim())) a.cliente = '';
+  }
+  return [...new Set(faltas)];
+}
+
 export async function gerarApresentacao(a, marcaBase = {}) {
   const slides = Array.isArray(a.slides) ? a.slides.slice(0, 18) : [];
   if (!slides.length) throw new Error('Envie pelo menos um slide.');
@@ -402,6 +438,7 @@ export async function gerarApresentacao(a, marcaBase = {}) {
   if (graficos.length) throw new Error('o PDF não foi gerado porque um gráfico está com número faltando ou que não é número: ' + graficos.join(' | ') + '. Corrija os valores e chame de novo.');
   const risco = revisarApresentacao(slides, a.termosConfirmados || [], a.tipo, { titulo: a.titulo, rodape: a.rodape, cliente: a.cliente });
   if (risco.length) throw new Error(mensagemDaTrava(risco));
+  const faltas = limparPendencias(slides, a);
   const avisos = [];
   const marca = {
     ...marcaBase,
@@ -427,8 +464,8 @@ export async function gerarApresentacao(a, marcaBase = {}) {
       imagens.push(saida);
     }
   }
-  const pendencias = (JSON.stringify(slides).match(/\[CONFERIR/g) || []).length;
-  if (pendencias) avisos.push(`${pendencias} trecho(s) marcados com [CONFERIR] aparecem destacados nas páginas: o assessor precisa validar ou preencher antes de usar.`);
+  const pendencias = faltas.length;
+  if (faltas.length) avisos.push('Ficaram de fora das páginas, por falta de dado. Diga ao assessor, em uma linha cada, e gere de novo se ele informar: ' + faltas.join(' | '));
   let pptx = '';
   if (a.pptx !== false) {
     try {
@@ -437,7 +474,7 @@ export async function gerarApresentacao(a, marcaBase = {}) {
       pptx = p.pptx; avisos.push(...p.avisos);
     } catch { avisos.push('O PowerPoint editável não foi gerado nesta vez; o PDF está pronto.'); }
   }
-  const r = { tipo: 'apresentacao', titulo: a.titulo, pasta, imagens, pdf, pptx, avisos, pendencias, minhasImagens: marca.pastaImagens, em: Date.now() };
+  const r = { tipo: 'apresentacao', titulo: a.titulo, pasta, imagens, pdf, pptx, avisos, pendencias, faltas, minhasImagens: marca.pastaImagens, em: Date.now() };
   writeFileSync(ARQUIVO_GERACAO, JSON.stringify({ ...r, avisos: undefined }));
   return r;
 }

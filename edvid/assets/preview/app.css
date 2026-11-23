@@ -61,7 +61,8 @@ header {
   flex: 0 0 auto;
 }
 
-.logo-chip { display: flex; align-items: center; }
+.logo-chip { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.logo-chip .logo-capta { display: block; width: 34px; height: 34px; border-radius: 9px; }
 .logo-chip .logo-txt { font-weight: 800; font-size: 17px; letter-spacing: .02em; color: #fff; white-space: nowrap; }
 
 .head-info { min-width: 0; }

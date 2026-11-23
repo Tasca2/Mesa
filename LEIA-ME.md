@@ -76,7 +76,7 @@ Ao conectar, a Mesa avisa o CaptaMais **quais tarefas você usou** (só os nomes
 
 - No post para Instagram, a Mesa gera as **imagens do carrossel** em PNG (com a sua identificação e o aviso de conteúdo educativo no rodapé) e um PDF com todos os slides.
 - Qualquer tarefa com resultado em PDF sai como arquivo pronto.
-- **Anexar arquivo:** o clipe da conversa, em qualquer tarefa, aceita PDF e imagem (até 6 por pedido). O Claude lê só as pastas **Anexos** e **Fontes** da Mesa, sem terminal e sem acesso ao seu perfil. Na edição de vídeo não há anexo.
+- **Anexar arquivo:** o clipe da conversa, em qualquer tarefa, aceita PDF, imagem, Word, Excel, texto, CSV e legenda (até 6 por pedido): por exemplo a transcrição de uma reunião ou o relatório de performance de um cliente. Word e Excel são lidos como texto, com as tabelas. O Claude lê só as pastas **Anexos** e **Fontes** da Mesa, sem terminal e sem acesso ao seu perfil. Na edição de vídeo não há anexo.
 - **PDF em mais tarefas:** comparador de carteira, revisão de carteira (duas roscas, política × atual), proposta de assessoria e diagnóstico financeiro, além das apresentações das duas reuniões.
 - **Produtos:** o Raio-X de produto lê a lâmina e mostra cada condição com a página de onde saiu, sem recomendar compra. Comparar produtos é a antiga Renda fixa.
 - **Apresentação com a sua marca, em PDF e em PowerPoint** (primeira e segunda reunião): a Mesa pergunta uma coisa por vez (escritório, corretora, formato de atendimento, pontos fortes, quem é você), pede a sua foto e o logo, e gera as páginas 16:9 em PDF e o mesmo conteúdo em PowerPoint editável, na mesma pasta. O PowerPoint tem visual mais simples que o PDF e abre no PowerPoint, no Google Slides ou importado no Canva. O que você responde fica guardado: na próxima vez já vem preenchido. Depois de gerar, peça as mudanças na conversa e a Mesa refaz os dois arquivos.
@@ -84,8 +84,22 @@ Ao conectar, a Mesa avisa o CaptaMais **quais tarefas você usou** (só os nomes
 - **Uma conversa por rotina:** dentro de uma tarefa, a conversa trata só dela. Para outro assunto, volte ao Início e abra a tarefa certa. Ao voltar ao Início, a conversa vai para o **Histórico** e a tela começa limpa; o botão **Nova interação** faz o mesmo sem sair da tarefa. Voltando à mesma tarefa, a última conversa dela reaparece.
 - **Preenchimento guardado:** o que você escolhe e escreve em cada tarefa fica salvo no seu computador. Na próxima vez já vem preenchido e você só edita o que mudou; confira os dados do cliente antes de enviar.
 - **Suas próprias imagens e ícones:** guarde os arquivos (PNG, JPG, WEBP ou SVG, até 6 MB) em **Documentos › Mesa do Assessor › Minhas imagens** e peça no chat, citando o nome do arquivo ("use a foto escritorio.jpg na página do escritório").
-- Trechos que a Mesa não tem como confirmar saem com **[CONFERIR]** em destaque nas páginas: preencha ou valide antes de usar com o cliente. A Mesa também se recusa a escrever, sem [CONFERIR], frases sobre independência, custo, regulação ou retorno que você não disse.
+- O que a Mesa não consegue confirmar não vai escrito nas páginas: ela deixa o item de fora, mostra a lista do que faltou e pergunta no chat para completar. Ela também se recusa a escrever frases sobre independência, custo, regulação ou retorno que você não disse.
 - Tudo fica em **Documentos › Mesa do Assessor**.
+
+## Rotinas, clientes e mercado
+
+- **Cliente novo, em três caminhos:** *chegar preparado à primeira conversa* (nada a preencher sobre ele), *relatório para a segunda reunião* (você anexa extratos, relatório de performance ou transcrição, e a Mesa monta o resumo de cada documento e a tabela da carteira atual) e *mensagem de pós-reunião*.
+- **Clientes e histórico:** cada entrega concluída fica guardada no seu computador, por cliente, em **Documentos › Mesa do Assessor › Entregas**. O botão **Clientes**, no alto da tela, lista o que você já fez com cada um e abre os arquivos. As rotinas com cliente (segunda reunião, pós-reunião, proposta, follow-up, pré-reunião) partem do que já foi entregue e comparam a carteira atual com a proposta.
+- **Perfil que aprende:** escritório, corretora, foto, logo, nicho, público e método ficam no perfil; o que você preenche nas rotinas já vem preenchido na vez seguinte.
+- **Entrega em uma pasta só:** o PDF, o PowerPoint e o texto de uma rotina ficam juntos na pasta do cliente, com **Abrir a pasta** e **Copiar** (sem botões repetidos).
+- **Primeira reunião de 30 minutos:** roteiro de 30 minutos e apresentação de 10 a 12 páginas, com a pesquisa sobre você feita na internet (se você permitir), imagens da internet com licença livre e, se você ligar, imagens criadas por IA.
+- **Mercado hoje, com menus:** *Analisar uma ação* (completo, múltiplos, balanço e DRE, fatos e teses, ou mensagem ao cliente), *Fato relevante* (fatos recentes dos últimos 3 dias, análise completa, impacto nos números ou mensagem), *Comparar o setor* e *Fundo imobiliário* têm o mesmo desenho: o caminho completo ou só uma parte. O *Raio-X de produto* também analisa ação e fundo imobiliário.
+- **Nova interação:** cada rotina começa uma conversa nova; o botão **Nova interação** guarda a atual no Histórico e começa do zero.
+
+## Imagens por IA (opcional)
+
+A Mesa pode criar imagens originais para as apresentações. Na primeira vez que precisar, abre uma janelinha para você escolher o serviço (**Gemini**, do Google, ou **OpenAI**), ver como pegar a chave e colar. Cada pessoa usa a sua chave, e cada imagem custa poucos centavos na sua conta do serviço. A chave é conferida antes de salvar, fica protegida só neste computador e nunca vai para a conversa. Para trocar ou remover: menu da conta (o botão com o seu nome) › **Imagens por IA (chave)**. Sem chave, a Mesa usa só as imagens livres da internet.
 
 ## Privacidade e segurança
 
@@ -111,7 +125,7 @@ O instalador já deixa tudo pronto: a **Edição Mesa** (o editor de vídeo), o 
 
 Se por algum motivo algo não estiver instalado, ao clicar na tarefa a Mesa mostra **Instalar e continuar** e instala na hora, com o andamento na tela. Só o áudio do vídeo vai ao serviço de transcrição. Música e imagens de apoio pedem chaves próprias, opcionais, que você coloca no arquivo `.env` do editor se quiser usá-las.
 
-Ao clicar na tarefa, a Mesa pergunta **Qual vídeo você quer editar?**. Você marca o vídeo na lista (ou escolhe outro no computador pelo botão azul), confere a seleção e clica em **Concluir e editar**. A Mesa guarda uma cópia em **Documentos › Mesa do Assessor › Videos** e edita a cópia, sem mexer no original. O corte aparece na tela para você aprovar, e **Abrir a Edição Mesa** deixa ajustar na linha do tempo. O Reels sai sempre em vertical (9:16): se o vídeo original for horizontal, a Mesa reenquadra para o rosto de quem fala, sem barras pretas.
+Ao clicar na tarefa, a Mesa pergunta **Qual vídeo você quer editar?**. Você marca o vídeo na lista (ou escolhe outro no computador pelo botão azul), confere a seleção e clica em **Concluir e editar**. A Mesa guarda uma cópia em **Documentos › Mesa do Assessor › Videos** e edita a cópia, sem mexer no original. O corte aparece na tela para você aprovar, com tela cheia e sem as faixas pretas que o vídeo traz, e **Abrir a Edição Mesa** (acima do vídeo) deixa ajustar na linha do tempo. O Reels sai sempre em vertical (9:16): se o vídeo original for horizontal, a Mesa reenquadra para o rosto de quem fala, sem barras pretas.
 
 ## Se algo não funcionar
 
